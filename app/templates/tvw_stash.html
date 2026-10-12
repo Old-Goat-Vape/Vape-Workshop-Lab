@@ -1,0 +1,346 @@
+{% extends "base_public.html" %}
+{% block title %}My Stash | The Vape Workshop Calculator{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw.css') }}">
+
+<div class="tvw-page tvw-stash-page">
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-3">
+    <div>
+      <h1 class="h4 mb-1">My Stash</h1>
+      {% if is_lab_linked %}
+        <p class="small text-secondary mb-0">
+          Quantities are <strong>Lab holdings</strong> — the same stock as in Old Goat Lab. Edits here update your physical library.
+        </p>
+      {% else %}
+        <p class="small text-secondary mb-0">
+          Your personal stash lists flavours you track in TVW. It powers <strong>What Can I Make</strong> (canonical reference match).
+        </p>
+      {% endif %}
+    </div>
+    <div class="d-flex flex-wrap gap-2 w-100 w-md-auto">
+      <a class="btn btn-sm btn-outline-info flex-grow-1 flex-md-grow-0" href="{{ url_for('tvw_recipes.tvw_what_can_i_make') }}">What Can I Make</a>
+      <a class="btn btn-sm btn-outline-light flex-grow-1 flex-md-grow-0" href="{{ url_for('tvw_recipes.tvw_flavours') }}">Browse flavours</a>
+    </div>
+  </div>
+
+  <form class="card card-body shadow-sm mb-3" method="get" action="{{ url_for('tvw_recipes.tvw_stash') }}">
+    <div class="row g-2 align-items-end">
+      <div class="col-12 col-md-6">
+        <label class="form-label small text-secondary mb-0">Search</label>
+        <input class="form-control form-control-sm" name="search" placeholder="Name, brand, or reference #" value="{{ search }}" autocomplete="off">
+      </div>
+      <input type="hidden" name="sort_by" value="{{ sort_by }}">
+      <input type="hidden" name="sort_dir" value="{{ sort_dir }}">
+      <div class="col-6 col-md-3 d-grid">
+        <button type="submit" class="btn btn-sm btn-outline-light">Search</button>
+      </div>
+      <div class="col-6 col-md-3 d-grid">
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('tvw_recipes.tvw_stash') }}">Clear</a>
+      </div>
+    </div>
+  </form>
+
+  <section class="card shadow-sm mb-3">
+    <div class="card-body">
+      <h2 class="h6 mb-2">Quick add</h2>
+      <p class="small text-secondary mb-2">
+        Add a flavour directly here. This uses the same canonical flavour identity as flavour pages and What Can I Make.
+      </p>
+      <div class="row g-2 align-items-end">
+        <div class="col-12 col-lg-7">
+          <label class="form-label small text-secondary mb-0">Flavour</label>
+          <input id="stashQuickAddFlavour" class="form-control form-control-sm" list="stashQuickAddOptions" placeholder="Start typing brand or flavour name">
+          <datalist id="stashQuickAddOptions">
+            {% for opt in quick_add_options %}
+              <option value="{{ opt.brand or 'Unknown' }} — {{ opt.canonical_name }}" data-flavour-id="{{ opt.id }}" data-reference-id="{{ opt.source_flavor_ref_id or '' }}"></option>
+            {% endfor %}
+          </datalist>
+        </div>
+        <div class="col-6 col-lg-2">
+          <label class="form-label small text-secondary mb-0">Qty (ml)</label>
+          <input id="stashQuickAddQty" type="number" step="0.1" min="0" value="10" class="form-control form-control-sm text-end">
+        </div>
+        {% if is_lab_linked %}
+          <div class="col-6 col-lg-3">
+            <label class="form-label small text-secondary mb-0">Fallback Ref # (optional)</label>
+            <input id="stashQuickAddRef" type="number" min="1" class="form-control form-control-sm text-end" placeholder="For unmapped rows">
+          </div>
+        {% endif %}
+        <div class="col-12 d-grid d-md-flex gap-2 mt-1">
+          <button id="stashQuickAddBtn" type="button" class="btn btn-sm btn-outline-warning">Add to stash</button>
+          <span id="stashQuickAddHint" class="small text-secondary align-self-center"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {% macro sort_url(key) -%}
+    {{ url_for(
+      'tvw_recipes.tvw_stash',
+      search=search,
+      sort_by=key,
+      sort_dir=('desc' if sort_by == key and sort_dir == 'asc' else 'asc') if sort_by == key else 'asc'
+    ) }}
+  {%- endmacro %}
+
+  {% macro sort_mark(key) -%}
+    {% if sort_by == key %}
+      <span class="text-warning ms-1">{% if sort_dir == 'desc' %}▼{% else %}▲{% endif %}</span>
+    {% endif %}
+  {%- endmacro %}
+
+  <div class="d-flex justify-content-between align-items-center mb-2 small text-secondary">
+    <span><strong>{{ stash_rows|length }}</strong> line(s) in this view</span>
+  </div>
+
+  <div class="table-responsive rounded border border-secondary shadow-sm d-none d-lg-block">
+    <table class="table table-dark table-sm align-middle mb-0">
+      <thead class="sticky-top">
+        <tr>
+          <th class="bg-dark border-secondary">
+            <a class="text-light text-decoration-none" href="{{ sort_url('name') }}">Name{{ sort_mark('name') }}</a>
+          </th>
+          <th class="d-none d-md-table-cell bg-dark border-secondary">
+            <a class="text-light text-decoration-none" href="{{ sort_url('brand') }}">Manufacturer{{ sort_mark('brand') }}</a>
+          </th>
+          {% if is_lab_linked %}
+            <th class="text-end d-none d-lg-table-cell bg-dark border-secondary">
+              <a class="text-light text-decoration-none" href="{{ sort_url('reference') }}">Ref #{{ sort_mark('reference') }}</a>
+            </th>
+            <th class="text-end d-none d-xl-table-cell bg-dark border-secondary">Lab</th>
+          {% else %}
+            <th class="text-center d-none d-lg-table-cell bg-dark border-secondary">★</th>
+          {% endif %}
+          <th class="text-end bg-dark border-secondary">
+            <a class="text-light text-decoration-none" href="{{ sort_url('quantity') }}">Qty (ml){{ sort_mark('quantity') }}</a>
+          </th>
+          <th class="text-end text-nowrap bg-dark border-secondary">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in stash_rows %}
+          <tr class="tvw-stash-row"
+              data-flavour-id="{{ row.flavour_id or '' }}"
+              data-reference-id="{{ row.reference_id or '' }}"
+              data-tvw-mapped="{{ '1' if row.tvw_mapped else '0' }}"
+              data-lab-linked="{{ '1' if is_lab_linked else '0' }}">
+            <td>
+              <span class="d-md-none text-secondary small">{{ row.brand }} · </span>
+              {% if row.flavour_id %}
+                <a class="fw-semibold text-light" href="{{ url_for('tvw_recipes.tvw_flavour_detail', flavour_id=row.flavour_id) }}">{{ row.display_name }}</a>
+              {% else %}
+                <span class="fw-semibold">{{ row.display_name }}</span>
+                <span class="badge text-bg-secondary ms-1">no TVW page</span>
+              {% endif %}
+            </td>
+            <td class="text-secondary d-none d-md-table-cell">{{ row.brand }}</td>
+            {% if is_lab_linked %}
+              <td class="text-end font-monospace small d-none d-lg-table-cell">{{ row.reference_id }}</td>
+              <td class="text-end small d-none d-xl-table-cell">{{ row.lab_status or "—" }}</td>
+            {% else %}
+              <td class="text-center d-none d-lg-table-cell">
+                <input type="checkbox" class="form-check-input js-stash-fav" data-flavour-id="{{ row.flavour_id }}" {% if row.is_favorite %}checked{% endif %} aria-label="Favorite">
+              </td>
+            {% endif %}
+            <td class="text-end p-1" style="max-width: 7rem;">
+              <input type="number" step="0.1" min="0" class="form-control form-control-sm text-end js-stash-qty" value="{{ '%.2f'|format(row.quantity_ml|float) }}" aria-label="Quantity ml">
+            </td>
+            <td class="text-end p-1">
+              <div class="d-flex flex-wrap gap-1 justify-content-end">
+                <button type="button" class="btn btn-xs btn-outline-success px-2 py-1 js-stash-save">Save</button>
+                <button type="button" class="btn btn-xs btn-outline-danger px-2 py-1 js-stash-remove">Remove</button>
+              </div>
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="{{ 6 if is_lab_linked else 5 }}" class="text-secondary py-4 text-center">
+              Nothing in stash yet.
+              <a class="text-info" href="{{ url_for('tvw_recipes.tvw_flavours') }}">Add from the flavour catalogue</a>.
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="d-lg-none vstack gap-2">
+    {% for row in stash_rows %}
+      <article class="card shadow-sm tvw-stash-row"
+          data-flavour-id="{{ row.flavour_id or '' }}"
+          data-reference-id="{{ row.reference_id or '' }}"
+          data-tvw-mapped="{{ '1' if row.tvw_mapped else '0' }}"
+          data-lab-linked="{{ '1' if is_lab_linked else '0' }}">
+        <div class="card-body py-2">
+          <div class="d-flex justify-content-between gap-2">
+            <div>
+              {% if row.flavour_id %}
+                <a class="fw-semibold text-light text-decoration-none" href="{{ url_for('tvw_recipes.tvw_flavour_detail', flavour_id=row.flavour_id) }}">{{ row.display_name }}</a>
+              {% else %}
+                <span class="fw-semibold">{{ row.display_name }}</span>
+                <span class="badge text-bg-secondary ms-1">no TVW page</span>
+              {% endif %}
+              <div class="small text-secondary">{{ row.brand }}</div>
+              {% if is_lab_linked %}
+                <div class="small text-secondary">Ref #{{ row.reference_id }} · {{ row.lab_status or "—" }}</div>
+              {% endif %}
+            </div>
+            {% if not is_lab_linked %}
+              <div class="form-check mt-1">
+                <input type="checkbox" class="form-check-input js-stash-fav" data-flavour-id="{{ row.flavour_id }}" {% if row.is_favorite %}checked{% endif %} aria-label="Favorite">
+                <label class="form-check-label small text-secondary">Fav</label>
+              </div>
+            {% endif %}
+          </div>
+          <div class="d-flex gap-2 align-items-center mt-2">
+            <input type="number" step="0.1" min="0" class="form-control form-control-sm text-end js-stash-qty" value="{{ '%.2f'|format(row.quantity_ml|float) }}" aria-label="Quantity ml">
+            <button type="button" class="btn btn-xs btn-outline-success px-2 py-1 js-stash-save">Save</button>
+            <button type="button" class="btn btn-xs btn-outline-danger px-2 py-1 js-stash-remove">Remove</button>
+          </div>
+        </div>
+      </article>
+    {% else %}
+      <div class="card"><div class="card-body small text-secondary text-center">Nothing in stash yet. <a class="text-info" href="{{ url_for('tvw_recipes.tvw_flavours') }}">Add from the flavour catalogue</a>.</div></div>
+    {% endfor %}
+  </div>
+
+  <p class="small text-secondary mt-3 mb-0">
+    {% if is_lab_linked %}
+      <strong>Remove</strong> archives the Lab line (same as clearing that holding). Unmapped catalogue rows can still be edited by reference id.
+    {% else %}
+      <strong>Favorite</strong> is saved to your account (optional). Duplicate legacy rows are merged when you add or save.
+    {% endif %}
+  </p>
+</div>
+
+<style>
+  .tvw-stash-page .table thead.sticky-top th { box-shadow: inset 0 -1px 0 var(--bs-secondary); z-index: 2; }
+  .btn-xs { font-size: 0.78rem; line-height: 1.2; }
+</style>
+
+<script>
+(() => {
+  const quickInput = document.getElementById("stashQuickAddFlavour");
+  const quickQty = document.getElementById("stashQuickAddQty");
+  const quickBtn = document.getElementById("stashQuickAddBtn");
+  const quickHint = document.getElementById("stashQuickAddHint");
+  const quickRef = document.getElementById("stashQuickAddRef");
+  const datalist = document.getElementById("stashQuickAddOptions");
+
+  async function parseJson(res) {
+    try { return await res.json(); } catch (_) { return {}; }
+  }
+
+  function resolveQuickAddIds() {
+    const val = (quickInput?.value || "").trim();
+    if (!val || !datalist) return { flavourId: 0, referenceId: 0 };
+    const opt = [...datalist.options].find((o) => o.value === val);
+    if (!opt) return { flavourId: 0, referenceId: 0 };
+    return {
+      flavourId: parseInt(opt.dataset.flavourId || "0", 10) || 0,
+      referenceId: parseInt(opt.dataset.referenceId || "0", 10) || 0,
+    };
+  }
+
+  quickBtn?.addEventListener("click", async () => {
+    const qty = parseFloat(quickQty?.value || "0");
+    const isLab = {{ "true" if is_lab_linked else "false" }};
+    const { flavourId, referenceId } = resolveQuickAddIds();
+    const fallbackRef = parseInt(quickRef?.value || "0", 10) || 0;
+    let body = {};
+    if (isLab) {
+      const rid = referenceId || fallbackRef;
+      if (flavourId) body = { flavour_id: flavourId, quantity_ml: qty };
+      else if (rid) body = { reference_id: rid, quantity_ml: qty };
+      else {
+        quickHint.textContent = "Pick a flavour or enter a fallback reference id.";
+        return;
+      }
+    } else {
+      if (!flavourId) {
+        quickHint.textContent = "Pick a valid flavour from the list.";
+        return;
+      }
+      body = { flavour_id: flavourId, quantity_ml: qty, is_favorite: false };
+    }
+    quickBtn.disabled = true;
+    quickHint.textContent = "";
+    const res = await fetch("/api/stash", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    quickBtn.disabled = false;
+    if (!res.ok) {
+      const j = await parseJson(res);
+      quickHint.textContent = j.message || "Could not add to stash.";
+      return;
+    }
+    quickHint.textContent = "Added.";
+    window.location.reload();
+  });
+
+  document.querySelectorAll(".tvw-stash-row").forEach((tr) => {
+    const fav = tr.querySelector(".js-stash-fav");
+
+    tr.querySelector(".js-stash-save")?.addEventListener("click", async () => {
+      const qty = parseFloat(tr.querySelector(".js-stash-qty")?.value || "0");
+      const fid = parseInt(tr.dataset.flavourId || "0", 10) || 0;
+      const rid = parseInt(tr.dataset.referenceId || "0", 10) || 0;
+      const lab = tr.dataset.labLinked === "1";
+      let body;
+      const url = "/api/stash";
+      if (lab) {
+        body = fid ? { flavour_id: fid, quantity_ml: qty } : { reference_id: rid, quantity_ml: qty };
+      } else {
+        body = { flavour_id: fid, quantity_ml: qty };
+        if (fav) body.is_favorite = fav.checked;
+      }
+      const res = await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const j = await parseJson(res);
+        alert(j.message || "Could not save");
+        return;
+      }
+      tr.querySelector(".js-stash-save").textContent = "Saved";
+      setTimeout(() => { tr.querySelector(".js-stash-save").textContent = "Save"; }, 800);
+    });
+
+    tr.querySelector(".js-stash-remove")?.addEventListener("click", async () => {
+      if (!confirm("Remove this line from your stash?")) return;
+      const fid = parseInt(tr.dataset.flavourId || "0", 10) || 0;
+      const rid = parseInt(tr.dataset.referenceId || "0", 10) || 0;
+      const lab = tr.dataset.labLinked === "1";
+      const url = lab && rid && !fid
+        ? `/api/stash/reference/${rid}`
+        : `/api/stash/${fid}`;
+      const res = await fetch(url, { method: "DELETE" });
+      if (!res.ok) {
+        const j = await parseJson(res);
+        alert(j.message || "Could not remove");
+        return;
+      }
+      window.location.reload();
+    });
+
+    fav?.addEventListener("change", async () => {
+      const fid = parseInt(fav.dataset.flavourId || "0", 10);
+      const res = await fetch("/api/stash", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flavour_id: fid, is_favorite: fav.checked }),
+      });
+      if (!res.ok) {
+        fav.checked = !fav.checked;
+        const j = await parseJson(res);
+        alert(j.message || "Could not update favorite");
+      }
+    });
+  });
+})();
+</script>
+{% endblock %}

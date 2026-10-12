@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Mix for {{ job_recipe.job_name }} · Lab{% endblock %}
+{% block content %}
+<div class="mb-4">
+  <a href="{{ url_for('production_jobs.detail', job_id=job_id, tab='recipes') }}" class="small text-secondary text-decoration-none">← {{ job_recipe.job_name }}</a>
+  <h1 class="h3 mb-1 mt-1">Mix for this job</h1>
+  <div class="text-secondary">
+    <span style="color:#5ec8d8;">Production Job: {{ job_recipe.job_name }}</span>
+    · {{ job_recipe.recipe_name }} · v{{ job_recipe.version_number }}
+  </div>
+</div>
+
+<div class="alert border-0 mb-3" style="background:#1a2a1a; color:#9fdf9f; max-width:520px;" role="status">
+  <div class="small text-uppercase" style="letter-spacing:.06em; opacity:.8;">Producing as</div>
+  <div class="fs-5 fw-semibold text-light">{{ producing_as }}</div>
+  <div class="small mt-1" style="opacity:.75;">Signed-in account only. Sign out to produce as someone else.</div>
+</div>
+
+<div class="pj-board p-3 p-md-4" style="background:#121212; border:1px solid #2a2a2a; border-radius:10px; max-width:520px;">
+  <div class="small text-secondary mb-3">
+    Bottle size: <strong class="text-light">{{ '%.0f'|format(bottle_size_ml) }} ml</strong><br>
+    Remaining requirement: <strong class="text-warning">{{ '%.0f'|format(remaining_bottles) }}</strong> bottles
+  </div>
+  <form method="post" class="vstack gap-3">
+    <div>
+      <div class="form-label small text-secondary">Production amount</div>
+      <div class="d-grid gap-2">
+        <label class="btn btn-outline-secondary text-start">
+          <input type="radio" name="bottle_mode" value="1" class="form-check-input me-2" checked>
+          1 bottle = {{ '%.0f'|format(bottle_size_ml) }} ml
+        </label>
+        <label class="btn btn-outline-secondary text-start">
+          <input type="radio" name="bottle_mode" value="5" class="form-check-input me-2">
+          5 bottles = {{ '%.0f'|format(bottle_size_ml * 5) }} ml
+        </label>
+        <label class="btn btn-outline-secondary text-start">
+          <input type="radio" name="bottle_mode" value="10" class="form-check-input me-2">
+          10 bottles = {{ '%.0f'|format(bottle_size_ml * 10) }} ml
+        </label>
+        <label class="btn btn-outline-secondary text-start">
+          <input type="radio" name="bottle_mode" value="remaining" class="form-check-input me-2">
+          Remaining requirement = {{ '%.0f'|format(remaining_bottles * bottle_size_ml) }} ml
+        </label>
+        <label class="btn btn-outline-secondary text-start">
+          <input type="radio" name="bottle_mode" value="custom" class="form-check-input me-2">
+          Custom bottles
+          <input type="number" step="any" min="0.1" name="custom_bottles" class="form-control form-control-sm bg-black border-secondary mt-2" placeholder="e.g. 5" style="max-width:140px;">
+        </label>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-warning fw-semibold">Start production batch</button>
+    <div class="small text-secondary">Opens Workshop Guided Mix with this Production Job attached. Personal mixes launched from the recipe page will not count.</div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,17 @@
+# Copy to .env next to app.py. Do not commit .env to git.
+# Lines are KEY=VALUE. # starts a comment. Quotes optional on values.
+
+SECRET_KEY=replace-with-long-random-string
+# Leave blank to use local app data (recommended on Windows / OneDrive):
+#   %LOCALAPPDATA%\TheVapeWorkshopCalculator\tvw_calculator.db
+DATABASE_PATH=
+# Optional override for the local data directory (parent of tvw_calculator.db)
+# TVW_LOCAL_DATA_DIR=
+# Disable Werkzeug reloader by default (prevents duplicate SQLite connections)
+FLASK_USE_RELOADER=0
+TVW_ENABLE_LAB_MODULES=1
+FLASK_ENV=production
+# APP_ENV is informational only unless you add code to read it
+# APP_ENV=production
+PYTHONUTF8=1
+# TVW_OLD_GOAT_PASSWORD=

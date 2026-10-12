@@ -1,0 +1,123 @@
+{# Community dashboard discovery — featured recipe + tabbed collection #}
+{% from "partials/tvw_dashboard_illustrations.html" import discovery_featured_motif %}
+
+{% macro discover_meta_items(recipe, include_rating=true) -%}
+  {%- set parts = [] -%}
+  {%- if recipe.status -%}{%- set _ = parts.append(recipe.status|replace('_', ' ')) -%}{%- endif -%}
+  {%- if recipe.primary_tag -%}{%- set _ = parts.append(recipe.primary_tag) -%}{%- endif -%}
+  {%- if recipe.current_total_flavour_pct is not none -%}{%- set _ = parts.append("%.1f"|format(recipe.current_total_flavour_pct|float) ~ "% flavour") -%}{%- endif -%}
+  {%- if include_rating and recipe.recipe_rating_count and recipe.avg_recipe_rating is not none -%}{%- set _ = parts.append("Rated " ~ ("%.1f"|format(recipe.avg_recipe_rating|float)) ~ " (" ~ recipe.recipe_rating_count ~ ")") -%}{%- endif -%}
+  {%- if recipe.updated_at -%}{%- set _ = parts.append("Updated " ~ recipe.updated_at[:10]) -%}{%- endif -%}
+  {{ parts|join(" · ") }}
+{%- endmacro %}
+
+{% macro discover_recipe_card(recipe) -%}
+  <article class="tvw-discover-card">
+    <div class="tvw-discover-card-main">
+      <h3 class="tvw-discover-card-title">
+        <a href="{{ recipe.detail_href }}" class="tvw-discover-card-title-link">{{ recipe.name }}</a>
+      </h3>
+      <p class="tvw-discover-card-author">by {{ recipe.owner_username }}</p>
+      {% if recipe.context_label %}
+        <span class="tvw-discover-reason">{{ recipe.context_label }}</span>
+      {% endif %}
+      {% if recipe.primary_tag %}
+        <p class="tvw-discover-card-category">{{ recipe.primary_tag }}</p>
+      {% elif recipe.status %}
+        <p class="tvw-discover-card-category">{{ recipe.status|replace('_', ' ') }}</p>
+      {% endif %}
+      <div class="tvw-discover-card-meta">
+        {{ discover_meta_items(recipe, include_rating=recipe.show_rating_meta|default(false)) }}
+      </div>
+    </div>
+    <div class="tvw-discover-card-actions">
+      <a class="tvw-discover-btn tvw-discover-btn--primary" href="{{ recipe.detail_href }}">View recipe</a>
+      {% if recipe.can_mix and recipe.mix_href %}
+        <a class="tvw-discover-btn tvw-discover-btn--mix" href="{{ recipe.mix_href }}">Mix</a>
+      {% endif %}
+    </div>
+  </article>
+{%- endmacro %}
+
+<section class="tvw-discover" aria-labelledby="tvwDiscoverHeading">
+  <header class="tvw-discover-head">
+    <h2 id="tvwDiscoverHeading" class="tvw-discover-title">Discover recipes</h2>
+    <p class="tvw-discover-lead">See what the community has been creating.</p>
+  </header>
+
+  {% if not has_discovery %}
+    <div class="tvw-discover-empty alert alert-secondary mb-0">
+      Nothing to discover yet under your visibility rules. Try creating a recipe or check back after more public recipes are shared.
+    </div>
+  {% else %}
+  <div class="tvw-discover-layout">
+    {% if discovery_featured %}
+    <article class="tvw-discover-featured">
+      <div class="tvw-discover-featured-art">
+        {{ discovery_featured_motif() }}
+      </div>
+      <div class="tvw-discover-featured-body">
+        <span class="tvw-discover-badge">{{ discovery_featured_badge }}</span>
+        <h3 class="tvw-discover-featured-name">
+          <a href="{{ discovery_featured.detail_href }}" class="tvw-discover-featured-name-link">
+            {{ discovery_featured.name }}
+          </a>
+        </h3>
+        <p class="tvw-discover-featured-author">by {{ discovery_featured.owner_username }}</p>
+        {% if discovery_featured.version_notes %}
+          <p class="tvw-discover-featured-desc">{{ discovery_featured.version_notes }}</p>
+        {% endif %}
+        <div class="tvw-discover-featured-meta">
+          {{ discover_meta_items(discovery_featured, include_rating=discovery_featured.show_rating_meta|default(false)) }}
+        </div>
+        <div class="tvw-discover-featured-actions">
+          <a class="tvw-discover-btn tvw-discover-btn--primary" href="{{ discovery_featured.detail_href }}">View recipe</a>
+          {% if discovery_featured.can_mix and discovery_featured.mix_href %}
+            <a class="tvw-discover-btn tvw-discover-btn--mix" href="{{ discovery_featured.mix_href }}">Mix this recipe</a>
+          {% endif %}
+        </div>
+      </div>
+    </article>
+    {% endif %}
+
+    <div class="tvw-discover-collection{% if not discovery_featured %} tvw-discover-collection--wide{% endif %}">
+      <div class="tvw-discover-tabs" data-tvw-discover-tabs>
+        <div class="tvw-discover-tablist-wrap">
+          <div class="tvw-discover-tablist" role="tablist" aria-label="Recipe collections">
+            {% for tab in discovery_tabs %}
+              <button type="button"
+                      class="tvw-discover-tab{% if loop.first %} is-active{% endif %}"
+                      role="tab"
+                      id="tvw-discover-tab-{{ tab.id }}"
+                      aria-controls="tvw-discover-panel-{{ tab.id }}"
+                      aria-selected="{{ 'true' if loop.first else 'false' }}"
+                      tabindex="{{ '0' if loop.first else '-1' }}">
+                {{ tab.label }}
+              </button>
+            {% endfor %}
+          </div>
+        </div>
+
+        {% for tab in discovery_tabs %}
+          <div class="tvw-discover-panel{% if loop.first %} is-active{% endif %}"
+               role="tabpanel"
+               id="tvw-discover-panel-{{ tab.id }}"
+               aria-labelledby="tvw-discover-tab-{{ tab.id }}"
+               {% if not loop.first %}hidden{% endif %}>
+            <div class="tvw-discover-panel-head">
+              <a class="tvw-discover-see-all" href="{{ tab.see_all_href }}">{{ tab.see_all_text }}</a>
+            </div>
+            <div class="tvw-discover-card-grid">
+              {% for recipe in tab.recipes %}
+                {{ discover_recipe_card(recipe) }}
+              {% else %}
+                <p class="tvw-discover-panel-empty">No recipes in this collection yet.</p>
+              {% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</section>

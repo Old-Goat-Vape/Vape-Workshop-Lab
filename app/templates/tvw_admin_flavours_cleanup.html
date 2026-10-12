@@ -1,0 +1,107 @@
+{% extends "base_public.html" %}
+{% block title %}Flavour identity cleanup | TVW Admin{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw.css') }}">
+<div class="tvw-page">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h1 class="h4 mb-0">Flavour identity cleanup</h1>
+    <div class="d-flex gap-2 flex-wrap">
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.flavour_moderation') }}">Flavour list</a>
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.flavour_merge_pick') }}">Merge by ID</a>
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.dashboard') }}">Dashboard</a>
+    </div>
+  </div>
+
+  <p class="small text-secondary">Find duplicate or suspicious catalogue rows, then open a side-by-side merge. Merges are soft (source row kept, linked data moved); no hard delete.</p>
+
+  <form class="card card-body shadow-sm mb-3" method="get">
+    <div class="row g-2">
+      <div class="col-12 col-md-3">
+        <input class="form-control form-control-sm" name="search" value="{{ search }}" placeholder="Name or brand">
+      </div>
+      <div class="col-12 col-md-3">
+        <select class="form-select form-select-sm" name="manufacturer">
+          <option value="">All manufacturers</option>
+          {% for m in manufacturers %}<option value="{{ m }}" {% if manufacturer == m %}selected{% endif %}>{{ m }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-4">
+        <select class="form-select form-select-sm" name="view">
+          <option value="" {% if view == '' %}selected{% endif %}>All rows (filter below ignores some)</option>
+          <option value="duplicates" {% if view == 'duplicates' %}selected{% endif %}>Likely duplicates (same brand+name)</option>
+          <option value="suspicious" {% if view == 'suspicious' %}selected{% endif %}>Suspicious (empty or tiny name)</option>
+          <option value="merged" {% if view == 'merged' %}selected{% endif %}>Merged into another</option>
+          <option value="hidden" {% if view == 'hidden' %}selected{% endif %}>Hidden</option>
+          <option value="invalid" {% if view == 'invalid' %}selected{% endif %}>Invalid flag</option>
+          <option value="active" {% if view == 'active' %}selected{% endif %}>Active canonical only</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-1 d-grid"><button class="btn btn-sm btn-outline-light">Filter</button></div>
+      <div class="col-6 col-md-1 d-grid"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('tvw_admin.flavour_identity_cleanup') }}">Reset</a></div>
+    </div>
+  </form>
+
+  <div class="small text-secondary mb-2">{{ total }} row(s)</div>
+
+  <div class="table-responsive">
+    <table class="table table-dark table-sm align-middle">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Brand / name</th>
+          <th>Ref</th>
+          <th>Flags</th>
+          <th>Dup grp</th>
+          <th>Merge</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr class="{% if row.suspicious %}table-warning{% endif %}">
+            <td>{{ row.id }}</td>
+            <td>
+              <div>{{ row.brand }} — {{ row.canonical_name }}</div>
+              <div class="small text-secondary">{{ row.category or "—" }} · {{ row.moderation_status }}</div>
+              {% if row.merged_into_flavour_id %}
+                <div class="small text-info">→ merged_into #{{ row.merged_into_flavour_id }}</div>
+              {% endif %}
+            </td>
+            <td class="small">{{ row.source_flavor_ref_id or "—" }}</td>
+            <td class="small">
+              {% if row.is_hidden %}<span class="badge text-bg-secondary">hidden</span>{% endif %}
+              {% if row.is_invalid %}<span class="badge text-bg-warning">invalid</span>{% endif %}
+              {% if row.suspicious %}<span class="badge text-bg-danger">suspicious</span>{% endif %}
+            </td>
+            <td>{% if row.dup_group_size > 1 %}<span class="badge text-bg-info">{{ row.dup_group_size }}</span>{% else %}—{% endif %}</td>
+            <td>
+              <form class="d-flex gap-1 align-items-center flex-wrap" method="get" action="{{ url_for('tvw_admin.flavour_merge_pick') }}">
+                <input type="hidden" name="source" value="{{ row.id }}">
+                <input class="form-control form-control-sm" name="target" type="number" min="1" placeholder="Target id" style="width:6rem" required>
+                <button class="btn btn-sm btn-outline-light" type="submit">Compare</button>
+              </form>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="6" class="text-secondary">No rows for this filter.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if total_pages > 1 %}
+    <div class="d-flex gap-2 mt-3">
+      {% if page > 1 %}
+        <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.flavour_identity_cleanup', search=search, manufacturer=manufacturer, view=view, page=page-1) }}">Prev</a>
+      {% endif %}
+      <span class="small text-secondary align-self-center">Page {{ page }} / {{ total_pages }}</span>
+      {% if page < total_pages %}
+        <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.flavour_identity_cleanup', search=search, manufacturer=manufacturer, view=view, page=page+1) }}">Next</a>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {% if not can_merge %}
+    <p class="small text-secondary mt-3 mb-0">Merge actions require Master or Old Goat. You can still review and use hide/invalid on the main flavour list.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base_public.html" %}
+{% block title %}Flavour merge | TVW Admin{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw.css') }}">
+<div class="tvw-page">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h1 class="h4 mb-0">Merge two flavour IDs</h1>
+    <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.flavour_identity_cleanup') }}">Cleanup list</a>
+  </div>
+  <p class="small text-secondary">Source is merged <strong>into</strong> target. Recipe lines use <code>flavor_reference</code> ids linked on each row.</p>
+  <form class="card card-body shadow-sm" method="get" action="{{ url_for('tvw_admin.flavour_merge_pick') }}">
+    <div class="row g-2 align-items-end">
+      <div class="col-6 col-md-3">
+        <label class="form-label small">Source catalogue id (duplicate)</label>
+        <input class="form-control form-control-sm" name="source" type="number" min="1" required>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small">Target catalogue id (keep)</label>
+        <input class="form-control form-control-sm" name="target" type="number" min="1" required>
+      </div>
+      <div class="col-12 col-md-3 d-grid">
+        <button class="btn btn-sm btn-outline-light" type="submit">Open comparison</button>
+      </div>
+    </div>
+  </form>
+  {% if not can_merge %}
+    <p class="small text-secondary mt-3 mb-0">Executing a merge requires Master or Old Goat.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,44 @@
+# Local env & secrets
+.env
+.env.*
+!.env.example
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+*.sqlite-shm
+*.sqlite-wal
+*.sqbpro
+instance/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Logs / temp / backups
+logs/
+*.log
+*.tmp
+*.swp
+*.bak
+*.backup
+backup/
+backups/
+*_backup.db
+
+# Editor
+.vscode/
+.idea/

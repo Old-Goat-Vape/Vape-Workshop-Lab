@@ -1,0 +1,99 @@
+{% extends "base_public.html" %}
+{% block title %}Mix hub · sessions | The Vape Workshop Calculator{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw.css') }}">
+
+<div class="tvw-page">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-1">Mix hub</h1>
+      <p class="small text-secondary mb-0">
+        <strong>Quick mix</strong> lives on each recipe page (instant totals).
+        <strong>Guided mix</strong> saves pour steps you can resume here. Same batch settings carry over when you start from the recipe.
+      </p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_recipe_library') }}">Recipe library</a>
+    </div>
+  </div>
+
+  <section class="card shadow-sm">
+    <div class="card-body p-0">
+      <div class="p-3 border-bottom border-secondary">
+        <h2 class="h6 mb-0">Guided mix sessions</h2>
+        <p class="small text-secondary mb-0 mt-1">Resume in-progress runs or review completed checklists.</p>
+      </div>
+      {% if sessions %}
+        <div class="table-responsive d-none d-md-block">
+          <table class="table table-dark table-sm align-middle mb-0">
+            <thead>
+              <tr class="text-secondary small">
+                <th>Recipe</th>
+                <th>Version</th>
+                <th class="text-end">Batch</th>
+                <th class="text-end">Nic</th>
+                <th>PG/VG</th>
+                <th>Started</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in sessions %}
+                <tr>
+                  <td class="fw-semibold">{{ row.recipe_name or ('#' ~ row.recipe_id) }}</td>
+                  <td>v{{ row.version_number }}</td>
+                  <td class="text-end">{{ row.target_ml|int }} ml</td>
+                  <td class="text-end">{{ row.target_nic }} mg/ml</td>
+                  <td class="small">{{ row.target_pgvg or '—' }}</td>
+                  <td class="small text-secondary">{{row.created_at}}</td>
+                  <td>
+                    {% if row.in_progress %}
+                      <span class="badge text-bg-warning text-dark">In progress · {{ row.open_steps }} left</span>
+                    {% else %}
+                      <span class="badge text-bg-success">Completed</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-end">
+                    {% if row.in_progress %}
+                      <a class="btn btn-sm btn-warning" href="{{ url_for('tvw_recipes.tvw_guided_mix_session', session_id=row.id) }}">Resume</a>
+                    {% else %}
+                      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_guided_mix_session', session_id=row.id) }}">Review</a>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="d-md-none vstack gap-2 p-3">
+          {% for row in sessions %}
+            <div class="card bg-body-secondary border-secondary">
+              <div class="card-body py-3 small">
+                <div class="fw-semibold">{{ row.recipe_name or ('#' ~ row.recipe_id) }} · v{{ row.version_number }}</div>
+                <div class="text-secondary mt-1">{{ row.target_ml|int }} ml · {{ row.target_nic }} mg/ml · {{ row.target_pgvg or 'PG/VG' }}</div>
+                <div class="text-secondary mt-1">{{ row.created_at }}</div>
+                <div class="mt-2 d-flex justify-content-between align-items-center gap-2">
+                  {% if row.in_progress %}
+                    <span class="badge text-bg-warning text-dark">{{ row.open_steps }} steps left</span>
+                    <a class="btn btn-sm btn-warning" href="{{ url_for('tvw_recipes.tvw_guided_mix_session', session_id=row.id) }}">Resume</a>
+                  {% else %}
+                    <span class="badge text-bg-success">Completed</span>
+                    <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_guided_mix_session', session_id=row.id) }}">Review</a>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="p-3">
+          <p class="text-secondary small mb-2">No guided sessions yet.</p>
+          <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_recipe_library') }}">Pick a recipe</a>
+          <span class="text-secondary small ms-2">→ open it → <strong>Mix</strong> → Guided mix.</span>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}

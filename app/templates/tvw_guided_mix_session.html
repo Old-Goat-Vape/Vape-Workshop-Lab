@@ -1,0 +1,4081 @@
+{% extends "base_public.html" %}
+
+{% block title %}{{ bundle.recipe_name or recipe.name }} · mix{% endblock %}
+
+{% block content %}
+
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw.css') }}">
+
+<script>document.body.classList.add("tvw-bench-mode");</script>
+
+
+
+{% set prog = bundle.progress %}
+
+{% set rslug = recipe.slug or recipe.id %}
+
+{% set pv = (bundle.target_pgvg or '30/70').split('/') %}
+
+{% set hp = pv[0] if pv|length > 0 else '30' %}
+
+{% set hv = pv[1] if pv|length > 1 else '70' %}
+
+{% set mix_again_href = url_for('tvw_recipes.tvw_recipe_detail', slug=rslug) ~ '?version_id=' ~ bundle.recipe_version_id ~ '&target_ml=' ~ bundle.target_ml ~ '&target_nic_mg_ml=' ~ bundle.target_nic ~ '&pg_ratio=' ~ hp ~ '&vg_ratio=' ~ hv ~ '&nic_base_mg_ml=' ~ (bundle.nic_base_mg_ml|int) ~ '&nicotine_carrier=' ~ bundle.nicotine_carrier ~ '#mix-card' %}
+
+
+
+<div class="tvw-workstation" id="guidedRoot"
+
+     data-session-id="{{ session_id }}"
+
+     data-batch-ml="{{ (bundle.batch_size_ml or bundle.target_ml)|int }}"
+
+     data-recipe-name="{{ bundle.recipe_name or recipe.name }}"
+
+     data-version="v{{ bundle.version_number or '?' }}"
+
+     data-target-nic="{{ bundle.target_nic }}"
+
+     data-pgvg="{{ bundle.target_pgvg or '30/70' }}">
+
+
+
+  <header class="tvw-ws-header">
+
+    <div class="tvw-ws-header-main">
+
+      <a class="tvw-ws-leave" href="{{ url_for('tvw_community.community_home') }}" id="leaveBench">← Dashboard</a>
+
+      <span class="tvw-ws-kicker">Guided mix</span>
+
+      <h1 class="tvw-ws-recipe" id="wsRecipeName">{{ bundle.recipe_name or recipe.name }}</h1>
+
+      <span class="tvw-ws-version" id="wsVersion">v{{ bundle.version_number or '?' }}</span>
+
+    </div>
+
+    <div class="tvw-ws-telemetry" aria-label="Session status">
+
+      <span class="tvw-ws-led" id="roleChip">—</span>
+
+      <span class="tvw-ws-counter" id="focusStepBadge">—</span>
+
+      <span class="tvw-ws-batch" id="batchReadout">{{ bundle.target_ml|int }} ml</span>
+
+    </div>
+
+  </header>
+
+  {% if bundle.production_job %}
+  <div class="alert mb-0 rounded-0 border-0 text-center py-2" style="background:#0d3a45; color:#7fe0ef; border-bottom:1px solid #1a5a68 !important;" role="status">
+    <strong>Production Job: {{ bundle.production_job.job_name }}</strong>
+    · {{ bundle.production_job.recipe_name }} · Batch for this job
+    {% if lab_bridge_enabled and bundle.production_job.production_job_id %}
+    · <a href="{{ url_for('production_jobs.detail', job_id=bundle.production_job.production_job_id) }}" style="color:#ffb86b;">Open job</a>
+    {% endif %}
+    {% if lab_bridge_enabled and bundle.production_job.batch_status in ['in_progress', 'planned'] %}
+    <form method="post" action="{{ url_for('production_jobs.cancel_session_batch', session_id=session_id) }}" class="d-inline ms-2"
+          onsubmit="return confirm('Cancel this production batch? It will not count toward the job, inventory, or production pay.');">
+      <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">Cancel production batch</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="tvw-ws-body tvw-ws-bench-layout">
+
+    <aside id="usedPanel" class="tvw-ws-panel tvw-ws-used" aria-label="Used bottles left side"></aside>
+
+    <section class="tvw-ws-panel tvw-ws-face tvw-step-add-ingredient" id="focusCard" aria-live="polite">
+
+      <div class="tvw-ws-center-meta">
+
+        <h2 class="tvw-ws-center-recipe" id="centerRecipeName">{{ bundle.recipe_name or recipe.name }}</h2>
+
+        <p class="tvw-ws-center-batch" id="centerBatchMeta">{{ bundle.target_ml|int }} ml batch</p>
+
+        <p class="tvw-ws-center-contents" id="centerBottleContents">Batch progress: 0.00 ml of {{ bundle.target_ml|int }} ml</p>
+
+        <div class="tvw-ws-fill-track" aria-hidden="true"><div class="tvw-ws-fill-fill" id="centerFillBar" style="width:0%"></div></div>
+
+      </div>
+
+      <div class="tvw-ws-face-head">
+
+        <p class="tvw-ws-face-role" id="focusRole"></p>
+
+        <h2 class="tvw-ws-face-ingredient" id="focusIngredient"></h2>
+
+        <p class="tvw-ws-face-brand" id="focusBrand"></p>
+
+        <p class="tvw-ws-face-phase" id="workflowPhase"></p>
+
+        <div class="tvw-ws-pour-equiv d-none" id="pourEquivBlock" aria-live="polite">
+
+          <p class="tvw-ws-pour-equiv-line" id="pourTargetWeight"></p>
+
+          <p class="tvw-ws-pour-equiv-line" id="pourEquivVolume"></p>
+
+          <p class="tvw-ws-pour-equiv-note" id="pourDensityNote"></p>
+
+        </div>
+
+        <p class="tvw-ws-face-title visually-hidden" id="focusTitle">…</p>
+
+      </div>
+
+
+
+      <div class="tvw-ws-lcd" id="scaleHero">
+
+        <div class="tvw-ws-lcd-cell tvw-ws-lcd-target">
+
+          <span class="tvw-ws-lcd-label" id="targetScaleLabel">Target</span>
+
+          <div class="tvw-ws-lcd-value">
+
+            <span class="tvw-ws-readout" id="focusG">0.00</span><span class="tvw-ws-unit">g</span>
+
+          </div>
+
+        </div>
+
+        <div class="tvw-ws-lcd-cell tvw-ws-lcd-live" id="scaleLiveBlock">
+
+          <span class="tvw-ws-lcd-label">Scale</span>
+
+          <div class="tvw-ws-lcd-value">
+
+            <span class="tvw-ws-readout" id="focusMeasuredDisplay">—</span><span class="tvw-ws-unit">g</span>
+
+          </div>
+
+        </div>
+
+        <div class="tvw-ws-delta" id="deltaReadout"></div>
+
+      </div>
+
+
+
+      <p class="tvw-ws-pct" id="focusPctWrap"><span id="focusPct"></span></p>
+
+      <p class="tvw-ws-face-why" id="focusWhy"></p>
+
+      <p class="tvw-ws-goat-inline" id="goatLine"></p>
+
+      <p id="remainingReadout" class="tvw-ws-remaining"></p>
+
+
+
+      <div id="guidedPolicyBox" class="tvw-ws-alarm d-none" role="alert"></div>
+
+
+
+      <div class="tvw-ws-primary-zone" id="focusActions"></div>
+
+
+
+      <div class="tvw-ws-next" id="nextPreviewCard"><strong id="nextPreviewText">—</strong></div>
+
+    </section>
+
+    <aside id="todoPanel" class="tvw-ws-panel tvw-ws-todo" aria-label="Bottles to add right side"></aside>
+
+  </div>
+
+
+
+  <div id="completionSummary" class="tvw-ws-panel tvw-ws-complete tvw-ws-batch-report {% if not prog.all_done %}d-none{% endif %}">
+
+    <div id="mixSummaryDetail" class="tvw-ws-mix-summary" aria-live="polite"></div>
+
+    <section id="mixerNotesSection" class="tvw-ws-report-section tvw-ws-mixer-notes d-none" aria-label="Mixer notes">
+
+      <h3 class="tvw-ws-report-section-title">Mixer notes</h3>
+
+      <p class="tvw-ws-mixer-notes-help">Free-text notes for this batch only — separate from automatic event logs.</p>
+
+      <label for="mixerNotesInput" class="visually-hidden">Mixer notes for this batch</label>
+
+      <textarea id="mixerNotesInput" class="tvw-ws-mixer-notes-input" rows="4" maxlength="4000" placeholder="Add notes about this batch, e.g. steep time, taste, mistakes, bottle changes, or what to adjust next time."></textarea>
+
+      <div class="tvw-ws-mixer-notes-actions">
+
+        <button type="button" class="tvw-ws-commit tvw-ws-commit-secondary" id="saveMixerNotesBtn">SAVE NOTES</button>
+
+        <p id="mixerNotesStatus" class="tvw-ws-mixer-notes-status d-none" role="status" aria-live="polite">Notes saved.</p>
+
+      </div>
+
+    </section>
+
+    <div class="tvw-ws-complete-actions">
+
+      <a class="tvw-ws-exit-primary" href="{{ mix_again_href }}">MIX AGAIN</a>
+
+      <a class="tvw-ws-exit" href="{{ url_for('tvw_recipes.tvw_recipe_detail', slug=rslug) }}?version_id={{ bundle.recipe_version_id }}">BACK TO RECIPE</a>
+
+      <a class="tvw-ws-exit" href="{{ url_for('dashboard_index') }}">DASHBOARD</a>
+
+    </div>
+
+  </div>
+
+
+
+  <span class="visually-hidden" id="progBar" aria-hidden="true"></span>
+
+  <span class="visually-hidden" id="progLabel">{{ prog.completed_steps }}/{{ prog.total_steps }}</span>
+
+  <span class="visually-hidden" id="nowLabel"></span>
+
+  <span class="visually-hidden" id="focusMl"></span>
+
+  <span class="visually-hidden" id="focusMeasured"></span>
+
+  <span class="visually-hidden" id="focusHint"></span>
+
+  <span class="visually-hidden" id="focusWhat"></span>
+
+  <span class="visually-hidden" id="mixCoachPanel"></span>
+
+  <span class="visually-hidden" id="mixCoachLabel"></span>
+
+  <span class="visually-hidden" id="mixCoachDetail"></span>
+
+  <div id="guidedToast" class="tvw-ws-toast d-none" role="status" aria-live="polite"></div>
+
+</div>
+
+<script type="application/json" id="guidedSessionBundle">{{ bundle|tojson }}</script>
+
+<script src="{{ url_for('static', filename='policy_feedback.js') }}"></script>
+
+<script src="{{ url_for('static', filename='guided_scale_input.js') }}"></script>
+
+<script>
+
+(() => {
+
+  const root = document.getElementById("guidedRoot");
+
+  const sessionId = Number(root.dataset.sessionId);
+
+  const sessionMeta = {
+
+    recipeName: root.dataset.recipeName || "",
+
+    version: root.dataset.version || "",
+
+    targetMl: Number(root.dataset.batchMl) || 0,
+
+    targetNic: Number(root.dataset.targetNic) || 0,
+
+    pgvg: root.dataset.pgvg || "30/70",
+
+  };
+
+
+
+  const completionSummary = document.getElementById("completionSummary");
+
+  const mixerNotesSection = document.getElementById("mixerNotesSection");
+
+  const mixerNotesInput = document.getElementById("mixerNotesInput");
+
+  const saveMixerNotesBtn = document.getElementById("saveMixerNotesBtn");
+
+  const mixerNotesStatus = document.getElementById("mixerNotesStatus");
+
+  const mixerNotesUi = { dirty: false, focused: false, saving: false };
+
+  const focusCard = document.getElementById("focusCard");
+
+  const usedPanel = document.getElementById("usedPanel");
+
+  const todoPanel = document.getElementById("todoPanel");
+
+  const centerRecipeName = document.getElementById("centerRecipeName");
+
+  const centerBatchMeta = document.getElementById("centerBatchMeta");
+
+  const centerBottleContents = document.getElementById("centerBottleContents");
+
+  const centerFillBar = document.getElementById("centerFillBar");
+
+  const remainingReadout = document.getElementById("remainingReadout");
+
+  const guidedPolicyBox = document.getElementById("guidedPolicyBox");
+
+  const roleChip = document.getElementById("roleChip");
+
+  const focusTitle = document.getElementById("focusTitle");
+
+  const focusRole = document.getElementById("focusRole");
+
+  const focusIngredient = document.getElementById("focusIngredient");
+
+  const focusBrand = document.getElementById("focusBrand");
+
+  const focusWhy = document.getElementById("focusWhy");
+
+  const pourEquivBlock = document.getElementById("pourEquivBlock");
+
+  const pourTargetWeight = document.getElementById("pourTargetWeight");
+
+  const pourEquivVolume = document.getElementById("pourEquivVolume");
+
+  const pourDensityNote = document.getElementById("pourDensityNote");
+
+  const workflowPhase = document.getElementById("workflowPhase");
+
+  const focusG = document.getElementById("focusG");
+
+  const focusMeasured = document.getElementById("focusMeasured");
+
+  const focusMeasuredDisplay = document.getElementById("focusMeasuredDisplay");
+
+  const focusPct = document.getElementById("focusPct");
+
+  const focusPctWrap = document.getElementById("focusPctWrap");
+
+  const goatLine = document.getElementById("goatLine");
+
+  const microFlash = document.getElementById("microFlash");
+
+  const focusActions = document.getElementById("focusActions");
+
+  const focusStepBadge = document.getElementById("focusStepBadge");
+
+  const nextPreviewText = document.getElementById("nextPreviewText");
+
+  const nextPreviewCard = document.getElementById("nextPreviewCard");
+
+  const scaleHero = document.getElementById("scaleHero");
+
+  const scaleLiveBlock = document.getElementById("scaleLiveBlock");
+
+  const targetScaleLabel = document.getElementById("targetScaleLabel");
+
+  const deltaReadout = document.getElementById("deltaReadout");
+
+  const progLabel = document.getElementById("progLabel");
+
+  const guidedToast = document.getElementById("guidedToast");
+
+  let coachCache = {};
+
+  let toastTimer = null;
+
+  /** @type {null | { stepNo: number, mode: string, measured: number, displayTarget: number, partialGrams?: number, ingredientName?: string, policy: object, reading: object }} */
+  let underPourUi = null;
+
+  /** @type {null | { stepNo: number, mode: string, measured: number, displayTarget: number, policy: object, reading: object }} */
+  let nicotineRecoveryUi = null;
+
+  /** Persist scale field across setFocus re-renders while the user is typing. */
+  let scaleInputUi = {
+    stepNo: null,
+    state: null,
+    controller: null,
+  };
+
+  const resetScaleInputUi = () => {
+    if (scaleInputUi.controller && typeof scaleInputUi.controller.resetState === "function") {
+      scaleInputUi.controller.resetState();
+    }
+    scaleInputUi.stepNo = null;
+    scaleInputUi.state = null;
+    scaleInputUi.controller = null;
+  };
+
+  const createScaleInputState = () => (
+    window.GuidedScaleInput && typeof window.GuidedScaleInput.createScaleInputState === "function"
+      ? window.GuidedScaleInput.createScaleInputState()
+      : { focused: false, dirty: false, selectedOnce: false }
+  );
+
+  const renderNicotineRecoveryProgressNote = (title, target, current, needed, extraLine) => {
+    if (!guidedPolicyBox) return;
+    const extra = extraLine ? `<br>${escHtml(extraLine)}` : "";
+    guidedPolicyBox.innerHTML = `
+      <p class="tvw-ws-bench-note-title">${escHtml(title)}</p>
+      <p class="tvw-ws-bench-note-body">Do not tare.<br>Target: ${target.toFixed(2)} g<br>Current scale: ${current.toFixed(2)} g<br>Needed: ${needed.toFixed(2)} g${extra}</p>
+    `;
+    guidedPolicyBox.className = "tvw-ws-alarm tvw-ws-bench-note is-stop";
+    guidedPolicyBox.classList.remove("d-none", "alert", "alert-warning", "alert-danger", "alert-info", "alert-secondary");
+  };
+
+  const enterNicotineRecovery = (stepNo, policy, reading, payload) => {
+    const displayTarget = Number(
+      (reading && reading.display_target_grams)
+      || (payload && (payload.display_target_grams || payload.target_grams || payload.grams))
+      || 0,
+    );
+    const measured = Number(
+      (reading && (reading.recovery_current_scale_grams || reading.measured_grams))
+      || (payload && (payload.recovery_current_scale_grams || payload.measured_grams))
+      || 0,
+    );
+    const classification = String((reading && reading.classification) || (policy && policy.decision) || "").toLowerCase();
+    let mode = "recovery_check";
+    if (payload && payload.nicotine_overpour_pending) mode = "pour_back";
+    else if (payload && payload.nicotine_accept_confirm_pending) mode = "accept_confirm";
+    else if (payload && payload.nicotine_over_decision_pending) mode = "over_decision";
+    else if (classification.includes("still_over")) mode = "still_over";
+    else if (payload && payload.under_decision_pending) mode = "under_decision";
+    else if (measured > 0) mode = "continue_pour";
+    nicotineRecoveryUi = {
+      stepNo: Number(stepNo),
+      mode,
+      measured,
+      displayTarget,
+      policy: policy || {},
+      reading: reading || {},
+    };
+  };
+
+  const syncNicotineRecoveryUiFromReading = (stepNo, body) => {
+    if (!nicotineRecoveryUi || Number(nicotineRecoveryUi.stepNo) !== Number(stepNo)) return;
+    const reading = body.reading || {};
+    const sess = body.session || {};
+    const step = ((sess.steps) || []).find((s) => Number(s.step_no) === Number(stepNo));
+    const payload = (step && step.payload) || {};
+    nicotineRecoveryUi.measured = Number(
+      reading.recovery_current_scale_grams || reading.measured_grams || nicotineRecoveryUi.measured || 0,
+    );
+    nicotineRecoveryUi.displayTarget = Number(
+      reading.display_target_grams || nicotineRecoveryUi.displayTarget || 0,
+    );
+    nicotineRecoveryUi.policy = body.policy || nicotineRecoveryUi.policy;
+    nicotineRecoveryUi.reading = reading || nicotineRecoveryUi.reading;
+    const classification = String((reading && reading.classification) || "").toLowerCase();
+    if (payload.nicotine_overpour_pending) nicotineRecoveryUi.mode = "pour_back";
+    else if (payload.nicotine_accept_confirm_pending) nicotineRecoveryUi.mode = "accept_confirm";
+    else if (payload.nicotine_over_decision_pending) nicotineRecoveryUi.mode = "over_decision";
+    else if (classification.includes("still_over")) nicotineRecoveryUi.mode = "still_over";
+    else if (payload.under_decision_pending || body.awaiting_under_decision) nicotineRecoveryUi.mode = "under_decision";
+    else if (payload.nicotine_recovery_mode) nicotineRecoveryUi.mode = "continue_pour";
+    nicotineRecoveryUi.reading = reading || nicotineRecoveryUi.reading || {};
+    if (reading && reading.nicotine_accept_allowed != null) {
+      nicotineRecoveryUi.reading.nicotine_accept_allowed = reading.nicotine_accept_allowed;
+    }
+  };
+
+  const isLargeUnderClassification = (classification, policy, reading) => {
+
+    const c = String(
+
+      (reading && reading.classification)
+
+      || (policy && policy.decision)
+
+      || classification
+
+      || "",
+
+    ).toLowerCase();
+
+    return c === "large_under_target" || c === "under_target_caution";
+
+  };
+
+  const underModeFromPayload = (payload, reading) => {
+
+    const serverMode = String(
+
+      (payload && payload.under_pour_mode)
+
+      || (reading && reading.under_pour_mode)
+
+      || "",
+
+    ).toLowerCase();
+
+    if (serverMode === "change_bottle") return "change_bottle";
+
+    if (serverMode === "continue") return "continue_pour";
+
+    if (isLargeUnderClassification((payload && payload.under_classification) || (reading && reading.classification))) {
+
+      return "large_decision";
+
+    }
+
+    return "decision";
+
+  };
+
+  const renderUnderPourProgressNote = (title, target, current, needed, extraLine) => {
+
+    if (!guidedPolicyBox) return;
+
+    const extra = extraLine ? `<br>${escHtml(extraLine)}` : "";
+
+    guidedPolicyBox.innerHTML = `
+
+      <p class="tvw-ws-bench-note-title">${escHtml(title)}</p>
+
+      <p class="tvw-ws-bench-note-body">Target: ${target.toFixed(2)} g<br>Current: ${current.toFixed(2)} g<br>Needed: ${needed.toFixed(2)} g${extra}</p>
+
+    `;
+
+    guidedPolicyBox.className = "tvw-ws-alarm tvw-ws-bench-note is-info";
+
+    guidedPolicyBox.classList.remove("d-none", "alert", "alert-warning", "alert-danger", "alert-info", "alert-secondary");
+
+  };
+
+
+
+  const apiJson = async (url, options = {}) => {
+
+    const res = await fetch(url, {
+      credentials: "same-origin",
+      redirect: "manual",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      ...options,
+    });
+
+    const raw = await res.text();
+
+    let body = {};
+
+    try {
+
+      body = raw ? JSON.parse(raw) : {};
+
+    } catch (_parseErr) {
+
+      const err = new Error(
+
+        `Server returned HTML instead of JSON from ${url} status ${res.status}`,
+
+      );
+
+      throw err;
+
+    }
+
+    if (res.type === "opaqueredirect" || res.status === 302 || res.status === 301) {
+
+      throw new Error(`Server returned HTML instead of JSON from ${url} status ${res.status}`);
+
+    }
+
+    if (!res.ok) {
+
+      const err = new Error(body.message || "Request failed");
+
+      err.policy = body.policy || {};
+
+      err.session = body.session;
+
+      err.reading = body.reading;
+
+      err.awaiting_under_decision = !!body.awaiting_under_decision;
+      err.awaiting_nicotine_recovery = !!body.awaiting_nicotine_recovery;
+      err.nicotine_recovery_active = !!body.nicotine_recovery_active;
+
+      throw err;
+
+    }
+
+    return body;
+
+  };
+
+  let stepSaveInFlight = false;
+
+  const setStepSaving = (active, btn) => {
+    stepSaveInFlight = !!active;
+    if (!btn) return;
+    btn.disabled = !!active;
+    btn.setAttribute("aria-busy", active ? "true" : "false");
+    if (active) {
+      if (!btn.dataset.originalLabel) btn.dataset.originalLabel = (btn.textContent || "").trim();
+      btn.textContent = "Saving…";
+    } else if (btn.dataset.originalLabel) {
+      btn.textContent = btn.dataset.originalLabel;
+      delete btn.dataset.originalLabel;
+    }
+  };
+
+  const completeGuidedStep = async (stepNo, payload, triggerBtn) => {
+    if (stepSaveInFlight) return null;
+    setStepSaving(true, triggerBtn);
+    try {
+      return await apiJson(`/api/mix/guided/session/${sessionId}/steps/${stepNo}/complete`, {
+        method: "POST",
+        body: JSON.stringify(payload || {}),
+      });
+    } finally {
+      setStepSaving(false, triggerBtn);
+    }
+  };
+
+
+
+  const stepTypeFor = (step) => String((step.payload || {}).step_type || "instruction").toLowerCase();
+
+  const stepTypeClass = (stepType) => `tvw-step-${String(stepType || "instruction").toLowerCase().replaceAll("_", "-")}`;
+
+
+
+  const LED_CLASS = {
+
+    "Main Flavour": "is-main",
+
+    "Supporting Flavour": "is-support",
+
+    "Accent": "is-accent",
+
+    "Sweetener": "is-sweetener",
+
+    "Cooling": "is-cooling",
+
+    "Base Liquid": "is-base",
+
+    "Nicotine": "is-nic",
+
+    "Safety": "is-safety",
+
+    "Scale": "is-scale",
+
+    "Recovery": "is-recovery",
+
+    "Pour": "is-main",
+
+    "Checkpoint": "is-base",
+
+    "Setup": "is-scale",
+
+    "Done": "is-main",
+
+  };
+
+
+
+  const roleLabelFor = (p, stepType) => {
+
+    const cat = String(p.category || "").toLowerCase();
+
+    if (cat === "nicotine") return "Nicotine";
+
+    if (cat === "pg" || cat === "vg") return "Base Liquid";
+
+    const role = String(p.ingredient_role || "").toLowerCase();
+
+    const map = {
+
+      base_main_note: "Main Flavour",
+
+      support: "Supporting Flavour",
+
+      accent: "Accent",
+
+      micro_accent: "Accent",
+
+      sweetener: "Sweetener",
+
+      coolant: "Cooling",
+
+      additive: "Accent",
+
+    };
+
+    if (map[role]) return map[role];
+
+    if (stepType === "tare") return "Scale";
+
+    if (stepType === "caution") return "Safety";
+
+    if (stepType === "recovery") return "Recovery";
+
+    if (stepType === "transition") return "Checkpoint";
+
+    if (stepType === "completion") return "Done";
+
+    if (stepType === "add_ingredient") return "Pour";
+
+    return "Setup";
+
+  };
+
+
+
+  const setRoleLed = (label) => {
+
+    const led = LED_CLASS[label] || "is-scale";
+
+    roleChip.textContent = label;
+
+    roleChip.className = "tvw-ws-led " + led;
+
+  };
+
+
+
+  const cleanDisplayName = (raw) => {
+
+    let s = String(raw || "").trim();
+
+    s = s.replace(/\*+/g, "");
+
+    s = s.replace(/\s*\(\s*\)\s*/g, " ");
+
+    s = s.replace(/\s+/g, " ").trim();
+
+    s = s.replace(/\s+Concentrate$/i, "").trim();
+
+    return s;
+
+  };
+
+
+
+  const bottleName = (p, stepType) => {
+
+    const name = cleanDisplayName(p.name || p.ingredient_name || p.title || "");
+
+    if (stepType === "caution") return "Nicotine — gloves on";
+
+    if (stepType === "recovery") return "Fix the pour";
+
+    if (stepType === "transition") return name || "Checkpoint";
+
+    if (stepType === "completion") return "Finished";
+
+    if (stepType === "instruction") return "Prepare your bench";
+
+    return name || "—";
+
+  };
+
+
+
+  const ingredientLabel = (p) => {
+
+    const brand = cleanDisplayName(p.brand || "");
+
+    const name = cleanDisplayName(p.name || p.ingredient_name || "");
+
+    if (brand && name) return `${brand} ${name}`;
+
+    return name || brand || "—";
+
+  };
+
+
+
+  const peekLinkedPourStep = (steps, current) => {
+
+    if (!current || !steps) return null;
+
+    const type = stepTypeFor(current);
+
+    if (type === "add_ingredient") return current;
+
+    if (type !== "tare") return null;
+
+    const no = Number(current.step_no);
+
+    return steps.find((s) => Number(s.step_no) === no + 1 && stepTypeFor(s) === "add_ingredient") || null;
+
+  };
+
+
+
+  const computeBottleFill = (steps, targetMl) => {
+
+    const pours = (steps || []).filter((s) => stepTypeFor(s) === "add_ingredient");
+
+    const totalMlFromPours = pours.reduce((sum, s) => {
+
+      const p = s.payload || {};
+
+      const ml = Number(p.ml != null ? p.ml : p.target_ml);
+
+      return sum + (Number.isFinite(ml) && ml > 0 ? ml : 0);
+
+    }, 0);
+
+    const totalG = pours.reduce((sum, s) => sum + Number((s.payload || {}).target_grams || (s.payload || {}).grams || 0), 0);
+
+    let doneMl = 0;
+
+    let doneG = 0;
+
+    for (const s of pours) {
+
+      if (!s.completed_at) continue;
+
+      const p = s.payload || {};
+
+      const targetG = Number(p.target_grams || p.grams || 0);
+
+      const measured = p.measured_grams != null && p.measured_grams !== "" ? Number(p.measured_grams) : NaN;
+
+      const g = Number.isFinite(measured) ? measured : targetG;
+
+      if (Number.isFinite(g)) doneG += g;
+
+      const stepMl = Number(p.ml != null ? p.ml : p.target_ml);
+
+      if (Number.isFinite(stepMl) && stepMl > 0 && Number.isFinite(targetG) && targetG > 0 && Number.isFinite(g)) {
+
+        doneMl += stepMl * (g / targetG);
+
+      } else if (Number.isFinite(stepMl) && stepMl > 0) {
+
+        doneMl += stepMl;
+
+      }
+
+    }
+
+    const ml = Number(targetMl) || 0;
+
+    if (!(totalMlFromPours > 0) && totalG > 0 && ml > 0) {
+
+      doneMl = (doneG / totalG) * ml;
+
+    }
+
+    const denom = ml > 0 ? ml : totalMlFromPours;
+
+    const pct = denom > 0 ? Math.min(100, Math.round((doneMl / denom) * 100)) : 0;
+
+    return { pct, doneG, totalG, doneMl, targetMl: ml, totalMlFromPours };
+
+  };
+
+
+
+  const pourVolumeFor = (p) => {
+
+    const ml = Number(p && (p.ml != null ? p.ml : p.target_ml));
+
+    return Number.isFinite(ml) && ml > 0 ? ml : 0;
+
+  };
+
+
+
+  const denseWeightNoteFor = (p, targetG, targetMl) => {
+
+    if (!(targetG > 0) || !(targetMl > 0)) return "";
+
+    const ratio = targetG / targetMl;
+
+    const cat = String((p && p.category) || "").toLowerCase();
+
+    const carrier = String((p && (p.nicotine_carrier || p.carrier)) || "").toUpperCase();
+
+    const vgHeavy = ratio >= 1.15 || cat === "vg" || (cat === "nicotine" && (carrier === "VG" || ratio >= 1.1));
+
+    if (vgHeavy) return "VG-heavy ingredients weigh more than their ml volume.";
+
+    if (Math.abs(targetG - targetMl) >= 0.08) return "Mixed by weight. Batch progress is shown in ml.";
+
+    return "";
+
+  };
+
+
+
+  const updatePourEquiv = (p, targetG, { show }) => {
+
+    if (!pourEquivBlock) return;
+
+    if (!show || !(targetG > 0)) {
+
+      pourEquivBlock.classList.add("d-none");
+
+      if (pourTargetWeight) pourTargetWeight.textContent = "";
+
+      if (pourEquivVolume) pourEquivVolume.textContent = "";
+
+      if (pourDensityNote) pourDensityNote.textContent = "";
+
+      return;
+
+    }
+
+    const targetMl = pourVolumeFor(p);
+
+    pourEquivBlock.classList.remove("d-none");
+
+    if (pourTargetWeight) pourTargetWeight.textContent = `Target weight: ${targetG.toFixed(2)} g`;
+
+    if (pourEquivVolume) {
+
+      pourEquivVolume.textContent = targetMl > 0
+
+        ? `Equivalent volume: ${targetMl.toFixed(2)} ml`
+
+        : "";
+
+      pourEquivVolume.style.display = targetMl > 0 ? "" : "none";
+
+    }
+
+    if (pourDensityNote) {
+
+      const note = targetMl > 0 ? denseWeightNoteFor(p, targetG, targetMl) : "";
+
+      pourDensityNote.textContent = note;
+
+      pourDensityNote.style.display = note ? "" : "none";
+
+    }
+
+  };
+
+
+
+  const isBottlePhysicallyLeft = (payload) => {
+
+    const p = payload || {};
+
+    return !!(p.bottle_moved || String(p.pour_state || "").toLowerCase() === "bottle_moved");
+
+  };
+
+
+
+  const isPourStepFinished = (step, payload) => {
+
+    const p = payload || {};
+
+    return !!step.completed_at && !p.overpour_recovery_pending;
+
+  };
+
+
+
+  const linkedPourStepFor = (steps, current) => {
+
+    if (!current || !steps) return null;
+
+    const type = stepTypeFor(current);
+
+    if (type === "add_ingredient") return current;
+
+    if (type === "tare") {
+
+      const no = Number(current.step_no);
+
+      return steps.find((s) => Number(s.step_no) === no + 1 && stepTypeFor(s) === "add_ingredient") || null;
+
+    }
+
+    if (type === "transition") {
+
+      const no = Number(current.step_no);
+
+      const prev = steps.find((s) => Number(s.step_no) === no - 1);
+
+      if (prev && stepTypeFor(prev) === "add_ingredient") return prev;
+
+      return steps
+
+        .filter((s) => Number(s.step_no) < no && stepTypeFor(s) === "add_ingredient")
+
+        .sort((a, b) => Number(b.step_no) - Number(a.step_no))[0] || null;
+
+    }
+
+    return null;
+
+  };
+
+
+
+  const benchStatusFor = (steps, current, stepType) => {
+
+    const plan = (steps || [])
+
+      .filter((s) => stepTypeFor(s) === "add_ingredient")
+
+      .map((s) => {
+
+        const p = s.payload || {};
+
+        const shortName = cleanDisplayName(p.name || p.ingredient_name || ingredientLabel(p));
+
+        return {
+
+          label: ingredientLabel(p),
+
+          shortName,
+
+          physicallyLeft: isBottlePhysicallyLeft(p),
+
+          pourFinished: isPourStepFinished(s, p),
+
+        };
+
+      });
+
+    const done = plan.filter((x) => x.physicallyLeft);
+
+    let toAdd = plan.filter((x) => !x.pourFinished);
+
+    if (stepType === "instruction") {
+
+      return {
+
+        done: [],
+
+        toAdd: plan.map((x) => ({ label: x.label, shortName: x.shortName })),
+
+      };
+
+    }
+
+    if (current) {
+
+      const type = stepTypeFor(current);
+
+      const pour = linkedPourStepFor(steps, current);
+
+      const dp = (pour && pour.payload) || current.payload || {};
+
+      const handName = cleanDisplayName(dp.name || dp.ingredient_name || ingredientLabel(dp));
+
+      if (type === "tare" || type === "add_ingredient") {
+
+        toAdd = toAdd.filter((x) => x.shortName !== handName);
+
+      } else if (type === "transition") {
+
+        const tp = current.payload || {};
+
+        const moveName = cleanDisplayName(tp.name || tp.ingredient_name || handName);
+
+        if (moveName) {
+
+          toAdd = toAdd.filter((x) => x.shortName !== moveName);
+
+        }
+
+      }
+
+    }
+
+    return { done, toAdd };
+
+  };
+
+
+
+  const sessionBatchMl = (sess) => {
+
+    const n = Number(sess && (sess.batch_size_ml != null ? sess.batch_size_ml : sess.target_ml));
+
+    return Number.isFinite(n) && n > 0 ? n : (Number(sessionMeta.targetMl) || 0);
+
+  };
+
+
+
+  const sessionTargetRatio = (sess) => {
+
+    const pg = Number(sess && sess.target_pg_percent);
+
+    const vg = Number(sess && sess.target_vg_percent);
+
+    if (Number.isFinite(pg) && Number.isFinite(vg) && pg + vg > 0) {
+
+      return { pg: Math.round(pg), vg: Math.round(vg) };
+
+    }
+
+    const parts = String((sess && sess.target_pgvg) || sessionMeta.pgvg || "30/70").split("/");
+
+    return { pg: Number(parts[0]) || 30, vg: Number(parts[1]) || 70 };
+
+  };
+
+
+
+  const payloadCategory = (p) => String((p && p.category) || "").toLowerCase();
+
+
+
+  const isVgPour = (p) => payloadCategory(p) === "vg" || String(p?.name || "").trim().toLowerCase() === "vg";
+
+
+
+  const isPgPour = (p) => payloadCategory(p) === "pg" || String(p?.name || "").trim().toLowerCase() === "pg";
+
+
+
+  const targetMlFromPayload = (p, targetG) => {
+
+    const ml = Number(p && (p.ml != null ? p.ml : p.target_ml));
+
+    if (Number.isFinite(ml) && ml > 0) return ml;
+
+    const dens = Number(p && p.density);
+
+    if (Number.isFinite(dens) && dens > 0 && targetG > 0) return targetG / dens;
+
+    return targetG > 0 ? targetG : 0;
+
+  };
+
+
+
+  const physicalActionFor = (stepType, p, targetG, batchCtx = {}) => {
+
+    const name = ingredientLabel(p);
+
+    const role = roleLabelFor(p, stepType === "tare" ? "add_ingredient" : stepType);
+
+    if (stepType === "instruction") {
+
+      return {
+
+        action: "Prepare your bench",
+
+        ingredient: sessionMeta.recipeName || "Today's mix",
+
+        role: "",
+
+        phase: "Lay everything out before you touch the scale.",
+
+      };
+
+    }
+
+    if (stepType === "tare") {
+
+      return {
+
+        action: "",
+
+        ingredient: `Pick up ${name}`,
+
+        role,
+
+        phase: "Zero the scale",
+
+      };
+
+    }
+
+    if (stepType === "add_ingredient") {
+
+      const batchMl = Number(batchCtx.batchMl) || 0;
+
+      const ratio = batchCtx.ratio || { pg: 30, vg: 70 };
+
+      const targetMl = targetMlFromPayload(p, targetG);
+
+      if (isVgPour(p)) {
+
+        const phaseLines = [
+
+          `Target estimate: ${targetG.toFixed(2)} g / ${targetMl.toFixed(2)} ml`,
+
+          batchMl > 0 ? `Final bottle target: ${batchMl} ml` : "",
+
+          `Target ratio: PG/VG ${ratio.pg}/${ratio.vg}`,
+
+          "VG is thick. Pour slowly and let bubbles settle before judging the final level.",
+
+        ].filter(Boolean);
+
+        return {
+
+          action: "Add VG to finish the bottle",
+
+          ingredient: name,
+
+          role,
+
+          phase: phaseLines.join("\n"),
+
+        };
+
+      }
+
+      if (isPgPour(p) && p && p.pg_adjustment_note) {
+
+        return {
+
+          action: "",
+
+          ingredient: `Pour ${name}`,
+
+          role,
+
+          phase: String(p.pg_adjustment_note).trim(),
+
+        };
+
+      }
+
+      return {
+
+        action: "",
+
+        ingredient: `Pour ${name}`,
+
+        role,
+
+        phase: "",
+
+      };
+
+    }
+
+    if (stepType === "transition") {
+
+      const shortName = cleanDisplayName(p.name || p.ingredient_name || "").trim() || name;
+
+      return {
+
+        action: "",
+
+        ingredient: `${name} complete`,
+
+        role: "",
+
+        phase: `Move ${shortName} to the LEFT SIDE`,
+
+      };
+
+    }
+
+    if (stepType === "caution") {
+
+      return {
+
+        action: "Put gloves on.",
+
+        ingredient: "Nicotine",
+
+        role: "Safety",
+
+        phase: String(p.what || "Verify bottle strength before you pour.").trim(),
+
+      };
+
+    }
+
+    if (stepType === "recovery") {
+
+      return {
+
+        action: "Slow down and re-weigh.",
+
+        ingredient: name || "This pour",
+
+        role: "Recovery",
+
+        phase: String(p.what || "").trim(),
+
+      };
+
+    }
+
+    if (stepType === "completion") {
+
+      return {
+
+        action: "Label and steep.",
+
+        ingredient: "Finished mix",
+
+        role: "",
+
+        phase: "",
+
+      };
+
+    }
+
+    return {
+
+      action: String(p.what || "Continue.").trim(),
+
+      ingredient: bottleName(p, stepType),
+
+      role,
+
+      phase: "",
+
+    };
+
+  };
+
+
+
+  const showUndoFor = (stepType) => {
+
+    if (stepType === "tare") return false;
+
+    if (stepType === "instruction") return false;
+
+    if (stepType === "transition") return false;
+
+    if (stepType === "completion") return false;
+
+    if (stepType === "caution") return false;
+
+    return stepType === "add_ingredient" || stepType === "recovery";
+
+  };
+
+
+
+  const stepAckMessage = (sess, completedStepNo) => {
+
+    const steps = sess.steps || [];
+
+    const completed = steps.find((s) => Number(s.step_no) === Number(completedStepNo));
+
+    if (!completed) return "";
+
+    const type = stepTypeFor(completed);
+
+    const p = completed.payload || {};
+
+    const name = ingredientLabel(p);
+
+    const shortName = String(p.name || p.ingredient_name || name).trim();
+
+    const next = steps.find((s) => Number(s.step_no) === Number(completedStepNo) + 1);
+
+    let nextName = "";
+
+    if (next) {
+
+      if (stepTypeFor(next) === "tare") {
+
+        const pourNext = steps.find((s) => Number(s.step_no) === Number(next.step_no) + 1);
+
+        const np = (pourNext && pourNext.payload) || next.payload || {};
+
+        nextName = String(np.name || np.ingredient_name || ingredientLabel(np)).trim();
+
+      } else {
+
+        const np = next.payload || {};
+
+        nextName = stepTypeFor(next) === "add_ingredient"
+
+          ? String(np.name || np.ingredient_name || ingredientLabel(np)).trim()
+
+          : "";
+
+      }
+
+    }
+
+    if (type === "instruction") {
+
+      return nextName ? `✓ Bench is ready. First up: ${nextName}.` : "✓ Bench is ready.";
+
+    }
+
+    if (type === "tare") {
+
+      return nextName ? `✓ Scale is zeroed. Pour ${nextName} next.` : "✓ Scale is zeroed.";
+
+    }
+
+    if (type === "add_ingredient") {
+
+      const move = shortName ? ` Move ${shortName} to the left side.` : " Move the bottle to the left side.";
+
+      const upcoming = nextName ? ` Next up: ${nextName}.` : "";
+
+      return `✓ Nice. ${shortName || "Ingredient"} is in.${move}${upcoming}`;
+
+    }
+
+    if (type === "transition" && nextName) {
+
+      return `✓ Cleared. Next up: ${nextName}.`;
+
+    }
+
+    return "";
+
+  };
+
+
+
+  const showToast = (message) => {
+
+    if (!guidedToast || !message) return;
+
+    if (toastTimer) clearTimeout(toastTimer);
+
+    guidedToast.textContent = message;
+
+    guidedToast.classList.remove("d-none");
+
+    guidedToast.classList.add("is-visible");
+
+    toastTimer = setTimeout(() => {
+
+      guidedToast.classList.remove("is-visible");
+
+      guidedToast.classList.add("d-none");
+
+    }, 2600);
+
+  };
+
+
+
+  const goatSays = (p, stepType, coach) => {
+
+    const generic = ["Steady hands", "Steady control", "Keep your normal approach", "Bench note"];
+
+    const pick = (...lines) => lines.find((l) => l && String(l).trim()) || "";
+
+
+
+    if (stepType === "recovery") {
+
+      return pick(p.tip, p.what, coach.detail, "You overshot. Slow down isn\u2019t optional anymore.");
+
+    }
+
+    if (stepType === "caution") {
+
+      return pick(p.tip, p.what, "Nicotine isn\u2019t forgiving. Verify the bottle.");
+
+    }
+
+    if (stepType === "tare") {
+
+      return pick(
+
+        "Always zero your scale before changing bottles. Even a tiny leftover weight can throw the next ingredient off.",
+
+        p.what,
+
+      );
+
+    }
+
+    if (stepType === "add_ingredient") {
+
+      const tip = pick(p.tip, coach.detail);
+
+      if (tip && !generic.some((g) => tip.includes(g)) && !/tare as mandatory/i.test(tip)) return tip;
+
+      const pct = Number(p.percent != null ? p.percent : p.pct);
+
+      if (pct > 0 && pct < 1) return "Tiny pour. The scale matters more than your wrist speed.";
+
+      if (pct >= 5) return "Main layer — get it right, everything else sits on this.";
+
+      return "Creep up on the number. Last 0.1 g is where people wreck it.";
+
+    }
+
+    const detail = (coach || {}).detail || "";
+
+    if (detail && !generic.some((g) => detail.includes(g))) return detail;
+
+    return pick(p.tip, p.what, "");
+
+  };
+
+
+
+  const actionLabelFor = (stepType, p) => {
+
+    if (stepType === "recovery") {
+
+      const fromServer = String(p.action_label || "").trim();
+
+      if (fromServer && !/^continue$/i.test(fromServer) && !/^i resolved this$/i.test(fromServer)) {
+
+        return fromServer;
+
+      }
+
+      if (p.correction_ready || p.reconcile_applied || p.base_adjusted) return "Apply correction";
+
+      if (String(p.source_event || "").toLowerCase() === "overpour") return "Review recovery plan";
+
+      return "Review recovery plan";
+
+    }
+
+    const map = {
+
+      tare: "Scale Zeroed",
+
+      add_ingredient: "Pour Complete",
+
+      transition: "Bottle Moved",
+
+      caution: "Safety Clear",
+
+      instruction: "Ready to Pour",
+
+      completion: "Done",
+
+    };
+
+    if (map[stepType]) return map[stepType];
+
+    const fromServer = String(p.action_label || "").trim();
+
+    if (fromServer && fromServer !== "Mark step done") return fromServer;
+
+    return "Next";
+
+  };
+
+
+
+  const undoLabelFor = (stepType) => {
+
+    if (stepType === "add_ingredient") return "Re-weigh";
+
+    if (stepType === "transition") return "Back";
+
+    if (stepType === "recovery") return "Back";
+
+    return "";
+
+  };
+
+
+
+  const esc = (s) => String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
+  const prepChecklistHtml = (targetNic) => {
+
+    const items = [
+
+      "Flavour concentrates on the RIGHT of your bench, in pour order",
+
+      "Empty vessel centred on scale",
+
+      "PG/VG base within reach",
+
+      "Pipettes, labels, and gloves ready",
+
+    ];
+
+    if (targetNic > 0) {
+
+      items.splice(2, 0, "Nicotine bottle strength verified");
+
+    }
+
+    return items.map((t) => `<li class="tvw-ws-check-item"><span class="tvw-ws-check-box" aria-hidden="true"></span>${t}</li>`).join("");
+
+  };
+
+
+
+  const renderBenchPanels = (sess, current, stepType) => {
+
+    const steps = sess.steps || [];
+
+    const bench = benchStatusFor(steps, current, stepType);
+
+    const isPrep = stepType === "instruction";
+
+    const doneLines = bench.done.length
+
+      ? bench.done.map((x) => `<li class="tvw-ws-side-item is-done">✓ ${esc(x.shortName)}</li>`).join("")
+
+      : `<li class="tvw-ws-side-item is-empty">—</li>`;
+
+    if (usedPanel) {
+
+      usedPanel.innerHTML = `
+
+        <div class="tvw-ws-side-head">
+
+          <span class="tvw-ws-kicker">USED</span>
+
+          <h2 class="tvw-ws-side-title">LEFT SIDE</h2>
+
+        </div>
+
+        <ul class="tvw-ws-side-list">${doneLines}</ul>
+
+      `;
+
+    }
+
+    const todoLines = bench.toAdd.length
+
+      ? bench.toAdd.map((x) => `<li class="tvw-ws-side-item">○ ${esc(x.shortName)}</li>`).join("")
+
+      : `<li class="tvw-ws-side-item is-empty">—</li>`;
+
+    const setupCopy = isPrep
+
+      ? `<p class="tvw-ws-side-hint">Arrange these bottles on the RIGHT side of your bench. After each pour, move the bottle to the LEFT.</p>`
+
+      : "";
+
+    if (todoPanel) {
+
+      todoPanel.innerHTML = `
+
+        <div class="tvw-ws-side-head">
+
+          <span class="tvw-ws-kicker">TO ADD</span>
+
+          <h2 class="tvw-ws-side-title">RIGHT SIDE</h2>
+
+        </div>
+
+        ${setupCopy}
+
+        <ul class="tvw-ws-side-list">${todoLines}</ul>
+
+      `;
+
+    }
+
+    if (isPrep) {
+
+      goatLine.textContent = "Arrange these bottles on the RIGHT side of your bench. After each pour, move the bottle to the LEFT.";
+
+      goatLine.className = "tvw-ws-goat-inline";
+
+    }
+
+  };
+
+
+
+  const updateCenterBatchMeta = (sess) => {
+
+    const steps = sess.steps || [];
+
+    const batchMl = sessionBatchMl(sess);
+
+    const ratio = sessionTargetRatio(sess);
+
+    const meta = {
+
+      recipeName: sess.recipe_name || sessionMeta.recipeName,
+
+      targetMl: batchMl,
+
+    };
+
+    const fill = computeBottleFill(steps, meta.targetMl);
+
+    const bottleContents = fill.targetMl > 0
+
+      ? `Batch progress: ${fill.doneMl.toFixed(2)} ml of ${Number(fill.targetMl).toFixed(0)} ml`
+
+      : `Batch progress: ${fill.doneMl.toFixed(2)} ml`;
+
+    if (centerRecipeName) centerRecipeName.textContent = meta.recipeName;
+
+    if (centerBatchMeta) {
+
+      centerBatchMeta.textContent = fill.targetMl > 0
+
+        ? `${Number(fill.targetMl).toFixed(0)} ml batch · ${ratio.pg}/${ratio.vg} PG/VG`
+
+        : `${ratio.pg}/${ratio.vg} PG/VG`;
+
+    }
+
+    if (centerBottleContents) centerBottleContents.textContent = bottleContents;
+
+    if (centerFillBar) centerFillBar.style.width = `${fill.pct}%`;
+
+  };
+
+
+
+  const updateRemaining = (val, targetG) => {
+
+    if (!remainingReadout) return;
+
+    if (!Number.isFinite(val) || !Number.isFinite(targetG) || targetG <= 0) {
+
+      remainingReadout.textContent = "";
+
+      return;
+
+    }
+
+    const rem = Math.max(0, targetG - val);
+
+    if (rem > 0.005) {
+
+      remainingReadout.textContent = `${rem.toFixed(2)} g remaining`;
+
+    } else {
+
+      remainingReadout.textContent = "";
+
+    }
+
+  };
+
+
+
+  const updateDelta = (val, targetG) => {
+
+    if (!Number.isFinite(val) || !Number.isFinite(targetG) || targetG <= 0) {
+
+      deltaReadout.textContent = "";
+
+      deltaReadout.className = "tvw-ws-delta";
+
+      return;
+
+    }
+
+    const d = val - targetG;
+
+    const sign = d >= 0 ? "+" : "";
+
+    deltaReadout.textContent = `${sign}${d.toFixed(2)} g`;
+
+    deltaReadout.className = "tvw-ws-delta " + (
+
+      Math.abs(d) <= Math.max(0.02, targetG * 0.008) ? "is-ok" : (d > 0 ? "is-over" : "is-under")
+
+    );
+
+  };
+
+
+
+  const activePourTargetGrams = (payload) => {
+
+    const p = payload || {};
+
+    const raw = p.display_target_grams != null
+
+      ? p.display_target_grams
+
+      : (p.target_grams != null ? p.target_grams : p.grams);
+
+    const n = Number(raw);
+
+    return Number.isFinite(n) && n > 0 ? n : 0;
+
+  };
+
+
+
+  const activePourScaleGrams = (payload, underState, underActive, stepNo) => {
+
+    if (
+      nicotineRecoveryUi
+      && stepNo != null
+      && Number(nicotineRecoveryUi.stepNo) === Number(stepNo)
+      && nicotineRecoveryUi.mode !== "pour_back"
+    ) {
+      const m = Number(nicotineRecoveryUi.measured);
+      if (Number.isFinite(m) && m >= 0) return m;
+    }
+
+    if (underActive && underState && Number.isFinite(Number(underState.measured))) {
+
+      return Number(underState.measured);
+
+    }
+
+    const p = payload || {};
+
+    if (p.nicotine_recovery_mode) {
+      const m = Number(p.recovery_current_scale_grams || p.measured_grams);
+      return Number.isFinite(m) ? m : 0;
+    }
+
+    if (p.under_decision_pending) {
+
+      const m = Number(p.measured_grams);
+
+      return Number.isFinite(m) ? m : 0;
+
+    }
+
+    return 0;
+
+  };
+
+
+
+  const syncActivePourReadout = (scaleG, targetG) => {
+
+    const scale = Number.isFinite(scaleG) ? scaleG : 0;
+
+    const target = Number.isFinite(targetG) ? targetG : 0;
+
+    updateDelta(scale, target);
+
+    updateRemaining(scale, target);
+
+    if (focusMeasuredDisplay) {
+
+      focusMeasuredDisplay.textContent = target > 0 ? scale.toFixed(2) : "—";
+
+    }
+
+  };
+
+
+
+  const activeStepTargetGrams = (stepNo) => {
+
+    const sess = window.__guidedSessionLast;
+
+    if (!sess || stepNo == null) return 0;
+
+    const step = (sess.steps || []).find((s) => Number(s.step_no) === Number(stepNo));
+
+    if (!step) return 0;
+
+    return activePourTargetGrams(step.payload || {});
+
+  };
+
+
+
+  const parseScaleInputGrams = (raw) => {
+
+    if (window.GuidedScaleInput && typeof window.GuidedScaleInput.parseScaleGrams === "function") {
+
+      return window.GuidedScaleInput.parseScaleGrams(raw);
+
+    }
+
+    const normalized = String(raw ?? "").trim().replace(/,/g, ".");
+
+    const n = Number(normalized);
+
+    return Number.isFinite(n) ? n : null;
+
+  };
+
+
+
+  const parseScaleInputForReadout = (raw) => {
+
+    if (window.GuidedScaleInput && typeof window.GuidedScaleInput.parseScaleGramsForReadout === "function") {
+
+      return window.GuidedScaleInput.parseScaleGramsForReadout(raw);
+
+    }
+
+    return parseScaleInputGrams(raw);
+
+  };
+
+
+
+  const isPartialScaleEntry = (raw) => Boolean(
+
+    window.GuidedScaleInput
+
+    && typeof window.GuidedScaleInput.isPartialScaleEntry === "function"
+
+    && window.GuidedScaleInput.isPartialScaleEntry(raw),
+
+  );
+
+
+
+  const resolveMeasuredGramsForStep = (raw, stepNo, { requireSanity = true } = {}) => {
+
+    const targetG = activeStepTargetGrams(stepNo);
+
+    const trimmed = String(raw ?? "").trim();
+
+    if (trimmed !== "" && isPartialScaleEntry(trimmed)) {
+
+      return { ok: false, message: "Enter a valid weight in grams (use . or , for decimals)." };
+
+    }
+
+    const parsed = parseScaleInputGrams(trimmed);
+
+    if (trimmed !== "" && parsed === null) {
+
+      return { ok: false, message: "Enter a valid weight in grams (use . or , for decimals)." };
+
+    }
+
+    const grams = parsed != null ? parsed : 0;
+
+    const sanityMsg = (window.GuidedScaleInput && window.GuidedScaleInput.SCALE_SANITY_MESSAGE)
+
+      || "Scale reading looks too high for this step. Check the decimal point.";
+
+    if (
+
+      requireSanity
+
+      && targetG > 0
+
+      && window.GuidedScaleInput
+
+      && window.GuidedScaleInput.isScaleReadingSuspicious(grams, targetG, trimmed)
+
+    ) {
+
+      return { ok: false, message: sanityMsg };
+
+    }
+
+    return { ok: true, grams };
+
+  };
+
+
+
+  const renderMixSummary = (sess) => {
+
+    const el = document.getElementById("mixSummaryDetail");
+
+    if (!el) return;
+
+    const summary = sess && sess.mix_summary;
+
+    if (!summary) {
+
+      el.innerHTML = "";
+
+      el.classList.add("d-none");
+
+      return;
+
+    }
+
+    const recipeName = escHtml(summary.recipe_name || sess.recipe_name || sessionMeta.recipeName || "Recipe");
+
+    const batchMl = Number(summary.batch_size_ml || sess.batch_size_ml || sessionMeta.targetMl || 0);
+
+    const targetRatio = escHtml(summary.target_ratio_label || `${Number(summary.target_pg_percent).toFixed(0)}/${Number(summary.target_vg_percent).toFixed(0)}`);
+
+    const estVol = Number(summary.estimated_final_volume_ml || 0).toFixed(2);
+
+    const estRatio = escHtml(summary.estimated_final_ratio_label || `${Number(summary.estimated_final_pg_percent)}/${Number(summary.estimated_final_vg_percent)}`);
+
+    const status = escHtml(summary.completion_status || "Complete");
+
+    const parts = [];
+
+    parts.push(`
+
+      <header class="tvw-ws-report-header">
+
+        <p class="tvw-ws-report-kicker">Batch complete</p>
+
+        <h2 class="tvw-ws-report-title">${recipeName}</h2>
+
+        <p class="tvw-ws-report-meta">${batchMl.toFixed(0)} ml batch · Target ${targetRatio} PG/VG</p>
+
+      </header>
+
+      <section class="tvw-ws-report-card" aria-label="Batch result">
+
+        <dl class="tvw-ws-report-stats">
+
+          <div><dt>Estimated final volume</dt><dd>${estVol} ml</dd></div>
+
+          <div><dt>Estimated final ratio</dt><dd>${estRatio} PG/VG</dd></div>
+
+          <div><dt>Status</dt><dd>${status}</dd></div>
+
+        </dl>
+
+      </section>
+
+    `);
+
+    if (summary.ratio_shift_explanation) {
+
+      parts.push(`<p class="tvw-ws-report-note">${escHtml(summary.ratio_shift_explanation)}</p>`);
+
+    }
+
+    const pgAdj = Array.isArray(summary.pg_adjustments) ? summary.pg_adjustments : [];
+
+    if (pgAdj.length) {
+
+      const heading = escHtml(summary.pg_adjustments_heading || "PG adjusted after accepted flavour overpours");
+
+      const lines = pgAdj.map((row) => `<li>${escHtml(row.label || "")}</li>`).join("");
+
+      parts.push(`
+
+        <section class="tvw-ws-report-section" aria-label="Adjustments made">
+
+          <h3 class="tvw-ws-report-section-title">Adjustments made</h3>
+
+          <p class="tvw-ws-report-subtitle">${heading}</p>
+
+          <ul class="tvw-ws-report-list">${lines}</ul>
+
+        </section>
+
+      `);
+
+    }
+
+    const devs = Array.isArray(summary.accepted_deviations) ? summary.accepted_deviations : [];
+
+    if (devs.length) {
+
+      const lines = devs.map((row) => `<li>${escHtml(row.label || "")}</li>`).join("");
+
+      parts.push(`
+
+        <section class="tvw-ws-report-section" aria-label="Accepted deviations">
+
+          <h3 class="tvw-ws-report-section-title">Accepted deviations</h3>
+
+          <ul class="tvw-ws-report-list">${lines}</ul>
+
+        </section>
+
+      `);
+
+    }
+
+    const nic = Array.isArray(summary.nicotine_events) ? summary.nicotine_events : [];
+
+    if (nic.length) {
+
+      const lines = nic.map((row) => `<li>${escHtml(row.label || "")}</li>`).join("");
+
+      parts.push(`
+
+        <section class="tvw-ws-report-section" aria-label="Nicotine notes">
+
+          <h3 class="tvw-ws-report-section-title">Nicotine</h3>
+
+          <ul class="tvw-ws-report-list">${lines}</ul>
+
+        </section>
+
+      `);
+
+    }
+
+    const notes = Array.isArray(summary.notes_for_next_time) ? summary.notes_for_next_time : [];
+
+    if (notes.length) {
+
+      const lines = notes.map((note) => `<li>${escHtml(note)}</li>`).join("");
+
+      parts.push(`
+
+        <section class="tvw-ws-report-section" aria-label="Notes for next time">
+
+          <h3 class="tvw-ws-report-section-title">Notes for next time</h3>
+
+          <ul class="tvw-ws-report-list tvw-ws-report-notes">${lines}</ul>
+
+        </section>
+
+      `);
+
+    }
+
+    if (summary.nicotine_recovery_warning) {
+
+      parts.push(`<p class="tvw-ws-report-warning">${escHtml(summary.nicotine_recovery_warning)}</p>`);
+
+    }
+
+    parts.push(`<p class="tvw-ws-report-footer">Label it. Steep it. Argue about it later.</p>`);
+
+    el.innerHTML = parts.join("");
+
+    el.classList.remove("d-none");
+
+  };
+
+
+
+  const syncMixerNotesUi = (sess) => {
+
+    if (!mixerNotesSection || !mixerNotesInput) return;
+
+    const prog = (sess && sess.progress) || {};
+
+    const show = !!prog.all_done;
+
+    mixerNotesSection.classList.toggle("d-none", !show);
+
+    if (!show) {
+
+      mixerNotesUi.dirty = false;
+
+      mixerNotesUi.focused = false;
+
+      if (mixerNotesStatus) mixerNotesStatus.classList.add("d-none");
+
+      return;
+
+    }
+
+    const notes = String(
+
+      (sess && sess.user_notes)
+
+      || ((sess && sess.mix_summary) || {}).user_notes
+
+      || "",
+
+    );
+
+    if (!mixerNotesUi.dirty && !mixerNotesUi.focused && document.activeElement !== mixerNotesInput) {
+
+      mixerNotesInput.value = notes;
+
+    }
+
+  };
+
+
+
+  const saveMixerNotes = async () => {
+
+    if (!mixerNotesInput || mixerNotesUi.saving) return;
+
+    mixerNotesUi.saving = true;
+
+    if (saveMixerNotesBtn) saveMixerNotesBtn.disabled = true;
+
+    if (mixerNotesStatus) mixerNotesStatus.classList.add("d-none");
+
+    try {
+
+      const body = await apiJson(`/api/mix/guided/session/${sessionId}/notes`, {
+
+        method: "POST",
+
+        body: JSON.stringify({ user_notes: mixerNotesInput.value || "" }),
+
+      });
+
+      if (body.session) {
+
+        applySession(body.session);
+
+      }
+
+      mixerNotesUi.dirty = false;
+
+      if (mixerNotesStatus) {
+
+        mixerNotesStatus.textContent = body.message || "Notes saved.";
+
+        mixerNotesStatus.classList.remove("d-none");
+
+      }
+
+    } catch (err) {
+
+      showToast(err.message || "Could not save notes.");
+
+    } finally {
+
+      mixerNotesUi.saving = false;
+
+      if (saveMixerNotesBtn) saveMixerNotesBtn.disabled = false;
+
+    }
+
+  };
+
+
+
+  if (mixerNotesInput) {
+
+    mixerNotesInput.addEventListener("focus", () => {
+
+      mixerNotesUi.focused = true;
+
+    });
+
+    mixerNotesInput.addEventListener("blur", () => {
+
+      mixerNotesUi.focused = false;
+
+    });
+
+    mixerNotesInput.addEventListener("input", () => {
+
+      mixerNotesUi.dirty = true;
+
+      if (mixerNotesStatus) mixerNotesStatus.classList.add("d-none");
+
+    });
+
+  }
+
+  if (saveMixerNotesBtn) {
+
+    saveMixerNotesBtn.addEventListener("click", () => {
+
+      saveMixerNotes();
+
+    });
+
+  }
+
+
+
+  const setFocus = (sess) => {
+
+    const prog = sess.progress || {};
+
+    const steps = sess.steps || [];
+
+    const current = steps.find((x) => !x.completed_at) || null;
+
+    if (underPourUi && current && Number(underPourUi.stepNo) !== Number(current.step_no)) {
+
+      underPourUi = null;
+
+    }
+
+    if (nicotineRecoveryUi && current && Number(nicotineRecoveryUi.stepNo) !== Number(current.step_no)) {
+
+      nicotineRecoveryUi = null;
+
+    }
+
+    const next = current ? steps.find((x) => Number(x.step_no) === Number(current.step_no) + 1) : null;
+
+    const total = prog.total_steps || 0;
+
+    const done = prog.completed_steps || 0;
+
+    coachCache = sess.coach_summary || {};
+
+
+
+    focusCard.classList.remove("d-none");
+
+    if (completionSummary) completionSummary.classList.add("d-none");
+
+
+
+    if (!current) {
+
+      focusCard.classList.add("d-none");
+
+      if (usedPanel) usedPanel.classList.add("d-none");
+
+      if (todoPanel) todoPanel.classList.add("d-none");
+
+      if (completionSummary) completionSummary.classList.remove("d-none");
+
+      renderMixSummary(sess);
+
+      syncMixerNotesUi(sess);
+
+      return;
+
+    }
+
+
+
+    if (usedPanel) usedPanel.classList.remove("d-none");
+
+    if (todoPanel) todoPanel.classList.remove("d-none");
+
+
+
+    const stepType = stepTypeFor(current);
+
+    const p = current.payload || {};
+
+    const pourStep = peekLinkedPourStep(steps, current);
+
+    const displayP = (pourStep && pourStep.payload) || p;
+
+    const isPrep = stepType === "instruction";
+
+    const isTarePhase = stepType === "tare";
+
+    const isPourPhase = stepType === "add_ingredient";
+
+    const isIngredientFlow = isTarePhase || isPourPhase;
+
+    if (
+      isPourPhase
+      && p.nicotine_overpour_pending
+      && (!nicotineRecoveryUi || Number(nicotineRecoveryUi.stepNo) !== Number(current.step_no))
+    ) {
+      enterNicotineRecovery(current.step_no, {}, {}, p);
+    } else if (
+      isPourPhase
+      && (p.nicotine_over_decision_pending || p.nicotine_accept_confirm_pending)
+      && (!nicotineRecoveryUi || Number(nicotineRecoveryUi.stepNo) !== Number(current.step_no))
+    ) {
+      enterNicotineRecovery(current.step_no, {}, {
+        measured_grams: Number(p.measured_grams || 0),
+        display_target_grams: Number(p.display_target_grams || p.target_grams || p.grams || 0),
+        over_by_grams: Number(p.over_by_grams || 0),
+        classification: p.nicotine_accept_confirm_pending ? "nicotine_accept_confirm" : "nicotine_over_decision",
+        nicotine_accept_allowed: p.nicotine_accept_allowed,
+        nicotine_strictness_mode: p.nicotine_strictness_mode,
+      }, p);
+    } else if (
+      isPourPhase
+      && p.nicotine_recovery_mode
+      && (!nicotineRecoveryUi || Number(nicotineRecoveryUi.stepNo) !== Number(current.step_no))
+    ) {
+      enterNicotineRecovery(current.step_no, {}, {
+        measured_grams: Number(p.recovery_current_scale_grams || p.measured_grams || 0),
+        display_target_grams: Number(p.display_target_grams || p.target_grams || p.grams || 0),
+        classification: String(p.under_classification || "nicotine_recovery_active"),
+      }, p);
+    }
+
+    if (
+      isPourPhase
+      && p.under_decision_pending
+      && !p.nicotine_recovery_mode
+      && (!underPourUi || Number(underPourUi.stepNo) !== Number(current.step_no))
+    ) {
+      const reading = {
+        measured_grams: Number(p.measured_grams || 0),
+        display_target_grams: Number(p.display_target_grams || p.target_grams || p.grams || 0),
+        classification: String(p.under_classification || "slight_under_target"),
+        partial_grams: Number(p.partial_grams || 0),
+        under_pour_mode: String(p.under_pour_mode || ""),
+      };
+      underPourUi = {
+        stepNo: Number(current.step_no),
+        mode: underModeFromPayload(p, reading),
+        measured: Number(p.measured_grams || 0),
+        displayTarget: Number(p.display_target_grams || p.target_grams || p.grams || 0),
+        partialGrams: Number(p.partial_grams || 0),
+        ingredientName: cleanDisplayName(displayP.name || displayP.ingredient_name || ingredientLabel(displayP)),
+        policy: {},
+        reading,
+      };
+    }
+
+    const role = isIngredientFlow
+
+      ? roleLabelFor(displayP, "add_ingredient")
+
+      : roleLabelFor(p, stepType);
+
+
+
+    renderBenchPanels(sess, current, stepType);
+
+    updateCenterBatchMeta(sess);
+
+
+
+    setRoleLed(role);
+
+    const stepPad = String(current.step_no).padStart(2, "0");
+
+    const totalPad = String(total).padStart(2, "0");
+
+    focusStepBadge.textContent = `${stepPad} / ${totalPad}`;
+
+    progLabel.textContent = `${done}/${total}`;
+
+
+
+    const flowClass = isIngredientFlow ? " is-ingredient-flow" : "";
+
+    const phaseClass = isTarePhase ? " is-tare-phase" : (isPourPhase ? " is-pour-phase" : "");
+
+    focusCard.className = `tvw-ws-panel tvw-ws-face ${stepTypeClass(isIngredientFlow ? "add_ingredient" : stepType)}${flowClass}${phaseClass}`
+
+      + (role === "Nicotine" ? " tvw-role-nicotine-wrap" : "")
+
+      + (isPrep ? " is-prep-face" : "");
+
+
+
+    focusTitle.textContent = bottleName(displayP, isIngredientFlow ? "add_ingredient" : stepType);
+
+
+
+    const targetG = activePourTargetGrams(isPourPhase ? p : displayP);
+
+    const isWeigh = isPourPhase && targetG > 0;
+
+
+
+    const batchCtx = {
+
+      batchMl: sessionBatchMl(sess),
+
+      ratio: sessionTargetRatio(sess),
+
+    };
+
+
+
+    if (isPrep) {
+
+      const prepPhys = physicalActionFor("instruction", p, 0, batchCtx);
+
+      focusRole.textContent = prepPhys.action;
+
+      focusIngredient.textContent = prepPhys.ingredient;
+
+      focusBrand.textContent = "";
+
+      workflowPhase.textContent = prepPhys.phase;
+
+      focusWhy.textContent = String(p.why || "").trim();
+
+      focusWhy.style.display = focusWhy.textContent ? "" : "none";
+
+      updatePourEquiv(p, 0, { show: false });
+
+    } else if (isIngredientFlow) {
+
+      const phys = physicalActionFor(isTarePhase ? "tare" : "add_ingredient", displayP, targetG, batchCtx);
+
+      focusRole.textContent = phys.action || "";
+
+      focusRole.style.display = phys.action ? "" : "none";
+
+      focusIngredient.textContent = phys.ingredient;
+
+      focusBrand.textContent = phys.role || "";
+
+      workflowPhase.textContent = phys.phase || "";
+
+      workflowPhase.style.display = phys.phase ? "" : "none";
+
+      workflowPhase.style.whiteSpace = phys.phase && phys.phase.includes("\n") ? "pre-line" : "";
+
+      const whyLine = String(displayP.why || "").trim();
+
+      const pgNote = isPourPhase && isPgPour(displayP) && displayP.pg_adjustment_note
+
+        ? String(displayP.pg_adjustment_note).trim()
+
+        : "";
+
+      focusWhy.textContent = pgNote || whyLine;
+
+      focusWhy.style.display = (pgNote || whyLine) ? "" : "none";
+
+      focusWhy.style.whiteSpace = (pgNote || whyLine) && (pgNote || whyLine).includes("\n") ? "pre-line" : "";
+
+      updatePourEquiv(displayP, targetG, { show: isPourPhase });
+
+    } else {
+
+      const phys = physicalActionFor(stepType, p, targetG, batchCtx);
+
+      focusRole.textContent = phys.action || "";
+
+      focusRole.style.display = phys.action ? "" : "none";
+
+      focusIngredient.textContent = phys.ingredient;
+
+      focusBrand.textContent = phys.role || cleanDisplayName(p.brand || "");
+
+      focusBrand.style.display = (phys.role || (stepType !== "transition" && p.brand)) ? "" : "none";
+
+      workflowPhase.textContent = phys.phase || String(p.what || "").trim();
+
+      workflowPhase.style.display = workflowPhase.textContent ? "" : "none";
+
+      const whyLine = stepType === "transition" ? "" : String(p.why || "").trim();
+
+      focusWhy.textContent = whyLine;
+
+      focusWhy.style.display = whyLine ? "" : "none";
+
+      updatePourEquiv(p, targetG, { show: false });
+
+    }
+
+
+
+    if (isPrep || isTarePhase || stepType === "transition" || stepType === "recovery" || stepType === "caution" || stepType === "completion") {
+
+      scaleHero.classList.add("is-prep-hidden");
+
+      if (remainingReadout) {
+
+        remainingReadout.textContent = "";
+
+        remainingReadout.style.display = "none";
+
+      }
+
+    } else if (isPourPhase) {
+
+      scaleHero.classList.remove("is-prep-hidden", "is-solo");
+
+      focusG.textContent = targetG > 0 ? targetG.toFixed(2) : "—";
+
+      targetScaleLabel.textContent = "Target";
+
+      const underActiveEarly = underPourUi && Number(underPourUi.stepNo) === Number(current.step_no);
+
+      const scaleSeed = activePourScaleGrams(p, underPourUi, underActiveEarly, current.step_no);
+
+      const scaleSeedText = (window.GuidedScaleInput && window.GuidedScaleInput.formatScaleGrams)
+
+        ? window.GuidedScaleInput.formatScaleGrams(Number.isFinite(scaleSeed) ? scaleSeed : 0)
+
+        : (Number.isFinite(scaleSeed) ? scaleSeed.toFixed(2) : "0.00");
+
+      const pourStepNo = Number(current.step_no);
+
+      const existingInput = document.getElementById("focusMeasuredInput");
+
+      const samePourStep = scaleInputUi.stepNo === pourStepNo;
+
+      const preserveScaleInput = samePourStep
+
+        && existingInput
+
+        && scaleInputUi.state
+
+        && (scaleInputUi.state.focused || scaleInputUi.state.dirty);
+
+      scaleLiveBlock.style.display = "";
+
+      if (!preserveScaleInput) {
+
+        if (!samePourStep) {
+
+          resetScaleInputUi();
+
+        }
+
+        scaleInputUi.stepNo = pourStepNo;
+
+        scaleInputUi.state = createScaleInputState();
+
+        scaleLiveBlock.innerHTML = `
+
+        <span class="tvw-ws-lcd-label">Scale</span>
+
+        <div class="tvw-ws-lcd-value">
+
+          <label for="focusMeasuredInput" class="visually-hidden">Grams on scale</label>
+
+          <input id="focusMeasuredInput" class="tvw-ws-input" type="text" inputmode="decimal" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="0.00" value="${scaleSeedText}" aria-label="Grams on scale">
+
+          <span class="tvw-ws-unit">g</span>
+
+        </div>
+
+      `;
+
+      }
+
+      const readoutSeed = preserveScaleInput
+
+        ? parseScaleInputForReadout(existingInput.value)
+
+        : scaleSeed;
+
+      deltaReadout.style.display = "";
+
+      if (remainingReadout) remainingReadout.style.display = "";
+
+      syncActivePourReadout(readoutSeed != null ? readoutSeed : 0, targetG);
+
+    } else {
+
+      resetScaleInputUi();
+
+      scaleHero.classList.remove("is-prep-hidden");
+
+      scaleHero.classList.add("is-solo");
+
+      focusG.textContent = targetG > 0 ? targetG.toFixed(2) : "—";
+
+      targetScaleLabel.textContent = targetG > 0 ? "Target" : "—";
+
+      scaleLiveBlock.style.display = "none";
+
+      deltaReadout.style.display = "none";
+
+      if (remainingReadout) {
+
+        remainingReadout.textContent = "";
+
+        remainingReadout.style.display = "none";
+
+      }
+
+    }
+
+
+
+    const pctVal = displayP.percent != null ? displayP.percent : displayP.pct;
+
+    if (pctVal != null && isIngredientFlow) {
+
+      focusPct.textContent = `${Number(pctVal).toFixed(2)}%`;
+
+      focusPctWrap.style.display = "";
+
+    } else {
+
+      focusPctWrap.style.display = "none";
+
+    }
+
+
+
+    if (isPrep) {
+
+      goatLine.className = "tvw-ws-goat-inline";
+
+    } else if (!isPrep) {
+
+      const coachP = isIngredientFlow ? displayP : p;
+
+      const line = goatSays(coachP, stepType, coachCache);
+
+      goatLine.textContent = line;
+
+      goatLine.className = "tvw-ws-goat-inline" + (
+
+        stepType === "recovery" || stepType === "caution" ? " is-warn" : ""
+
+      );
+
+    }
+
+
+
+    // Suppress vague coach “Minor drift” on checkpoints; show concrete overpour note instead.
+    if (stepType === "transition" && p.checkpoint_note) {
+      const parts = String(p.checkpoint_note).split(/\n/).map((x) => x.trim()).filter(Boolean);
+      renderBenchNote({
+        title: parts[0] || "Slightly over",
+        body: parts.slice(1).join(" ") || parts[0] || "",
+        caution: String(p.checkpoint_note_kind || "").includes("over") || /slightly over/i.test(parts[0] || ""),
+        stop: false,
+      });
+      const coachDetail = String((coachCache && coachCache.detail) || "");
+      if (/minor drift/i.test(coachDetail) || /slight overpour noted/i.test(coachDetail)) {
+        goatLine.textContent = "";
+      }
+    } else if (stepType === "transition") {
+      const coachDetail = String((coachCache && coachCache.detail) || "");
+      if (/minor drift/i.test(coachDetail)) {
+        goatLine.textContent = "";
+      }
+    }
+
+
+
+    const primaryLabel = actionLabelFor(stepType, p);
+
+    const undoVisible = showUndoFor(stepType);
+
+    const underActive = underPourUi && Number(underPourUi.stepNo) === Number(current.step_no) && isPourPhase;
+
+    const nicRecoveryActive = nicotineRecoveryUi && Number(nicotineRecoveryUi.stepNo) === Number(current.step_no) && isPourPhase;
+
+    const ingName = underPourUi && underPourUi.ingredientName
+
+      ? underPourUi.ingredientName
+
+      : cleanDisplayName(displayP.name || displayP.ingredient_name || ingredientLabel(displayP));
+
+    if (nicRecoveryActive && nicotineRecoveryUi.mode === "over_decision") {
+
+      const dispT = Number(nicotineRecoveryUi.displayTarget) || targetG;
+      const curM = Number(nicotineRecoveryUi.measured) || 0;
+      const overBy = Math.max(0, curM - dispT);
+      const acceptAllowed = nicotineRecoveryUi.reading && nicotineRecoveryUi.reading.nicotine_accept_allowed !== false
+        && (p.nicotine_accept_allowed !== false);
+      const strictMode = String((p.nicotine_strictness_mode || nicotineRecoveryUi.reading && nicotineRecoveryUi.reading.nicotine_strictness_mode) || "personal");
+
+      renderBenchNote({
+        title: "Nicotine over target",
+        body: `Over by ${overBy.toFixed(2)} g. ${strictMode === "lab_client" ? "Client/lab mode: only slight overages may be accepted with confirmation." : "You may accept this slight over or fix the dose."}`,
+        caution: true,
+        stop: false,
+      });
+
+      goatLine.textContent = strictMode === "lab_client"
+        ? "Client/lab mode: correct the dose if you are unsure."
+        : "Accept only if you are comfortable with the final strength.";
+
+      goatLine.className = "tvw-ws-goat-inline is-warn";
+
+      focusActions.innerHTML = `
+
+        ${acceptAllowed ? `<button type="button" class="tvw-ws-commit tvw-ws-commit-secondary js-nicotine-accept-over" data-step-no="${current.step_no}">Accept Nicotine Over</button>` : ""}
+
+        <button type="button" class="tvw-ws-commit js-nicotine-fix-dose" data-step-no="${current.step_no}">Fix Nicotine Dose</button>
+
+      `;
+
+      if (!acceptAllowed && guidedPolicyBox) {
+        guidedPolicyBox.innerHTML += `<p class="tvw-ws-bench-note-body">Client/lab mode: nicotine over tolerance must be corrected.</p>`;
+      }
+
+    } else if (nicRecoveryActive && nicotineRecoveryUi.mode === "accept_confirm") {
+
+      const dispT = Number(nicotineRecoveryUi.displayTarget) || targetG;
+      const curM = Number(nicotineRecoveryUi.measured) || 0;
+      const overBy = Math.max(0, curM - dispT);
+
+      renderBenchNote({
+        title: "Accept nicotine over target?",
+        body: `Target: ${dispT.toFixed(2)} g\nActual: ${curM.toFixed(2)} g\nOver by: ${overBy.toFixed(2)} g\nFinal nicotine strength may be higher than the recipe target.\nThis will be saved in the batch log.`,
+        caution: true,
+        stop: false,
+      });
+
+      focusActions.innerHTML = `
+
+        <button type="button" class="tvw-ws-commit js-nicotine-confirm-accept" data-step-no="${current.step_no}">Yes, Accept &amp; Log</button>
+
+        <button type="button" class="tvw-ws-commit tvw-ws-commit-secondary js-nicotine-cancel-accept" data-step-no="${current.step_no}">Go Back</button>
+
+      `;
+
+    } else if (nicRecoveryActive && nicotineRecoveryUi.mode === "pour_back") {
+
+      renderBenchNote({
+        title: "Nicotine over target",
+        body: "Stop pouring. Pour the nicotine back into its original bottle. Put the mixing bottle back on the scale. Do not tare the scale. Some nicotine may remain in the mixing bottle. If you tare now, the next pour can make the dose too strong.",
+        caution: false,
+        stop: true,
+      });
+
+      goatLine.textContent = "Do not tare the scale.";
+
+      goatLine.className = "tvw-ws-goat-inline is-warn";
+
+      focusActions.innerHTML = `
+
+        <button type="button" class="tvw-ws-commit js-nicotine-poured-back" data-step-no="${current.step_no}">I POURED IT BACK</button>
+
+      `;
+
+    } else if (nicRecoveryActive && (nicotineRecoveryUi.mode === "recovery_check" || nicotineRecoveryUi.mode === "continue_pour" || nicotineRecoveryUi.mode === "still_over")) {
+
+      const dispT = Number(nicotineRecoveryUi.displayTarget) || targetG;
+
+      const curM = Number(nicotineRecoveryUi.measured) || 0;
+
+      const need = Math.max(0, dispT - curM);
+
+      const title = nicotineRecoveryUi.mode === "still_over" ? "Still over target." : "Nicotine recovery";
+
+      const extra = nicotineRecoveryUi.mode === "still_over"
+        ? "Pour a little more back into the nicotine bottle, then place the mixing bottle back on the scale."
+        : "Pour nicotine toward the remaining amount from the current scale reading.";
+
+      renderNicotineRecoveryProgressNote(title, dispT, curM, need, extra);
+
+      goatLine.textContent = "Do not tare.";
+
+      goatLine.className = "tvw-ws-goat-inline is-warn";
+
+      focusActions.innerHTML = `
+
+        <button type="button" class="tvw-ws-commit js-nicotine-check-weight" data-step-no="${current.step_no}">Check Weight</button>
+
+      `;
+
+    } else if (nicRecoveryActive && nicotineRecoveryUi.mode === "under_decision") {
+
+      const dispT = Number(nicotineRecoveryUi.displayTarget) || targetG;
+
+      const curM = Number(nicotineRecoveryUi.measured) || 0;
+
+      const need = Math.max(0, dispT - curM);
+
+      renderNicotineRecoveryProgressNote("Nicotine under target", dispT, curM, need, "Final nicotine strength will be affected. Add more carefully or accept the lower dose.");
+
+      focusActions.innerHTML = `
+
+        <button type="button" class="tvw-ws-commit js-accept-under" data-step-no="${current.step_no}">Accept Lower Dose</button>
+
+        <button type="button" class="tvw-ws-commit tvw-ws-commit-secondary js-nicotine-check-weight" data-step-no="${current.step_no}">Check Weight</button>
+
+      `;
+
+    } else if (underActive && underPourUi.mode === "large_decision") {
+
+      const dispT = Number(underPourUi.displayTarget) || targetG;
+
+      const curM = Number(underPourUi.measured) || 0;
+
+      const need = Math.max(0, dispT - curM);
+
+      renderUnderPourProgressNote("Still under", dispT, curM, need, "This pour does not look finished yet.");
+
+      focusActions.innerHTML = `
+
+        <button type="button" class="tvw-ws-commit js-continue-pouring" data-step-no="${current.step_no}">Continue Pouring</button>
+
+        <button type="button" class="tvw-ws-commit tvw-ws-commit-secondary js-save-partial" data-step-no="${current.step_no}">Save As Partial / Change Bottle</button>
+
+        <button type="button" class="tvw-ws-commit tvw-ws-commit-muted js-accept-under-large" data-step-no="${current.step_no}">Accept Underpour</button>
+
+      `;
+
+    } else if (underActive && underPourUi.mode === "accept_confirm") {
+
+      renderBenchNote({
+
+        title: "Accept this underpour?",
+
+        body: "This will change the recipe strength for this ingredient. Only confirm if you intend to keep this amount.",
+
+        caution: false,
+
+        stop: false,
+
+      });
+
+      focusActions.innerHTML = `
+
+        <button type="button" class="tvw-ws-commit js-confirm-accept-under" data-step-no="${current.step_no}">Confirm Accept Underpour</button>
+
+        <button type="button" class="tvw-ws-commit tvw-ws-commit-secondary js-back-large-decision" data-step-no="${current.step_no}">Back</button>
+
+      `;
+
+    } else if (underActive && underPourUi.mode === "change_bottle") {
+
+      const dispT = Number(underPourUi.displayTarget) || targetG;
+
+      const curM = Number(underPourUi.partialGrams || underPourUi.measured) || 0;
+
+      const need = Math.max(0, dispT - curM);
+
+      renderUnderPourProgressNote(
+
+        "Partial saved",
+
+        dispT,
+
+        curM,
+
+        need,
+
+        `Put the empty bottle aside. Pick up another ${ingName} bottle.`,
+
+      );
+
+      goatLine.textContent = `Keep the same vessel on the scale. Pour from the fresh ${ingName} bottle toward the remaining amount.`;
+
+      goatLine.className = "tvw-ws-goat-inline is-warn";
+
+      focusActions.innerHTML = `
+
+        <button type="button" class="tvw-ws-commit js-ack-change-bottle" data-step-no="${current.step_no}">Ready — Continue Pouring</button>
+
+      `;
+
+    } else if (underActive && underPourUi.mode === "continue_pour") {
+
+      const dispT = Number(underPourUi.displayTarget) || targetG;
+
+      const curM = Number(underPourUi.measured) || 0;
+
+      const need = Math.max(0, dispT - curM);
+
+      renderUnderPourProgressNote("Continue pouring", dispT, curM, need, "Add more to the same vessel, then check weight.");
+
+      goatLine.textContent = "Pour toward the remaining amount, then enter the new scale reading.";
+
+      goatLine.className = "tvw-ws-goat-inline";
+
+      focusActions.innerHTML = `
+
+        <button type="button" class="tvw-ws-commit js-done-step" data-step-no="${current.step_no}">Check Weight</button>
+
+        <button type="button" class="tvw-ws-commit tvw-ws-commit-secondary js-accept-under-large" data-step-no="${current.step_no}">Accept Underpour</button>
+
+      `;
+
+    } else if (underActive && underPourUi.mode === "decision") {
+
+      focusActions.innerHTML = `
+
+        <button type="button" class="tvw-ws-commit js-accept-under" data-step-no="${current.step_no}">Accept This Pour</button>
+
+        <button type="button" class="tvw-ws-commit tvw-ws-commit-secondary js-try-one-drop" data-step-no="${current.step_no}">Try One Drop</button>
+
+      `;
+
+    } else if (underActive && underPourUi.mode === "topup") {
+
+      const dispT = Number(underPourUi.displayTarget) || targetG;
+
+      const curM = Number(underPourUi.measured) || 0;
+
+      const need = Math.max(0, dispT - curM);
+
+      goatLine.textContent = "Add one tiny drop, then wait for the scale to settle.";
+
+      goatLine.className = "tvw-ws-goat-inline is-warn";
+
+      focusActions.innerHTML = `
+
+        <button type="button" class="tvw-ws-commit js-check-topup" data-step-no="${current.step_no}">Check Weight</button>
+
+        <button type="button" class="tvw-ws-commit tvw-ws-commit-secondary js-accept-under" data-step-no="${current.step_no}">Accept This Pour</button>
+
+      `;
+
+      if (guidedPolicyBox) {
+
+        guidedPolicyBox.innerHTML = `
+
+          <p class="tvw-ws-bench-note-title">Careful top-up</p>
+
+          <p class="tvw-ws-bench-note-body">Target: ${dispT.toFixed(2)} g<br>Current: ${curM.toFixed(2)} g<br>Needed: ${need.toFixed(2)} g<br>Add one tiny drop, then wait for the scale to settle.</p>
+
+        `;
+
+        guidedPolicyBox.className = "tvw-ws-alarm tvw-ws-bench-note is-caution";
+
+        guidedPolicyBox.classList.remove("d-none", "alert", "alert-warning", "alert-danger", "alert-info", "alert-secondary");
+
+      }
+
+    } else if (stepType === "completion") {
+
+      renderBenchNote({
+
+        title: "Finished mix",
+
+        body: "Label the bottle and note the batch date.\nTap Done to open your full batch report.",
+
+        caution: false,
+
+        stop: false,
+
+      });
+
+      goatLine.textContent = "";
+
+      goatLine.className = "tvw-ws-goat-inline";
+
+      focusActions.innerHTML = `
+
+        <button type="button" class="tvw-ws-commit js-done-step" data-step-no="${current.step_no}">${primaryLabel}</button>
+
+      `;
+
+    } else if (stepType === "recovery" && String(p.source_event || "").toLowerCase() === "overpour") {
+
+      const recoveryNote = seriousOverpourRecoveryNote(p);
+
+      renderBenchNote(recoveryNote);
+
+      goatLine.textContent = "";
+
+      goatLine.className = "tvw-ws-goat-inline";
+
+      focusActions.innerHTML = `
+
+        <button type="button" class="tvw-ws-commit js-done-step" data-step-no="${current.step_no}">${actionLabelFor("recovery", p)}</button>
+
+        ${undoVisible ? `<button type="button" class="tvw-ws-undo js-undo-step" data-step-no="${current.step_no}">${undoLabelFor(stepType)}</button>` : ""}
+
+      `;
+
+    } else {
+
+      focusActions.innerHTML = `
+
+        <button type="button" class="tvw-ws-commit js-done-step" data-step-no="${current.step_no}">${primaryLabel}</button>
+
+        ${undoVisible ? `<button type="button" class="tvw-ws-undo js-undo-step" data-step-no="${current.step_no}">${undoLabelFor(stepType)}</button>` : ""}
+
+      `;
+
+    }
+
+
+
+    const measuredInput = document.getElementById("focusMeasuredInput");
+
+    if (measuredInput && !measuredInput.dataset.scaleBound) {
+
+      measuredInput.dataset.scaleBound = "1";
+
+      if (!scaleInputUi.state) {
+
+        scaleInputUi.state = createScaleInputState();
+
+      }
+
+      if (scaleInputUi.stepNo == null) {
+
+        scaleInputUi.stepNo = Number(current.step_no);
+
+      }
+
+      const onValueChange = (val, raw) => {
+
+        const readoutVal = val != null ? val : parseScaleInputForReadout(raw);
+
+        if (readoutVal === null && String(raw || "").trim() !== "") {
+
+          focusMeasured.textContent = "Measured: --";
+
+          syncActivePourReadout(0, targetG);
+
+          return;
+
+        }
+
+        const grams = readoutVal != null ? readoutVal : 0;
+
+        focusMeasured.textContent = isPartialScaleEntry(raw)
+
+          ? `Measured: ${String(raw).trim()} g`
+
+          : `Measured: ${grams.toFixed(2)} g`;
+
+        syncActivePourReadout(grams, targetG);
+
+        if (underPourUi && (underPourUi.mode === "topup" || underPourUi.mode === "continue_pour") && Number(underPourUi.stepNo) === Number(current.step_no)) {
+
+          underPourUi.measured = grams;
+
+        }
+
+        if (nicotineRecoveryUi && Number(nicotineRecoveryUi.stepNo) === Number(current.step_no) && nicotineRecoveryUi.mode !== "pour_back") {
+
+          nicotineRecoveryUi.measured = grams;
+
+        }
+
+      };
+
+      if (window.GuidedScaleInput && typeof window.GuidedScaleInput.attachScaleInput === "function") {
+
+        scaleInputUi.controller = window.GuidedScaleInput.attachScaleInput(measuredInput, {
+
+          onValueChange,
+
+          state: scaleInputUi.state,
+
+          autoFocus: !scaleInputUi.state.focused && !scaleInputUi.state.dirty,
+
+        });
+
+      } else {
+
+        measuredInput.addEventListener("input", () => {
+
+          onValueChange(parseScaleInputGrams(measuredInput.value), measuredInput.value);
+
+        });
+
+        if (!scaleInputUi.state.focused && !scaleInputUi.state.dirty) {
+
+          measuredInput.focus();
+
+        }
+
+      }
+
+    }
+
+
+
+    if (stepType === "recovery") {
+
+      const resolveName = cleanDisplayName(
+
+        p.ingredient_name || p.name || p.ingredient_label || ingredientLabel(p),
+
+      );
+
+      if (resolveName) {
+
+        nextPreviewText.textContent = `Resolve ${resolveName} before moving on.`;
+
+        nextPreviewCard.style.display = "";
+
+      } else {
+
+        nextPreviewCard.style.display = "none";
+
+        nextPreviewText.textContent = "";
+
+      }
+
+    } else if (next) {
+
+      let previewName = "";
+
+      const nextType = stepTypeFor(next);
+
+      if (nextType === "tare") {
+
+        const pourNext = peekLinkedPourStep(steps, next) || steps.find((x) => Number(x.step_no) === Number(next.step_no) + 1);
+
+        const np = (pourNext && pourNext.payload) || next.payload || {};
+
+        previewName = cleanDisplayName(np.name || np.ingredient_name || ingredientLabel(np));
+
+      } else if (nextType === "add_ingredient") {
+
+        const np = next.payload || {};
+
+        previewName = cleanDisplayName(np.name || np.ingredient_name || ingredientLabel(np));
+
+      } else if (nextType === "transition") {
+
+        const np = next.payload || {};
+
+        previewName = cleanDisplayName(np.name || np.ingredient_name || "");
+
+        if (previewName) previewName = `Move ${previewName} left`;
+
+      } else if (nextType === "caution") {
+
+        previewName = "Nicotine safety check";
+
+      } else if (nextType === "completion") {
+
+        previewName = "Finish and label";
+
+      } else {
+
+        previewName = cleanDisplayName((next.payload || {}).title || bottleName(next.payload || {}, nextType));
+
+      }
+
+      const currentHand = isIngredientFlow
+
+        ? cleanDisplayName(displayP.name || displayP.ingredient_name || ingredientLabel(displayP))
+
+        : "";
+
+      const staleSelf = currentHand && previewName && previewName.toLowerCase() === currentHand.toLowerCase();
+
+      if (!previewName || staleSelf || isTarePhase) {
+
+        nextPreviewCard.style.display = "none";
+
+        nextPreviewText.textContent = "";
+
+      } else {
+
+        nextPreviewText.textContent = `Up next: ${previewName}`;
+
+        nextPreviewCard.style.display = "";
+
+      }
+
+    } else {
+
+      nextPreviewCard.style.display = "none";
+
+      nextPreviewText.textContent = "";
+
+    }
+
+  };
+
+
+
+  const applySession = (sess) => {
+
+    const prog = sess.progress || {};
+
+    if (completionSummary) {
+
+      const showDone = !!prog.all_done;
+
+      completionSummary.classList.toggle("d-none", !showDone);
+
+      if (showDone) {
+
+        focusCard.classList.add("d-none");
+
+        if (usedPanel) usedPanel.classList.add("d-none");
+
+        if (todoPanel) todoPanel.classList.add("d-none");
+
+        renderMixSummary(sess);
+
+        syncMixerNotesUi(sess);
+
+      } else {
+
+        syncMixerNotesUi(sess);
+
+      }
+
+    }
+
+    if (underPourUi) {
+
+      const cur = (sess.steps || []).find((x) => !x.completed_at);
+
+      if (!cur || Number(cur.step_no) !== Number(underPourUi.stepNo)) {
+
+        underPourUi = null;
+
+      } else if (!(cur.payload || {}).under_decision_pending && underPourUi.mode === "decision") {
+
+        // Server cleared pending without our UI knowing — keep top-up if already there.
+
+      }
+
+    }
+
+    setFocus(sess);
+
+  };
+
+
+
+  const escHtml = (s) => String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
+  const underPourNoteFromPolicy = (policy, reading) => {
+
+    const classification = String((reading && reading.classification) || (policy && policy.decision) || "").toLowerCase();
+
+    if (!classification.includes("under")) return null;
+
+    const warnings = ((policy && policy.warnings) || []).filter(Boolean);
+
+    const raw = String(warnings[0] || "").trim();
+
+    if (!raw) return null;
+
+    const parts = raw.split(/\n/).map((x) => x.trim()).filter(Boolean);
+
+    const title = parts[0] || "Slightly under";
+
+    const isLarge = isLargeUnderClassification(classification, null, { classification });
+
+    const body = isLarge
+
+      ? (parts.slice(1).join(" ") || "This pour does not look finished yet.")
+
+      : (parts.slice(1).join(" ") || "Close enough for this pour. One more drop may put you over target.");
+
+    return { title, body, caution: isLarge ? false : classification.includes("caution") };
+
+  };
+
+  const overPourNoteFromText = (raw, reading, policy) => {
+
+    const text = String(raw || "").trim();
+
+    const classification = String((reading && reading.classification) || (policy && policy.decision) || "").toLowerCase();
+
+    const isSlightOver = classification === "slight_over_target"
+
+      || /slightly over by/i.test(text)
+
+      || /small overpour detected/i.test(text);
+
+    const isSeriousOver = classification.includes("recovery")
+
+      || classification === "over_target_hard_stop"
+
+      || /reconcile required/i.test(text);
+
+    if (!text && !classification.includes("over")) return null;
+
+    if (!isSlightOver && !classification.includes("over") && !/over by/i.test(text) && !/overpour/i.test(text)) {
+      return null;
+    }
+
+    const parts = text.split(/\n/).map((x) => x.trim()).filter(Boolean);
+
+    let title = parts[0] || "";
+
+    let body = parts.slice(1).join(" ");
+
+    if (!title && reading && Number(reading.over_by_grams) > 0) {
+
+      title = `Slightly over by ${Number(reading.over_by_grams).toFixed(2)} g`;
+
+    }
+
+    if (!title && /over by/i.test(text)) title = text;
+
+    if (!body) {
+
+      if (reading && reading.base_adjusted) {
+
+        body = "Small overpour detected. The bench adjusted the remaining base where possible.";
+
+      } else if (isSlightOver) {
+
+        body = "Small overpour detected. Continue, but keep the next pours controlled.";
+
+      } else {
+
+        body = text;
+
+      }
+
+    }
+
+    if (!title) return null;
+
+    return {
+
+      title,
+
+      body,
+
+      caution: isSlightOver && !isSeriousOver,
+
+      stop: isSeriousOver,
+
+    };
+
+  };
+
+  const seriousOverpourRecoveryNote = (p) => {
+
+    const name = cleanDisplayName(p.ingredient_name || p.name || ingredientLabel(p)) || "Ingredient";
+
+    const target = Number(p.target_amount ?? p.target_grams ?? p.display_target_grams ?? 0);
+
+    const actual = Number(p.measured_amount ?? p.measured_grams ?? 0);
+
+    const overBy = Math.max(0, actual - target);
+
+    return {
+
+      title: `${name} overpoured by ${overBy.toFixed(2)} g`,
+
+      body: [
+
+        `Target: ${target.toFixed(2)} g`,
+
+        `Actual: ${actual.toFixed(2)} g`,
+
+        "This is too much to ignore.",
+
+        "The bench needs to adjust the remaining recipe before you continue.",
+
+      ].join("\n"),
+
+      stop: true,
+
+    };
+
+  };
+
+  const renderBenchNote = (note) => {
+
+    if (!note || !guidedPolicyBox) return false;
+
+    const bodyHtml = String(note.body || "")
+
+      .split(/\n/)
+
+      .map((line) => escHtml(line.trim()))
+
+      .filter(Boolean)
+
+      .join("<br>");
+
+    guidedPolicyBox.innerHTML = `
+
+      <p class="tvw-ws-bench-note-title">${escHtml(note.title)}</p>
+
+      <p class="tvw-ws-bench-note-body">${bodyHtml}</p>
+
+    `;
+
+    const tone = note.stop ? "is-stop" : (note.caution || note.title.toLowerCase().includes("over") ? "is-caution" : "is-info");
+
+    guidedPolicyBox.className = "tvw-ws-alarm tvw-ws-bench-note " + tone;
+
+    guidedPolicyBox.classList.remove("d-none", "alert", "alert-warning", "alert-danger", "alert-info", "alert-secondary");
+
+    return true;
+
+  };
+
+  const enterUnderDecision = (stepNo, policy, reading) => {
+
+    const measured = Number((reading && reading.measured_grams) || 0);
+
+    const displayTarget = Number((reading && reading.display_target_grams) || 0);
+
+    const classification = String((reading && reading.classification) || (policy && policy.decision) || "");
+
+    const mode = isLargeUnderClassification(classification, policy, reading) ? "large_decision" : "decision";
+
+    underPourUi = {
+
+      stepNo: Number(stepNo),
+
+      mode,
+
+      measured,
+
+      displayTarget,
+
+      partialGrams: Number((reading && reading.partial_grams) || 0),
+
+      ingredientName: "",
+
+      policy: policy || {},
+
+      reading: reading || {},
+
+    };
+
+  };
+
+  const syncUnderPourUiFromReading = (stepNo, body) => {
+
+    if (!underPourUi || Number(underPourUi.stepNo) !== Number(stepNo)) return;
+
+    const reading = body.reading || {};
+
+    const sess = body.session || {};
+
+    const step = ((sess.steps) || []).find((s) => Number(s.step_no) === Number(stepNo));
+
+    const payload = (step && step.payload) || {};
+
+    underPourUi.measured = Number(reading.measured_grams || underPourUi.measured || 0);
+
+    underPourUi.displayTarget = Number(reading.display_target_grams || underPourUi.displayTarget || 0);
+
+    underPourUi.partialGrams = Number(reading.partial_grams || payload.partial_grams || underPourUi.partialGrams || 0);
+
+    underPourUi.policy = body.policy || underPourUi.policy;
+
+    underPourUi.reading = reading || underPourUi.reading;
+
+    const serverMode = String(reading.under_pour_mode || payload.under_pour_mode || "").toLowerCase();
+
+    if (serverMode === "change_bottle") underPourUi.mode = "change_bottle";
+
+    else if (serverMode === "continue" && underPourUi.mode !== "accept_confirm") underPourUi.mode = "continue_pour";
+
+  };
+
+  const showAlarm = (policy, message, reading) => {
+
+    const sess = window.__guidedSessionLast;
+
+    const cur = sess && (sess.steps || []).find((s) => !s.completed_at);
+
+    const curType = cur ? stepTypeFor(cur) : "";
+
+    const curPayload = (cur && cur.payload) || {};
+
+    const onSeriousRecovery = curType === "recovery"
+
+      && String(curPayload.source_event || "").toLowerCase() === "overpour";
+
+    if (underPourUi && (underPourUi.mode === "topup" || underPourUi.mode === "continue_pour" || underPourUi.mode === "change_bottle")) {
+
+      return;
+
+    }
+
+    if (nicotineRecoveryUi && ["continue_pour", "recovery_check", "still_over", "under_decision", "over_decision", "accept_confirm"].includes(nicotineRecoveryUi.mode)) {
+
+      return;
+
+    }
+
+    const decision = String((policy && policy.decision) || "").toLowerCase();
+
+    const underNote = underPourNoteFromPolicy(policy, reading);
+
+    const overFromPolicy = overPourNoteFromText(
+
+      (((policy && policy.warnings) || []).filter(Boolean)[0] || message || ""),
+
+      reading,
+
+      policy,
+
+    );
+
+    const underGuide = !!underNote
+
+      || decision === "slight_under_target"
+
+      || decision === "under_target_caution"
+
+      || String((reading && reading.classification) || "").toLowerCase().includes("under");
+
+    const slightOver = decision === "slight_over_target"
+
+      || String((reading && reading.classification) || "").toLowerCase() === "slight_over_target"
+
+      || !!(overFromPolicy && overFromPolicy.caution);
+
+    const overDanger = (
+
+      decision.includes("recovery")
+
+      || decision === "over_target_hard_stop"
+
+      || String((reading && reading.classification) || "").toLowerCase().includes("recovery")
+
+      || !!(overFromPolicy && overFromPolicy.stop)
+
+    ) && !slightOver;
+
+    if (underNote) {
+
+      renderBenchNote({ ...underNote, caution: underNote.caution });
+
+      return;
+
+    }
+
+    if (overFromPolicy && !onSeriousRecovery) {
+
+      renderBenchNote(overFromPolicy);
+
+      return;
+
+    }
+
+    if (onSeriousRecovery) {
+
+      return;
+
+    }
+
+    const cls = window.PolicyFeedback.render(guidedPolicyBox, policy || {}, {
+
+      tone: "tvw",
+
+      warnLead: overDanger ? "Review correction." : "Worth a look before you continue.",
+
+      blockLead: "Stop. Fix this first.",
+
+    });
+
+    const hasPolicy = cls.warnings.length || cls.hardStops.length;
+
+    if (!hasPolicy && message) {
+
+      window.PolicyFeedback.notice(guidedPolicyBox, message, {
+
+        tone: "tvw",
+
+        severity: overDanger ? "danger" : "info",
+
+      });
+
+      guidedPolicyBox.className = "tvw-ws-alarm " + (overDanger ? "is-stop" : (underGuide ? "is-info" : "is-caution"));
+
+      guidedPolicyBox.classList.remove("d-none");
+
+      return;
+
+    }
+
+    if (!hasPolicy) {
+
+      guidedPolicyBox.className = "tvw-ws-alarm d-none";
+
+      return;
+
+    }
+
+    let toneCls = "is-caution";
+
+    if (cls.blocked || overDanger) toneCls = "is-stop";
+
+    else if (underGuide) toneCls = "is-info";
+
+    guidedPolicyBox.className = "tvw-ws-alarm " + toneCls;
+
+    guidedPolicyBox.classList.remove("d-none", "alert", "alert-warning", "alert-danger", "alert-info", "alert-secondary");
+
+  };
+
+
+
+  document.getElementById("guidedRoot").addEventListener("click", async (ev) => {
+
+    const doneBtn = ev.target.closest(".js-done-step");
+
+    const undoBtn = ev.target.closest(".js-undo-step");
+
+    const acceptBtn = ev.target.closest(".js-accept-under");
+
+    const tryDropBtn = ev.target.closest(".js-try-one-drop");
+
+    const checkTopupBtn = ev.target.closest(".js-check-topup");
+
+    const continuePourBtn = ev.target.closest(".js-continue-pouring");
+
+    const savePartialBtn = ev.target.closest(".js-save-partial");
+
+    const acceptUnderLargeBtn = ev.target.closest(".js-accept-under-large");
+
+    const confirmAcceptBtn = ev.target.closest(".js-confirm-accept-under");
+
+    const backLargeBtn = ev.target.closest(".js-back-large-decision");
+
+    const ackChangeBtn = ev.target.closest(".js-ack-change-bottle");
+
+    const nicotinePouredBackBtn = ev.target.closest(".js-nicotine-poured-back");
+
+    const nicotineCheckBtn = ev.target.closest(".js-nicotine-check-weight");
+
+    const nicotineFixBtn = ev.target.closest(".js-nicotine-fix-dose");
+
+    const nicotineAcceptOverBtn = ev.target.closest(".js-nicotine-accept-over");
+
+    const nicotineConfirmAcceptBtn = ev.target.closest(".js-nicotine-confirm-accept");
+
+    const nicotineCancelAcceptBtn = ev.target.closest(".js-nicotine-cancel-accept");
+
+    if (!doneBtn && !undoBtn && !acceptBtn && !tryDropBtn && !checkTopupBtn
+
+      && !continuePourBtn && !savePartialBtn && !acceptUnderLargeBtn
+
+      && !confirmAcceptBtn && !backLargeBtn && !ackChangeBtn
+
+      && !nicotinePouredBackBtn && !nicotineCheckBtn && !nicotineFixBtn
+
+      && !nicotineAcceptOverBtn && !nicotineConfirmAcceptBtn && !nicotineCancelAcceptBtn) return;
+
+    const postBtn = doneBtn || undoBtn || acceptBtn || checkTopupBtn || continuePourBtn || savePartialBtn
+      || confirmAcceptBtn || ackChangeBtn || nicotinePouredBackBtn || nicotineCheckBtn || nicotineFixBtn
+      || nicotineAcceptOverBtn || nicotineConfirmAcceptBtn || nicotineCancelAcceptBtn;
+    if (postBtn && stepSaveInFlight) return;
+
+    const stepNo = Number((doneBtn || undoBtn || acceptBtn || tryDropBtn || checkTopupBtn
+
+      || continuePourBtn || savePartialBtn || acceptUnderLargeBtn || confirmAcceptBtn
+
+      || backLargeBtn || ackChangeBtn || nicotinePouredBackBtn || nicotineCheckBtn
+
+      || nicotineFixBtn || nicotineAcceptOverBtn || nicotineConfirmAcceptBtn || nicotineCancelAcceptBtn).dataset.stepNo);
+
+    const measuredInput = document.getElementById("focusMeasuredInput");
+
+    const measuredRaw = measuredInput ? measuredInput.value : "";
+
+    const parsedMeasuredForUi = (fallback) => {
+
+      const resolved = resolveMeasuredGramsForStep(measuredRaw, stepNo, { requireSanity: false });
+
+      if (resolved.ok) return resolved.grams;
+
+      const n = parseScaleInputGrams(measuredRaw);
+
+      return n != null ? n : Number(fallback || 0);
+
+    };
+
+    if (acceptUnderLargeBtn && !confirmAcceptBtn) {
+
+      underPourUi = {
+
+        ...(underPourUi || {}),
+
+        stepNo,
+
+        mode: "accept_confirm",
+
+        measured: parsedMeasuredForUi((underPourUi && underPourUi.measured) || 0),
+
+        displayTarget: Number((underPourUi && underPourUi.displayTarget) || 0),
+
+        policy: (underPourUi && underPourUi.policy) || {},
+
+        reading: (underPourUi && underPourUi.reading) || {},
+
+      };
+
+      if (window.__guidedSessionLast) applySession(window.__guidedSessionLast);
+
+      return;
+
+    }
+
+    if (backLargeBtn) {
+
+      underPourUi = {
+
+        ...(underPourUi || {}),
+
+        stepNo,
+
+        mode: "large_decision",
+
+        measured: parsedMeasuredForUi((underPourUi && underPourUi.measured) || 0),
+
+        displayTarget: Number((underPourUi && underPourUi.displayTarget) || 0),
+
+        policy: (underPourUi && underPourUi.policy) || {},
+
+        reading: (underPourUi && underPourUi.reading) || {},
+
+      };
+
+      if (window.__guidedSessionLast) applySession(window.__guidedSessionLast);
+
+      return;
+
+    }
+
+    if (tryDropBtn) {
+
+      const dispT = Number((underPourUi && underPourUi.displayTarget) || 0);
+
+      const curM = parsedMeasuredForUi((underPourUi && underPourUi.measured) || 0);
+
+      underPourUi = {
+
+        stepNo,
+
+        mode: "topup",
+
+        measured: curM,
+
+        displayTarget: dispT,
+
+        policy: (underPourUi && underPourUi.policy) || {},
+
+        reading: (underPourUi && underPourUi.reading) || {},
+
+      };
+
+      if (window.__guidedSessionLast) applySession(window.__guidedSessionLast);
+
+      return;
+
+    }
+
+    if (nicotinePouredBackBtn) {
+
+      try {
+
+        const body = await completeGuidedStep(stepNo, { nicotine_action: "poured_back" }, nicotinePouredBackBtn);
+        if (!body) return;
+
+        window.__guidedSessionLast = body.session;
+
+        enterNicotineRecovery(stepNo, body.policy, body.reading, ((body.session.steps || []).find((s) => Number(s.step_no) === stepNo) || {}).payload || {});
+
+        applySession(body.session);
+
+        showAlarm(body.policy, body.message || "", body.reading);
+
+      } catch (e) {
+
+        if (e && e.session) {
+
+          window.__guidedSessionLast = e.session;
+
+          applySession(e.session);
+
+        }
+
+        showAlarm(e.policy, e.message, e.reading);
+
+      }
+
+      return;
+
+    }
+
+    if (nicotineFixBtn) {
+
+      try {
+
+        const body = await completeGuidedStep(stepNo, { nicotine_action: "fix_dose" }, nicotineFixBtn);
+        if (!body) return;
+
+        window.__guidedSessionLast = body.session;
+
+        enterNicotineRecovery(stepNo, body.policy, body.reading, ((body.session.steps || []).find((s) => Number(s.step_no) === stepNo) || {}).payload || {});
+
+        applySession(body.session);
+
+        showAlarm(body.policy, body.message || "", body.reading);
+
+      } catch (e) {
+
+        if (e && e.session) {
+
+          window.__guidedSessionLast = e.session;
+
+          applySession(e.session);
+
+        }
+
+        showAlarm(e.policy, e.message, e.reading);
+
+      }
+
+      return;
+
+    }
+
+    if (nicotineAcceptOverBtn) {
+
+      try {
+
+        const body = await completeGuidedStep(stepNo, { nicotine_action: "accept_over" }, nicotineAcceptOverBtn);
+        if (!body) return;
+
+        window.__guidedSessionLast = body.session;
+
+        enterNicotineRecovery(stepNo, body.policy, body.reading, ((body.session.steps || []).find((s) => Number(s.step_no) === stepNo) || {}).payload || {});
+
+        applySession(body.session);
+
+        showAlarm(body.policy, body.message || "", body.reading);
+
+      } catch (e) {
+
+        if (e && e.session) {
+
+          window.__guidedSessionLast = e.session;
+
+          applySession(e.session);
+
+        }
+
+        showAlarm(e.policy, e.message, e.reading);
+
+      }
+
+      return;
+
+    }
+
+    if (nicotineCancelAcceptBtn) {
+
+      try {
+
+        const body = await completeGuidedStep(stepNo, { nicotine_action: "cancel_accept" }, nicotineCancelAcceptBtn);
+        if (!body) return;
+
+        window.__guidedSessionLast = body.session;
+
+        enterNicotineRecovery(stepNo, body.policy, body.reading, ((body.session.steps || []).find((s) => Number(s.step_no) === stepNo) || {}).payload || {});
+
+        applySession(body.session);
+
+        showAlarm(body.policy, body.message || "", body.reading);
+
+      } catch (e) {
+
+        if (e && e.session) {
+
+          window.__guidedSessionLast = e.session;
+
+          applySession(e.session);
+
+        }
+
+        showAlarm(e.policy, e.message, e.reading);
+
+      }
+
+      return;
+
+    }
+
+    try {
+
+      const needsMeasured = !undoBtn && (doneBtn || acceptBtn || confirmAcceptBtn || checkTopupBtn || continuePourBtn || savePartialBtn || acceptUnderLargeBtn || nicotineCheckBtn);
+
+      let measuredGrams = null;
+
+      if (needsMeasured) {
+
+        const resolved = resolveMeasuredGramsForStep(measuredRaw, stepNo, { requireSanity: true });
+
+        if (!resolved.ok) {
+
+          showToast(resolved.message);
+
+          if (measuredInput) {
+
+            measuredInput.focus();
+
+            if (window.GuidedScaleInput && typeof window.GuidedScaleInput.selectAllOrEnd === "function") {
+
+              window.GuidedScaleInput.selectAllOrEnd(measuredInput);
+
+            }
+
+          }
+
+          return;
+
+        }
+
+        measuredGrams = resolved.grams;
+
+      }
+
+      const payload = { undo: !!undoBtn, measured_grams: measuredGrams != null ? measuredGrams : measuredRaw };
+
+      if (acceptBtn || confirmAcceptBtn) payload.accept_under = true;
+
+      if (nicotineConfirmAcceptBtn) payload.nicotine_action = "confirm_accept_over";
+
+      if (continuePourBtn) payload.under_action = "continue_pouring";
+
+      if (savePartialBtn) payload.under_action = "save_partial";
+
+      if (ackChangeBtn) payload.under_action = "ack_change_bottle";
+
+      const triggerBtn = postBtn || doneBtn || undoBtn;
+      const body = await completeGuidedStep(stepNo, payload, triggerBtn);
+      if (!body) return;
+
+      window.__guidedSessionLast = body.session;
+
+      if (body.awaiting_nicotine_recovery || body.awaiting_nicotine_over_decision) {
+
+        syncNicotineRecoveryUiFromReading(stepNo, body);
+
+        if (!nicotineRecoveryUi) {
+
+          const step = ((body.session.steps) || []).find((s) => Number(s.step_no) === Number(stepNo));
+
+          enterNicotineRecovery(stepNo, body.policy, body.reading, (step && step.payload) || {});
+
+        }
+
+        applySession(body.session);
+
+        showAlarm(body.policy, body.message || "", body.reading);
+
+        return;
+
+      }
+
+      if (body.awaiting_under_decision) {
+
+        if (underPourUi && underPourUi.mode === "topup" && Number(underPourUi.stepNo) === stepNo) {
+
+          syncUnderPourUiFromReading(stepNo, body);
+
+        } else if (continuePourBtn || savePartialBtn || ackChangeBtn) {
+
+          syncUnderPourUiFromReading(stepNo, body);
+
+        } else if (underPourUi && underPourUi.mode === "continue_pour" && Number(underPourUi.stepNo) === stepNo) {
+
+          syncUnderPourUiFromReading(stepNo, body);
+
+          if (isLargeUnderClassification((body.reading && body.reading.classification), body.policy, body.reading)) {
+
+            underPourUi.mode = "continue_pour";
+
+          }
+
+        } else {
+
+          const prevMode = underPourUi && underPourUi.mode;
+
+          enterUnderDecision(stepNo, body.policy, body.reading);
+
+          if (prevMode === "continue_pour" && isLargeUnderClassification((body.reading && body.reading.classification), body.policy, body.reading)) {
+
+            underPourUi.mode = "continue_pour";
+
+          }
+
+        }
+
+        applySession(body.session);
+
+        showAlarm(body.policy, body.message || "", body.reading);
+
+        return;
+
+      }
+
+      nicotineRecoveryUi = null;
+
+      underPourUi = null;
+
+      if (!undoBtn) {
+
+        const ack = stepAckMessage(body.session, stepNo);
+
+        if (ack) showToast(ack);
+
+      }
+
+      applySession(body.session);
+
+      showAlarm(body.policy, body.message || "", body.reading);
+
+    } catch (e) {
+
+      if (e && e.session) {
+
+        window.__guidedSessionLast = e.session;
+
+        applySession(e.session);
+
+      }
+
+      showAlarm(e.policy, e.message, e.reading);
+
+    }
+
+  });
+
+
+
+  window.__guidedSessionLast = JSON.parse(document.getElementById("guidedSessionBundle").textContent);
+
+  applySession(window.__guidedSessionLast);
+
+})();
+
+</script>
+
+{% endblock %}
+

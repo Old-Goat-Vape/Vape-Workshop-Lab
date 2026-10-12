@@ -1,0 +1,423 @@
+{% extends "base_public.html" %}
+{% block title %}{{ flavour.canonical_name }} | Flavour | The Vape Workshop Calculator{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw.css') }}">
+
+<div class="tvw-page">
+  <header class="card shadow-sm mb-3" id="summary">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+        <div class="flex-grow-1">
+          <h1 class="h4 mb-1">{{ flavour.canonical_name }}</h1>
+          <div class="text-secondary small mb-2">{{ flavour.brand or "Unknown manufacturer" }}</div>
+          <div class="d-flex flex-wrap gap-2 mb-2">
+            {% if flavour.usage_display_kind == 'avg_usage' %}
+              <span class="badge text-bg-info">Catalogue data</span>
+              <span class="small"><strong>{{ '%.2f'|format(flavour.usage_display_value) }}%</strong> typical usage (imported <code>avg_usage</code>)</span>
+            {% elif flavour.usage_display_kind == 'default_percent' %}
+              <span class="badge text-bg-secondary">Catalogue default</span>
+              <span class="small"><strong>{{ '%.2f'|format(flavour.usage_display_value) }}%</strong> suggested starting % (<code>default_percent</code>; no separate average on file)</span>
+            {% else %}
+              <span class="badge text-bg-dark">No usage hint</span>
+              <span class="small text-secondary">No <code>avg_usage</code> or <code>default_percent</code> on this catalogue row yet.</span>
+            {% endif %}
+          </div>
+          <div class="small text-secondary border-top border-secondary pt-2 mt-2">
+            <strong class="text-light">Your stash</strong>
+            {% if stash_binding.is_lab_linked %}
+              · Linked to Lab holdings{% if stash_binding.reference_id %} (ref #{{ stash_binding.reference_id }}){% endif %}
+            {% else %}
+              · Personal stash
+            {% endif %}
+            · <strong class="text-light">{{ '%.2f'|format(stash_binding.quantity_ml|float) }} ml</strong>
+            · <a class="link-info" href="#stash-actions">Adjust quantity</a>
+            · <a class="link-info text-decoration-none" href="{{ url_for('tvw_recipes.tvw_stash') }}">Open My Stash</a>
+          </div>
+          <div class="small text-secondary mt-2">
+            <a class="link-light text-decoration-none" href="#notes">Notes</a>
+            <span class="text-secondary">({{ community_counts.notes_visible }})</span>
+            ·
+            <a class="link-light text-decoration-none" href="#reviews">Reviews</a>
+            <span class="text-secondary">({{ community_counts.reviews_visible }})</span>
+            ·
+            <a class="link-light text-decoration-none" href="#recipes">Recipes</a>
+            <span class="text-secondary">({{ recipes_total }})</span>
+          </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_flavours') }}">Back to catalogue</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="card shadow-sm mb-3" id="stash-actions">
+    <div class="card-body">
+      <h2 class="h6 mb-2">Stash</h2>
+      {% if stash_binding.is_lab_linked %}
+        <p class="small text-secondary mb-2">Updates follow Lab shared holdings rules for your account.</p>
+      {% else %}
+        <p class="small text-secondary mb-2">Store how much you have on hand; <a class="link-info" href="{{ url_for('tvw_recipes.tvw_what_can_i_make') }}">What Can I Make</a> uses the same quantities.</p>
+      {% endif %}
+      <div class="d-flex flex-wrap gap-2 align-items-end">
+        <div style="min-width:8rem">
+          <label class="form-label small text-secondary mb-0">Qty (ml)</label>
+          <input id="stashQtyInput" type="number" min="0" step="0.1" class="form-control form-control-sm text-end" value="{{ '%.2f'|format(stash_binding.quantity_ml|float) }}">
+        </div>
+        <button id="stashSaveBtn" type="button" class="btn btn-sm btn-outline-success">Save to stash</button>
+        <button id="stashRemoveBtn" type="button" class="btn btn-sm btn-outline-danger">Remove from stash</button>
+        <span id="stashStatus" class="small text-secondary"></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="card shadow-sm mb-3" id="recipes">
+    <div class="card-body">
+      <h2 class="h6 mb-1">Recipes using this flavour</h2>
+      <p class="small text-secondary mb-3">
+        {{ recipes_total }} public recipe{{ 's' if recipes_total != 1 else '' }} whose <strong>current version</strong> includes this canonical reference (same visibility rules as the recipe library).
+      </p>
+      <div class="vstack gap-2">
+        {% for recipe in recipes_using %}
+          <a href="{{ url_for('tvw_recipes.tvw_recipe_detail', slug=(recipe.slug or recipe.id)) }}" class="tvw-list-row text-decoration-none text-light small d-flex flex-wrap justify-content-between gap-2">
+            <span>
+              <span class="fw-semibold">{{ recipe.name }}</span>
+              · v{{ recipe.current_version_number or "—" }}
+              · <span class="text-secondary text-uppercase">{{ (recipe.status or "WIP") }}</span>
+            </span>
+            {% if recipe.visibility %}
+              <span class="badge text-bg-dark text-uppercase" style="font-size:0.65rem">{{ recipe.visibility }}</span>
+            {% endif %}
+          </a>
+        {% else %}
+          <div class="text-secondary small">No matching recipes yet.</div>
+        {% endfor %}
+      </div>
+      {% if recipes_total_pages > 1 %}
+        <div class="d-flex flex-wrap gap-2 mt-3 align-items-center">
+          {% if recipes_page > 1 %}
+            <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_flavour_detail', flavour_id=flavour.id, recipes_page=recipes_page - 1) }}">Previous</a>
+          {% endif %}
+          <span class="small text-secondary">Page {{ recipes_page }} of {{ recipes_total_pages }}</span>
+          {% if recipes_page < recipes_total_pages %}
+            <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_flavour_detail', flavour_id=flavour.id, recipes_page=recipes_page + 1) }}">Next</a>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="card shadow-sm mb-3" id="notes">
+    <div class="card-body">
+      <h2 class="h6 mb-1">Community notes <span class="text-secondary fw-normal">({{ community_counts.notes_visible }} visible)</span></h2>
+      <p class="small text-secondary mb-3">Shown items respect active moderation; reported content may be hidden by admins.</p>
+      <h3 class="h6 small text-uppercase text-secondary mb-2">Add note</h3>
+      <div class="row g-2">
+        <div class="col-9">
+          <input id="noteInput" class="form-control form-control-sm" placeholder="Share your note for this flavour">
+        </div>
+        <div class="col-3 d-grid">
+          <button id="addNoteBtn" class="btn btn-sm btn-outline-light">Post</button>
+        </div>
+      </div>
+      <div id="notesList" class="vstack gap-2 mt-3">
+        {% for item in notes %}
+          <div class="tvw-list-row small d-flex flex-wrap align-items-start gap-2">
+            <div class="flex-grow-1">
+              <div>{{ item.note }}</div>
+              <div class="text-secondary">{{ item.author_username }}{% if item.created_at %} · {{ item.created_at }}{% endif %}</div>
+              {% if item.owner_moderation_visible and (not item.public_visible or (item.moderation_status or 'active')|lower != 'active') %}
+                <div class="text-warning small mt-1">
+                  Owner moderation view · {{ (item.moderation_status or "active")|upper }}
+                  {% if item.is_hidden %} · hidden from public view{% endif %}
+                  {% if item.moderation_reason %} · reason: {{ item.moderation_reason }}{% endif %}
+                  <div class="mt-1">Next: post an updated note or contact a moderator if you need a review.</div>
+                </div>
+              {% endif %}
+            </div>
+            <select class="form-select form-select-sm js-report-reason" style="max-width:11rem" data-note-id="{{ item.id }}">
+              <option value="spam">spam</option>
+              <option value="abusive">abusive</option>
+              <option value="duplicate">duplicate</option>
+              <option value="wrong_category">wrong_category</option>
+              <option value="misleading">misleading</option>
+              <option value="not_flavour">not_flavour</option>
+              <option value="other">other</option>
+            </select>
+            <button type="button" class="btn btn-sm btn-outline-danger js-report-note" data-note-id="{{ item.id }}">Report</button>
+          </div>
+        {% else %}
+          <div class="text-secondary small">No notes yet.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section class="card shadow-sm mb-3" id="reviews">
+    <div class="card-body">
+      <h2 class="h6 mb-1">Reviews <span class="text-secondary fw-normal">({{ community_counts.reviews_visible }} visible)</span></h2>
+      <p class="small text-secondary mb-3">Ratings and text follow the same visibility rules as notes.</p>
+      <h3 class="h6 small text-uppercase text-secondary mb-2">Add review</h3>
+      <div class="row g-2">
+        <div class="col-2">
+          <input id="reviewRating" type="number" min="0" max="5" step="0.5" value="4" class="form-control form-control-sm">
+        </div>
+        <div class="col-2">
+          <input id="reviewSteep" type="number" min="0" step="1" value="0" class="form-control form-control-sm" placeholder="Steep">
+        </div>
+        <div class="col-6">
+          <input id="reviewText" class="form-control form-control-sm" placeholder="Write your flavour review">
+        </div>
+        <div class="col-2 d-grid">
+          <button id="addReviewBtn" class="btn btn-sm btn-outline-light">Post</button>
+        </div>
+      </div>
+      <div id="reviewsList" class="vstack gap-2 mt-3">
+        {% for item in reviews %}
+          <div class="tvw-list-row small d-flex flex-wrap align-items-start gap-2">
+            <div class="flex-grow-1">
+              <div>Rating {{ item.rating }} / 5 · Steep {{ item.steep_days }} days</div>
+              <div>{{ item.review }}</div>
+              <div class="text-secondary">{{ item.author_username }}{% if item.created_at %} · {{ item.created_at }}{% endif %}</div>
+              {% if item.owner_moderation_visible and (not item.public_visible or (item.moderation_status or 'active')|lower != 'active') %}
+                <div class="text-warning small mt-1">
+                  Owner moderation view · {{ (item.moderation_status or "active")|upper }}
+                  {% if item.is_hidden %} · hidden from public view{% endif %}
+                  {% if item.moderation_reason %} · reason: {{ item.moderation_reason }}{% endif %}
+                  <div class="mt-1">Next: post an updated review or contact a moderator if you need a review.</div>
+                </div>
+              {% endif %}
+            </div>
+            <select class="form-select form-select-sm js-report-reason" style="max-width:11rem" data-review-id="{{ item.id }}">
+              <option value="spam">spam</option>
+              <option value="abusive">abusive</option>
+              <option value="duplicate">duplicate</option>
+              <option value="wrong_category">wrong_category</option>
+              <option value="misleading">misleading</option>
+              <option value="not_flavour">not_flavour</option>
+              <option value="other">other</option>
+            </select>
+            <button type="button" class="btn btn-sm btn-outline-danger js-report-review" data-review-id="{{ item.id }}">Report</button>
+          </div>
+        {% else %}
+          <div class="text-secondary small">No reviews yet.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const flavourId = {{ flavour.id }};
+  const stashBinding = {{ stash_binding|tojson }};
+  const notesList = document.getElementById("notesList");
+  const reviewsList = document.getElementById("reviewsList");
+  const stashQtyInput = document.getElementById("stashQtyInput");
+  const stashSaveBtn = document.getElementById("stashSaveBtn");
+  const stashRemoveBtn = document.getElementById("stashRemoveBtn");
+  const stashStatus = document.getElementById("stashStatus");
+
+  const apiJson = async (url, options = {}) => {
+    const response = await fetch(url, {
+      headers: { "Content-Type": "application/json" },
+      ...options,
+    });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.message || "Request failed");
+    return body;
+  };
+
+  const postReport = async (targetType, targetId, reason, detail) => {
+    await apiJson("/api/reports", {
+      method: "POST",
+      body: JSON.stringify({ target_type: targetType, target_id: targetId, reason, detail: detail || "" }),
+    });
+  };
+
+  stashSaveBtn?.addEventListener("click", async () => {
+    const qty = Number(stashQtyInput?.value || 0);
+    let body = {};
+    if (stashBinding?.is_lab_linked) {
+      if (stashBinding.reference_id) body = { reference_id: Number(stashBinding.reference_id), quantity_ml: qty };
+      else body = { flavour_id: flavourId, quantity_ml: qty };
+    } else {
+      body = { flavour_id: flavourId, quantity_ml: qty };
+    }
+    try {
+      await apiJson("/api/stash", {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      });
+      stashStatus.textContent = "Saved";
+    } catch (e) {
+      stashStatus.textContent = e.message || "Could not save stash entry.";
+    }
+  });
+
+  stashRemoveBtn?.addEventListener("click", async () => {
+    if (!confirm("Remove this flavour from stash?")) return;
+    const url = stashBinding?.is_lab_linked && stashBinding?.reference_id && !flavourId
+      ? `/api/stash/reference/${Number(stashBinding.reference_id)}`
+      : `/api/stash/${flavourId}`;
+    try {
+      await apiJson(url, { method: "DELETE" });
+      stashQtyInput.value = "0.00";
+      stashStatus.textContent = "Removed";
+    } catch (e) {
+      stashStatus.textContent = e.message || "Could not remove stash entry.";
+    }
+  });
+
+  const reasonSelect = () => {
+    const s = document.createElement("select");
+    s.className = "form-select form-select-sm";
+    s.style.maxWidth = "11rem";
+    for (const r of ["spam","abusive","duplicate","wrong_category","misleading","not_flavour","other"]) {
+      const o = document.createElement("option");
+      o.value = r;
+      o.textContent = r;
+      s.appendChild(o);
+    }
+    return s;
+  };
+
+  const esc = (s) => {
+    const d = document.createElement("div");
+    d.textContent = s == null ? "" : String(s);
+    return d.innerHTML;
+  };
+
+  const refreshNotes = async () => {
+    const body = await apiJson(`/api/flavours/${flavourId}/notes`);
+    notesList.innerHTML = "";
+    for (const item of body.items) {
+      const row = document.createElement("div");
+      row.className = "tvw-list-row small d-flex flex-wrap align-items-start gap-2";
+      const main = document.createElement("div");
+      main.className = "flex-grow-1";
+      const meta = [item.author_username || "unknown", item.created_at || ""].filter(Boolean).join(" · ");
+      main.innerHTML = `<div>${esc(item.note || "")}</div><div class="text-secondary">${esc(meta)}</div>`;
+      if (item.owner_moderation_visible && (!item.public_visible || String(item.moderation_status || "").toLowerCase() !== "active")) {
+        const hiddenTxt = Number(item.is_hidden || 0) === 1 ? " · hidden from public view" : "";
+        const reasonTxt = item.moderation_reason ? ` · reason: ${esc(item.moderation_reason)}` : "";
+        const mod = document.createElement("div");
+        mod.className = "text-warning small mt-1";
+        mod.innerHTML = `Owner moderation view · ${esc(String(item.moderation_status || "active").toUpperCase())}${hiddenTxt}${reasonTxt}<div class="mt-1">Next: post an updated note or contact a moderator if you need a review.</div>`;
+        main.appendChild(mod);
+      }
+      const sel = reasonSelect();
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn-sm btn-outline-danger";
+      btn.textContent = "Report";
+      btn.addEventListener("click", async () => {
+        try {
+          await postReport("note", item.id, sel.value, "");
+          alert("Report submitted. Thank you.");
+        } catch (e) {
+          alert(e.message);
+        }
+      });
+      row.appendChild(main);
+      row.appendChild(sel);
+      row.appendChild(btn);
+      notesList.appendChild(row);
+    }
+    if (!body.items.length) notesList.innerHTML = '<div class="text-secondary small">No notes yet.</div>';
+  };
+
+  const refreshReviews = async () => {
+    const body = await apiJson(`/api/flavours/${flavourId}/reviews`);
+    reviewsList.innerHTML = "";
+    for (const item of body.items) {
+      const row = document.createElement("div");
+      row.className = "tvw-list-row small d-flex flex-wrap align-items-start gap-2";
+      const main = document.createElement("div");
+      main.className = "flex-grow-1";
+      const meta = [item.author_username || "unknown", item.created_at || ""].filter(Boolean).join(" · ");
+      main.innerHTML = `<div>Rating ${esc(item.rating)} / 5 · Steep ${esc(item.steep_days ?? 0)} days</div><div>${esc(item.review || "")}</div><div class="text-secondary">${esc(meta)}</div>`;
+      if (item.owner_moderation_visible && (!item.public_visible || String(item.moderation_status || "").toLowerCase() !== "active")) {
+        const hiddenTxt = Number(item.is_hidden || 0) === 1 ? " · hidden from public view" : "";
+        const reasonTxt = item.moderation_reason ? ` · reason: ${esc(item.moderation_reason)}` : "";
+        const mod = document.createElement("div");
+        mod.className = "text-warning small mt-1";
+        mod.innerHTML = `Owner moderation view · ${esc(String(item.moderation_status || "active").toUpperCase())}${hiddenTxt}${reasonTxt}<div class="mt-1">Next: post an updated review or contact a moderator if you need a review.</div>`;
+        main.appendChild(mod);
+      }
+      const sel = reasonSelect();
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn-sm btn-outline-danger";
+      btn.textContent = "Report";
+      btn.addEventListener("click", async () => {
+        try {
+          await postReport("review", item.id, sel.value, "");
+          alert("Report submitted. Thank you.");
+        } catch (e) {
+          alert(e.message);
+        }
+      });
+      row.appendChild(main);
+      row.appendChild(sel);
+      row.appendChild(btn);
+      reviewsList.appendChild(row);
+    }
+    if (!body.items.length) reviewsList.innerHTML = '<div class="text-secondary small">No reviews yet.</div>';
+  };
+
+  notesList.addEventListener("click", async (ev) => {
+    const btn = ev.target.closest(".js-report-note");
+    if (!btn) return;
+    const id = parseInt(btn.getAttribute("data-note-id") || "0", 10);
+    const row = btn.closest(".tvw-list-row");
+    const sel = row && row.querySelector(".js-report-reason");
+    if (!id || !sel) return;
+    try {
+      await postReport("note", id, sel.value, "");
+      alert("Report submitted. Thank you.");
+    } catch (e) {
+      alert(e.message);
+    }
+  });
+
+  reviewsList.addEventListener("click", async (ev) => {
+    const btn = ev.target.closest(".js-report-review");
+    if (!btn) return;
+    const id = parseInt(btn.getAttribute("data-review-id") || "0", 10);
+    const row = btn.closest(".tvw-list-row");
+    const sel = row && row.querySelector(".js-report-reason");
+    if (!id || !sel) return;
+    try {
+      await postReport("review", id, sel.value, "");
+      alert("Report submitted. Thank you.");
+    } catch (e) {
+      alert(e.message);
+    }
+  });
+
+  document.getElementById("addNoteBtn").addEventListener("click", async () => {
+    const note = (document.getElementById("noteInput").value || "").trim();
+    if (!note) return;
+    await apiJson(`/api/flavours/${flavourId}/notes`, {
+      method: "POST",
+      body: JSON.stringify({ note }),
+    });
+    document.getElementById("noteInput").value = "";
+    await refreshNotes();
+  });
+
+  document.getElementById("addReviewBtn").addEventListener("click", async () => {
+    const rating = Number(document.getElementById("reviewRating").value || 0);
+    const steep_days = Number(document.getElementById("reviewSteep").value || 0);
+    const review = (document.getElementById("reviewText").value || "").trim();
+    await apiJson(`/api/flavours/${flavourId}/reviews`, {
+      method: "POST",
+      body: JSON.stringify({ rating, steep_days, review }),
+    });
+    document.getElementById("reviewText").value = "";
+    await refreshReviews();
+  });
+})();
+</script>
+{% endblock %}

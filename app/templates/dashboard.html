@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Old Goat Lab{% endblock %}
+
+{% block content %}
+<div class="mb-3 d-flex flex-wrap align-items-center gap-3">
+    <div class="flex-shrink-0 d-none d-sm-block">
+        {% with logo_href = url_for('dashboard_index'), show_wordmark = false %}{% include "partials/og_brand.html" %}{% endwith %}
+    </div>
+    <div>
+        <div class="og-page-eyebrow mb-1">Control center</div>
+        <h1 class="h3 fw-bold mb-0">OLD GOAT LAB <span class="text-secondary fw-light">// OVERVIEW</span></h1>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-12 col-md-4">
+        <div class="card h-100 border-secondary-subtle">
+            <div class="card-body">
+                <div class="text-secondary small text-uppercase">Inventory Assets</div>
+                <div class="display-6 fw-bold">{{ stats.total_items }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-4">
+        <div class="card h-100 border-secondary-subtle">
+            <div class="card-body">
+                <div class="text-secondary small text-uppercase">Low Stock Signals</div>
+                <div class="display-6 fw-bold text-warning">{{ stats.low_stock_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-4">
+        <div class="card h-100 border-secondary-subtle">
+            <div class="card-body">
+                <div class="text-secondary small text-uppercase">Daily Volume (ml)</div>
+                <div class="display-6 fw-bold text-info">{{ stats.recent_mixes }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<section class="card shadow-sm">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h6 mb-0">Launch Actions</h2>
+            <span class="small text-secondary">Production shortcuts only</span>
+        </div>
+        <div class="row g-2">
+            <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('recipes.library') }}" class="btn btn-outline-warning">Start Mix</a></div>
+            <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('recipes.pricing_sheet') }}" class="btn btn-outline-warning">Price List Worksheet</a></div>
+            <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('recipes.cost_calculator') }}" class="btn btn-outline-warning">Recipe Cost Calculator</a></div>
+            <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('recipes.create_recipe') }}" class="btn btn-outline-light">Recipe Creator</a></div>
+            <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('library.index') }}" class="btn btn-outline-light">Inventory / Library</a></div>
+            <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('mix.history') }}" class="btn btn-outline-light">Batch Logs</a></div>
+            {% if can_access_production_jobs %}
+            <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('production_jobs.index') }}" class="btn btn-outline-info">Production Jobs</a></div>
+            {% endif %}
+            {% if session.get('role') in ['Old Goat', 'Master', 'Manager'] %}
+            <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('master_admin.console') }}" class="btn btn-outline-danger">Admin / Reports</a></div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+{% endblock %}

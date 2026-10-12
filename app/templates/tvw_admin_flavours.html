@@ -1,0 +1,104 @@
+{% extends "base_public.html" %}
+{% block title %}Flavour Moderation | TVW Admin{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw.css') }}">
+<div class="tvw-page">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h4 mb-0">Flavour Moderation</h1>
+    <div class="d-flex gap-2 flex-wrap">
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.dashboard') }}">Dashboard</a>
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.user_moderation') }}">Users</a>
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.community_moderation') }}">Community</a>
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.recipe_moderation') }}">Recipes</a>
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.audit_log') }}">Audit</a>
+      <a class="btn btn-sm btn-outline-warning" href="{{ url_for('tvw_admin.flavour_identity_cleanup') }}">Identity cleanup</a>
+    </div>
+  </div>
+
+  <form class="card card-body shadow-sm mb-3">
+    <div class="row g-2">
+      <div class="col-12 col-md-4"><input class="form-control form-control-sm" name="search" value="{{ search }}" placeholder="Search flavour or brand"></div>
+      <div class="col-12 col-md-3">
+        <select class="form-select form-select-sm" name="manufacturer">
+          <option value="">All manufacturers</option>
+          {% for m in manufacturers %}<option value="{{ m }}" {% if manufacturer == m %}selected{% endif %}>{{ m }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-3">
+        <select class="form-select form-select-sm" name="status">
+          <option value="">All statuses</option>
+          <option value="active" {% if status == 'active' %}selected{% endif %}>Active</option>
+          <option value="hidden" {% if status == 'hidden' %}selected{% endif %}>Hidden</option>
+          <option value="invalid" {% if status == 'invalid' %}selected{% endif %}>Invalid</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-1 d-grid"><button class="btn btn-sm btn-outline-light">Go</button></div>
+      <div class="col-6 col-md-1 d-grid"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('tvw_admin.flavour_moderation') }}">Reset</a></div>
+    </div>
+  </form>
+
+  <div class="small text-secondary mb-2">{{ total }} flavour rows</div>
+  <div class="table-responsive">
+    <table class="table table-dark table-sm align-middle">
+      <thead><tr><th>Name</th><th>Brand</th><th>Status</th><th>Source Meta</th><th>Actions</th></tr></thead>
+      <tbody>
+        {% for row in rows %}
+          <tr>
+            <td>{{ row.canonical_name }}</td>
+            <td>{{ row.brand }}</td>
+            <td>
+              {% if row.is_invalid %}<span class="badge text-bg-danger">Invalid</span>
+              {% elif row.is_hidden %}<span class="badge text-bg-warning">Hidden</span>
+              {% else %}<span class="badge text-bg-success">Active</span>
+              {% endif %}
+            </td>
+            <td class="small text-secondary">
+              {{ row.source_name or row.source or "-" }}<br>
+              {{ row.source_table or "-" }}#{{ row.source_record_id or "-" }}<br>
+              {% if row.vc_url %}<a href="{{ row.vc_url }}" target="_blank" rel="noopener">VC</a>{% endif %}
+            </td>
+            <td>
+              <form method="post" action="{{ url_for('tvw_admin.update_flavour', flavour_id=row.id) }}" class="d-flex flex-column gap-1">
+                <input type="hidden" name="action" value="hide">
+                <input class="form-control form-control-sm" name="reason" placeholder="Reason (optional)">
+                <div class="d-flex gap-1 flex-wrap">
+                  {% if not row.is_hidden %}
+                    <button class="btn btn-sm btn-outline-warning">Hide</button>
+                  {% else %}
+                    <button class="btn btn-sm btn-outline-success" name="action" value="unhide">Unhide</button>
+                  {% endif %}
+                  {% if not row.is_invalid %}
+                    <button class="btn btn-sm btn-outline-danger" name="action" value="mark_invalid" {% if not can_destructive %}disabled{% endif %}>Mark invalid</button>
+                  {% else %}
+                    <button class="btn btn-sm btn-outline-success" name="action" value="mark_valid">Mark valid</button>
+                  {% endif %}
+                </div>
+                <details>
+                  <summary class="small">Edit canonical fields</summary>
+                  <div class="mt-1 d-flex flex-column gap-1">
+                    <input class="form-control form-control-sm" name="canonical_name" placeholder="Canonical name" value="{{ row.canonical_name }}">
+                    <input class="form-control form-control-sm" name="brand" placeholder="Brand" value="{{ row.brand }}">
+                    <input class="form-control form-control-sm" name="category" placeholder="Category" value="{{ row.category }}">
+                    <button class="btn btn-sm btn-outline-light" name="action" value="edit">Save edit</button>
+                  </div>
+                </details>
+              </form>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" class="text-secondary">No rows found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if total_pages > 1 %}
+    <div class="d-flex gap-2 mt-3">
+      {% if page > 1 %}<a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.flavour_moderation', search=search, manufacturer=manufacturer, status=status, page=page-1) }}">Previous</a>{% endif %}
+      <span class="small text-secondary align-self-center">Page {{ page }} of {{ total_pages }}</span>
+      {% if page < total_pages %}<a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.flavour_moderation', search=search, manufacturer=manufacturer, status=status, page=page+1) }}">Next</a>{% endif %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+

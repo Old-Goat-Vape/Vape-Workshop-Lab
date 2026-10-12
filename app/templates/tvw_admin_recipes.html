@@ -1,0 +1,109 @@
+{% extends "base_public.html" %}
+{% block title %}Recipe moderation | TVW Admin{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw.css') }}">
+<div class="tvw-page">
+  {% macro moderation_chip(status, hidden, active) -%}
+    {% set s = (status or 'active')|lower %}
+    {% if s == 'active' %}<span class="badge text-bg-success">active</span>
+    {% elif s == 'review' %}<span class="badge text-bg-info">review</span>
+    {% elif s == 'flagged' %}<span class="badge text-bg-warning text-dark">flagged</span>
+    {% elif s == 'hidden' %}<span class="badge text-bg-warning text-dark">hidden</span>
+    {% elif s == 'archived' %}<span class="badge text-bg-secondary">archived</span>
+    {% elif s == 'removed' %}<span class="badge text-bg-dark">removed</span>
+    {% else %}<span class="badge text-bg-secondary">{{ s }}</span>
+    {% endif %}
+    {% if hidden %}<span class="badge text-bg-warning text-dark">hidden flag</span>{% endif %}
+    {% if not active %}<span class="badge text-bg-dark">inactive</span>{% endif %}
+  {%- endmacro %}
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h1 class="h4 mb-0">Recipe moderation</h1>
+    <div class="d-flex gap-2">
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.dashboard') }}">Dashboard</a>
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.user_moderation') }}">Users</a>
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.community_moderation') }}">Community</a>
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.flavour_moderation') }}">Flavours</a>
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.audit_log') }}">Audit</a>
+    </div>
+  </div>
+
+  <form class="card card-body shadow-sm mb-3">
+    <div class="row g-2">
+      <div class="col-12 col-md-3">
+        <input class="form-control form-control-sm" name="search" value="{{ search }}" placeholder="Title or author">
+      </div>
+      <div class="col-6 col-md-2">
+        <select class="form-select form-select-sm" name="visibility">
+          <option value="" {% if not visibility %}selected{% endif %}>Visibility</option>
+          <option value="public" {% if visibility == 'public' %}selected{% endif %}>public</option>
+          <option value="private" {% if visibility == 'private' %}selected{% endif %}>private</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <input class="form-control form-control-sm" name="status" value="{{ status }}" placeholder="Status (wip…)">
+      </div>
+      <div class="col-6 col-md-2">
+        <input class="form-control form-control-sm" name="moderation_status" value="{{ moderation_status }}" placeholder="Mod status">
+      </div>
+      <div class="col-6 col-md-2">
+        <select class="form-select form-select-sm" name="hidden">
+          <option value="" {% if not hidden_filter %}selected{% endif %}>Hidden</option>
+          <option value="visible" {% if hidden_filter == 'visible' %}selected{% endif %}>Not hidden</option>
+          <option value="hidden" {% if hidden_filter == 'hidden' %}selected{% endif %}>Hidden</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-1 d-grid"><button class="btn btn-sm btn-outline-light">Go</button></div>
+    </div>
+  </form>
+
+  <div class="small text-secondary mb-2">{{ total }} recipe(s)</div>
+  <div class="table-responsive">
+    <table class="table table-dark table-sm align-middle">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Author</th>
+          <th>Visibility</th>
+          <th>Status</th>
+          <th>Moderation</th>
+          <th>Ver.</th>
+          <th>Updated</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr class="{% if row.is_hidden %}table-warning{% elif not row.active %}table-secondary{% endif %}">
+            <td class="fw-semibold">{{ row.name }}</td>
+            <td>{{ row.owner_username or "—" }}</td>
+            <td>{{ row.visibility }}</td>
+            <td>{{ row.status }}</td>
+            <td>
+              {{ moderation_chip(row.moderation_status, row.is_hidden, row.active) }}
+            </td>
+            <td>{{ row.current_version_number or "—" }}</td>
+            <td class="small text-secondary">{{ row.updated_at or row.created_at }}</td>
+            <td class="text-end">
+              <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.recipe_moderation_detail', recipe_id=row.id) }}">Review</a>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="8" class="text-secondary">No recipes match.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if total_pages > 1 %}
+    <div class="d-flex gap-2 mt-3">
+      {% if page > 1 %}
+        <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.recipe_moderation', search=search, visibility=visibility, status=status, moderation_status=moderation_status, hidden=hidden_filter, page=page-1) }}">Prev</a>
+      {% endif %}
+      <span class="small text-secondary align-self-center">Page {{ page }} / {{ total_pages }}</span>
+      {% if page < total_pages %}
+        <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.recipe_moderation', search=search, visibility=visibility, status=status, moderation_status=moderation_status, hidden=hidden_filter, page=page+1) }}">Next</a>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

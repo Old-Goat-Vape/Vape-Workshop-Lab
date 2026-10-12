@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Deliveries - Sales Control{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+  <div><h1 class="h3 mb-1">Deliveries</h1><div class="text-secondary small">Delivery headers and balances.</div></div>
+  <div class="d-flex gap-2"><a class="btn btn-outline-light btn-sm" href="{{ url_for('master_admin.sales_dashboard') }}">Back</a><a class="btn btn-warning btn-sm" href="{{ url_for('master_admin.sales_new_delivery') }}">+ New Delivery</a></div>
+</div>
+
+<div class="card border-0" style="background:#151515; border:1px solid #333 !important;">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-dark table-hover align-middle mb-0">
+        <thead><tr><th>#</th><th>Date</th><th>Client</th><th>Type</th><th>Status</th><th class="text-end">Sent</th><th class="text-end">Sold</th><th class="text-end">Paid</th><th class="text-end">Due</th><th class="text-end">Actions</th></tr></thead>
+        <tbody>
+          {% for d in deliveries %}
+          <tr>
+            <td>{{ d.delivery_number }}</td><td>{{ d.delivery_date }}</td><td>{{ d.client_name }}</td><td>{{ d.delivery_type }}</td><td>{{ d.status }}</td>
+            <td class="text-end">R {{ "%.2f"|format(d.sent_value or 0) }}</td>
+            <td class="text-end">R {{ "%.2f"|format(d.sold_value or 0) }}</td>
+            <td class="text-end">R {{ "%.2f"|format(d.paid_value or 0) }}</td>
+            <td class="text-end">R {{ "%.2f"|format(d.due_value or 0) }}</td>
+            <td class="text-end"><a class="btn btn-sm btn-outline-warning" href="{{ url_for('master_admin.sales_delivery_detail', delivery_id=d.id) }}">Open</a></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="10" class="text-center text-secondary py-4">No deliveries found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

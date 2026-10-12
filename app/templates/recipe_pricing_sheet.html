@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}Price List Worksheet - Old Goat Lab{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-start gap-3 mb-3">
+  <div>
+    <div class="og-page-eyebrow mb-1">Costing</div>
+    <h1 class="h3 mb-1">Client Price List Worksheet</h1>
+    <div class="text-secondary small">Concentrate cost from <code>flavor_reference.price_per_ml</code>. Add base liquid + packaging below for landed cost per bottle.</div>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a href="{{ url_for('recipes.library') }}" class="btn btn-outline-light btn-sm">Recipe Library</a>
+    <a href="{{ url_for('recipes.cost_calculator') }}" class="btn btn-outline-warning btn-sm">Recipe Cost Calculator</a>
+    <button type="button" class="btn btn-outline-warning btn-sm" id="copyPriceListBtn">Copy for spreadsheet</button>
+    <button type="button" class="btn btn-warning btn-sm" onclick="window.print()">Print</button>
+  </div>
+</div>
+
+<div class="card border-0 mb-3" style="background:#151515; border:1px solid #333 !important;">
+  <div class="card-body">
+    <h2 class="h6 text-warning mb-3">Global assumptions (apply to every row)</h2>
+    <div class="row g-2 align-items-end">
+      <div class="col-6 col-md-2">
+        <label class="form-label small text-secondary">Bottle size (ml)</label>
+        <input type="number" step="1" min="1" id="bottleMl" class="form-control bg-black border-secondary" value="30">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small text-secondary">Base liquid / ml</label>
+        <input type="number" step="0.0001" min="0" id="baseCostPerMl" class="form-control bg-black border-secondary" value="0" title="PG + VG + nicotine cost per ml (not in flavour %)">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small text-secondary">Bottle (R)</label>
+        <input type="number" step="0.01" min="0" id="bottleCost" class="form-control bg-black border-secondary" value="0">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small text-secondary">Label (R)</label>
+        <input type="number" step="0.01" min="0" id="labelCost" class="form-control bg-black border-secondary" value="0">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small text-secondary">Packaging (R)</label>
+        <input type="number" step="0.01" min="0" id="packagingCost" class="form-control bg-black border-secondary" value="0">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small text-secondary">Wholesale margin %</label>
+        <input type="number" step="0.1" min="0" max="95" id="wholesaleMargin" class="form-control bg-black border-secondary" value="35" title="Margin on wholesale price: (price - cost) / price">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small text-secondary">Retail margin %</label>
+        <input type="number" step="0.1" min="0" max="95" id="retailMargin" class="form-control bg-black border-secondary" value="55">
+      </div>
+    </div>
+    <div class="small text-secondary mt-2">
+      Formula: landed cost = (concentrate + base) × bottle ml + bottle + label + packaging.
+      Suggested price = cost ÷ (1 − margin%).
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 mb-3" style="background:#151515; border:1px solid #333 !important;">
+  <div class="card-body py-2">
+    <form method="GET" class="row g-2 align-items-end">
+      <div class="col-12 col-md-5">
+        <label class="form-label small text-secondary">Search</label>
+        <input name="search" class="form-control form-control-sm bg-black border-secondary" value="{{ search }}" placeholder="Name or code">
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small text-secondary">Status</label>
+        <select name="status" class="form-select form-select-sm bg-black border-secondary">
+          <option value="" {% if not status_filter %}selected{% endif %}>All statuses</option>
+          <option value="Production" {% if status_filter == 'Production' %}selected{% endif %}>Production</option>
+          <option value="Experimental" {% if status_filter == 'Experimental' %}selected{% endif %}>Experimental</option>
+          <option value="Custom" {% if status_filter == 'Custom' %}selected{% endif %}>Custom</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <button class="btn btn-outline-light btn-sm w-100">Filter</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0" style="background:#151515; border:1px solid #333 !important;" id="priceListCard">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h2 class="h6 mb-0">{{ total_count }} recipe{{ 's' if total_count != 1 else '' }}</h2>
+      <span class="small text-secondary">Sorted by name</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-dark table-hover align-middle mb-0 font-monospace small" id="priceListTable">
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Product</th>
+            <th class="text-end">Conc. R/ml</th>
+            <th class="text-end">Landed cost</th>
+            <th class="text-end">Wholesale</th>
+            <th class="text-end">Retail</th>
+            <th class="text-end">Wh. margin</th>
+            <th class="text-end">Ret. margin</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in recipes %}
+          <tr data-cost-per-ml="{{ '%.6f'|format(r.cost_per_ml or 0) }}" data-name="{{ r.name }}" data-code="{{ r.recipe_code }}">
+            <td class="text-warning-emphasis">#{{ r.recipe_code }}</td>
+            <td>
+              {{ r.name }}
+              {% if r.has_nicotine %}<span class="badge text-bg-danger ms-1">NIC</span>{% endif %}
+            </td>
+            <td class="text-end js-conc">R {{ "%.4f"|format(r.cost_per_ml or 0) }}</td>
+            <td class="text-end js-landed">—</td>
+            <td class="text-end text-success js-wholesale">—</td>
+            <td class="text-end text-info js-retail">—</td>
+            <td class="text-end js-wh-margin">—</td>
+            <td class="text-end js-ret-margin">—</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="text-center text-secondary py-4">No recipes match this filter.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>
+@media print {
+  .btn, form, .og-page-eyebrow { display: none !important; }
+  body { background: #fff !important; color: #000 !important; }
+  .card { border: 1px solid #ccc !important; background: #fff !important; }
+  .table-dark { --bs-table-bg: #fff; --bs-table-color: #000; }
+}
+</style>
+
+<script>
+(function () {
+  const money = (n) => "R " + (Number.isFinite(n) ? n.toFixed(2) : "0.00");
+  const pct = (n) => (Number.isFinite(n) ? n.toFixed(1) + "%" : "—");
+
+  function priceFromMargin(cost, marginPct) {
+    const m = Number(marginPct) / 100;
+    if (m >= 1) return cost;
+    return cost / (1 - m);
+  }
+
+  function marginOnPrice(cost, price) {
+    if (!price || price <= 0) return 0;
+    return ((price - cost) / price) * 100;
+  }
+
+  function recalc() {
+    const bottleMl = parseFloat(document.getElementById("bottleMl").value) || 0;
+    const basePerMl = parseFloat(document.getElementById("baseCostPerMl").value) || 0;
+    const bottle = parseFloat(document.getElementById("bottleCost").value) || 0;
+    const label = parseFloat(document.getElementById("labelCost").value) || 0;
+    const pack = parseFloat(document.getElementById("packagingCost").value) || 0;
+    const whMargin = parseFloat(document.getElementById("wholesaleMargin").value) || 0;
+    const retMargin = parseFloat(document.getElementById("retailMargin").value) || 0;
+    const overhead = bottle + label + pack;
+    const liquidPerBottle = bottleMl * basePerMl;
+
+    document.querySelectorAll("#priceListTable tbody tr[data-cost-per-ml]").forEach((row) => {
+      const conc = parseFloat(row.dataset.costPerMl) || 0;
+      const landed = conc * bottleMl + liquidPerBottle + overhead;
+      const wholesale = priceFromMargin(landed, whMargin);
+      const retail = priceFromMargin(landed, retMargin);
+      row.querySelector(".js-landed").textContent = money(landed);
+      row.querySelector(".js-wholesale").textContent = money(wholesale);
+      row.querySelector(".js-retail").textContent = money(retail);
+      row.querySelector(".js-wh-margin").textContent = pct(marginOnPrice(landed, wholesale));
+      row.querySelector(".js-ret-margin").textContent = pct(marginOnPrice(landed, retail));
+    });
+  }
+
+  ["bottleMl", "baseCostPerMl", "bottleCost", "labelCost", "packagingCost", "wholesaleMargin", "retailMargin"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("input", recalc);
+  });
+
+  document.getElementById("copyPriceListBtn")?.addEventListener("click", () => {
+    const bottleMl = document.getElementById("bottleMl").value;
+    const lines = ["Code\tProduct\tConcentrate R/ml\tLanded cost\tWholesale\tRetail\tWholesale margin\tRetail margin"];
+    document.querySelectorAll("#priceListTable tbody tr[data-cost-per-ml]").forEach((row) => {
+      lines.push([
+        row.dataset.code || "",
+        row.dataset.name || "",
+        row.dataset.costPerMl || "0",
+        row.querySelector(".js-landed")?.textContent?.replace("R ", "") || "",
+        row.querySelector(".js-wholesale")?.textContent?.replace("R ", "") || "",
+        row.querySelector(".js-retail")?.textContent?.replace("R ", "") || "",
+        row.querySelector(".js-wh-margin")?.textContent || "",
+        row.querySelector(".js-ret-margin")?.textContent || "",
+      ].join("\t"));
+    });
+  const header = `Bottle ${bottleMl}ml assumptions\n`;
+    navigator.clipboard.writeText(header + lines.join("\n")).then(() => {
+      alert("Copied — paste into Excel or Google Sheets.");
+    }).catch(() => {
+      prompt("Copy this:", header + lines.join("\n"));
+    });
+  });
+
+  recalc();
+})();
+</script>
+{% endblock %}

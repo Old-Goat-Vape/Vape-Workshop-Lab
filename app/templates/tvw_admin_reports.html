@@ -1,0 +1,121 @@
+{% extends "base_public.html" %}
+{% block title %}Reports | TVW Admin{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw.css') }}">
+<div class="tvw-page">
+  {% macro report_status_badge(s) -%}
+    {% set v = (s or 'open')|lower %}
+    {% if v == 'open' %}<span class="badge text-bg-warning text-dark">open</span>
+    {% elif v == 'escalated' %}<span class="badge text-bg-danger">escalated</span>
+    {% elif v == 'reviewed' %}<span class="badge text-bg-success">reviewed</span>
+    {% elif v == 'dismissed' %}<span class="badge text-bg-secondary">dismissed</span>
+    {% else %}<span class="badge text-bg-dark">{{ v }}</span>
+    {% endif %}
+  {%- endmacro %}
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h1 class="h4 mb-0">Content reports</h1>
+    <div class="d-flex gap-2 flex-wrap">
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.dashboard') }}">Dashboard</a>
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.community_moderation') }}">Community UGC</a>
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.recipe_moderation') }}">Recipes</a>
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.audit_log') }}">Audit</a>
+    </div>
+  </div>
+
+  <form class="card card-body shadow-sm mb-3" method="get">
+    <div class="row g-2">
+      <div class="col-12 col-md-3">
+        <select class="form-select form-select-sm" name="target_type">
+          <option value="">Any type</option>
+          <option value="recipe" {% if target_type == 'recipe' %}selected{% endif %}>recipe</option>
+          <option value="note" {% if target_type == 'note' %}selected{% endif %}>note</option>
+          <option value="review" {% if target_type == 'review' %}selected{% endif %}>review</option>
+          <option value="feedback" {% if target_type == 'feedback' %}selected{% endif %}>feedback</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-2">
+        <select class="form-select form-select-sm" name="status">
+          <option value="">Any status</option>
+          <option value="open" {% if status == 'open' %}selected{% endif %}>open</option>
+          <option value="escalated" {% if status == 'escalated' %}selected{% endif %}>escalated</option>
+          <option value="reviewed" {% if status == 'reviewed' %}selected{% endif %}>reviewed</option>
+          <option value="dismissed" {% if status == 'dismissed' %}selected{% endif %}>dismissed</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-4">
+        <input class="form-control form-control-sm" name="search" value="{{ search }}" placeholder="Search id, reporter, summary, detail">
+      </div>
+      <div class="col-6 col-md-1 d-grid"><button class="btn btn-sm btn-outline-light" type="submit">Filter</button></div>
+      <div class="col-6 col-md-2 d-grid"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('tvw_admin.content_reports_queue') }}">Reset</a></div>
+    </div>
+  </form>
+
+  <div class="small text-secondary mb-2">{{ total }} report(s)</div>
+
+  <div class="vstack gap-3">
+    {% for row in rows %}
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+            <div>
+              <span class="badge text-bg-secondary">#{{ row.id }}</span>
+              <span class="badge text-bg-info">{{ row.target_type }}</span>
+              <span class="badge text-bg-dark">target #{{ row.target_id }}</span>
+              {{ report_status_badge(row.status) }}
+            </div>
+            <div class="small text-secondary">{{ row.created_at }}</div>
+          </div>
+          <div class="small mb-1"><strong>Reporter:</strong> @{{ row.reporter_username }} · <strong>Reason:</strong> {{ row.reason }}</div>
+          <div class="tvw-list-row small mb-2" style="white-space: pre-wrap;">{{ row.target_summary }}</div>
+          {% if row.detail %}<div class="small text-secondary mb-2">Detail: {{ row.detail }}</div>{% endif %}
+          {% if row.reviewed_at %}
+            <div class="small text-secondary mb-2">Last moderation: {{ row.reviewed_at }} {% if row.reviewed_by_username %}(@{{ row.reviewed_by_username }}){% endif %}</div>
+          {% endif %}
+
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            {% if row.target_type == 'recipe' %}
+              <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.recipe_moderation_detail', recipe_id=row.target_id) }}">Recipe (admin)</a>
+              {% if row.target_recipe_slug %}
+                <a class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener" href="{{ url_for('tvw_recipes.tvw_recipe_detail', slug=row.target_recipe_slug) }}">Public recipe</a>
+              {% endif %}
+            {% else %}
+              <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.community_moderation', type=row.target_type, search=row.target_id) }}#content-{{ row.target_type }}-{{ row.target_id }}">UGC item (admin)</a>
+              {% if row.target_flavour_id %}
+                <a class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener" href="{{ url_for('tvw_recipes.tvw_flavour_detail', flavour_id=row.target_flavour_id) }}">Public flavour</a>
+              {% endif %}
+            {% endif %}
+          </div>
+
+          <form method="post" action="{{ url_for('tvw_admin.update_content_report', report_id=row.id) }}" class="d-flex flex-column gap-2">
+            <input type="hidden" name="return_target_type" value="{{ target_type }}">
+            <input type="hidden" name="return_status" value="{{ status }}">
+            <input type="hidden" name="return_search" value="{{ search }}">
+            <input type="hidden" name="return_page" value="{{ page }}">
+            <input class="form-control form-control-sm" name="note" placeholder="Moderator note (audit)">
+            <div class="d-flex flex-wrap gap-1">
+              <button type="submit" class="btn btn-sm btn-outline-success" name="action" value="mark_reviewed">Mark reviewed</button>
+              <button type="submit" class="btn btn-sm btn-outline-secondary" name="action" value="dismiss">Dismiss</button>
+              <button type="submit" class="btn btn-sm btn-outline-warning" name="action" value="escalate">Escalate</button>
+              <button type="submit" class="btn btn-sm btn-outline-info" name="action" value="reopen">Reopen</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    {% else %}
+      <div class="text-secondary">No reports for this filter.</div>
+    {% endfor %}
+  </div>
+
+  {% if total_pages > 1 %}
+    <div class="d-flex gap-2 mt-3">
+      {% if page > 1 %}
+        <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.content_reports_queue', target_type=target_type, status=status, search=search, page=page-1) }}">Prev</a>
+      {% endif %}
+      <span class="small text-secondary align-self-center">Page {{ page }} / {{ total_pages }}</span>
+      {% if page < total_pages %}
+        <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.content_reports_queue', target_type=target_type, status=status, search=search, page=page+1) }}">Next</a>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

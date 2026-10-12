@@ -1,0 +1,68 @@
+{% extends "base_public.html" %}
+{% block title %}Start guided mix · {{ recipe.name }} | The Vape Workshop Calculator{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw.css') }}">
+
+<div class="tvw-page">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-1">Guided mix</h1>
+      <p class="small text-secondary mb-0">
+        {{ recipe.name }} — same batch targets as <strong>Quick mix</strong> on the recipe page. Confirm version, then start your pour checklist.
+      </p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_recipe_detail', slug=(recipe.slug or recipe.id)) }}#mix-card">Quick mix on recipe</a>
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_my_mixes') }}">My mixes</a>
+    </div>
+  </div>
+
+  <form method="post" class="card shadow-sm">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-12 col-md-6">
+          <label class="form-label small text-secondary" for="version_id">Recipe version</label>
+          <select class="form-select form-select-sm" id="version_id" name="version_id" required>
+            {% for v in versions %}
+              <option value="{{ v.id }}" {% if default_version_id and (v.id|string) == default_version_id %}selected{% endif %}>
+                v{{ v.version_number }}{% if recipe.get('current_version_id') and v.id == recipe.get('current_version_id')|int %} (current){% endif %}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label small text-secondary" for="target_ml">Target ml</label>
+          <input class="form-control form-control-sm" id="target_ml" name="target_ml" type="number" min="5" step="1" value="{{ default_target_ml|int }}">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label small text-secondary" for="target_nic_mg_ml">Nic mg/ml</label>
+          <input class="form-control form-control-sm" id="target_nic_mg_ml" name="target_nic_mg_ml" type="number" min="0" step="0.1" value="{{ default_target_nic }}">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label small text-secondary" for="pg_ratio">PG %</label>
+          <input class="form-control form-control-sm" id="pg_ratio" name="pg_ratio" type="number" step="1" value="{{ default_pg_ratio|int }}">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label small text-secondary" for="vg_ratio">VG %</label>
+          <input class="form-control form-control-sm" id="vg_ratio" name="vg_ratio" type="number" step="1" value="{{ default_vg_ratio|int }}">
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label small text-secondary" for="nicotine_carrier">Nic carrier</label>
+          <select class="form-select form-select-sm" id="nicotine_carrier" name="nicotine_carrier">
+            <option value="PG" {% if default_nicotine_carrier == 'PG' %}selected{% endif %}>PG</option>
+            <option value="VG" {% if default_nicotine_carrier == 'VG' %}selected{% endif %}>VG</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label small text-secondary" for="nic_base_mg_ml">Nic base strength (mg/ml)</label>
+          <input class="form-control form-control-sm" id="nic_base_mg_ml" name="nic_base_mg_ml" type="number" min="1" step="1" value="{{ default_nic_base_mg_ml|int }}">
+        </div>
+      </div>
+      <div class="d-grid d-md-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-warning btn-sm">Start guided session</button>
+        <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_my_mixes') }}">My mixes</a>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

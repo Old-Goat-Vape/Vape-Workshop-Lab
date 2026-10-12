@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Production Jobs · Lab{% endblock %}
+{% block content %}
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-start gap-3 mb-4">
+  <div>
+    <div class="og-page-eyebrow mb-1" style="color:#5ec8d8;">Production</div>
+    <h1 class="h3 mb-1">Production Jobs</h1>
+    <div class="text-secondary small">Named manufacturing projects. Only Mix for this job counts toward a job.</div>
+  </div>
+  {% if can_manage %}
+  <a href="{{ url_for('production_jobs.create') }}" class="btn btn-warning fw-semibold">Create Production Job</a>
+  {% endif %}
+</div>
+
+{% if not jobs %}
+<div class="text-secondary">No production jobs yet.</div>
+{% else %}
+<div class="table-responsive">
+  <table class="table table-dark table-hover align-middle mb-0" style="--bs-table-bg:transparent;">
+    <thead>
+      <tr class="small text-secondary">
+        <th>Job</th>
+        <th>Type</th>
+        <th>Status</th>
+        <th>Recipes</th>
+        <th>Progress</th>
+        <th>Updated</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for j in jobs %}
+      <tr>
+        <td>
+          <a class="fw-semibold text-decoration-none" style="color:#ff9f43;" href="{{ url_for('production_jobs.detail', job_id=j.id) }}">{{ j.name }}</a>
+          {% if j.reference_label %}<div class="small text-secondary">{{ j.reference_label }}</div>{% endif %}
+        </td>
+        <td class="small text-secondary">{{ j.job_type }}</td>
+        <td>
+          {% set st = j.status %}
+          <span class="badge {% if st == 'complete' %}text-bg-success{% elif st == 'in_production' %}text-bg-info{% elif st == 'cancelled' %}text-bg-secondary{% elif st == 'ready' %}text-bg-warning{% else %}text-bg-dark border{% endif %}">{{ st }}</span>
+        </td>
+        <td>{{ j.recipe_count }}</td>
+        <td style="min-width:180px;">
+          <div class="small mb-1">{{ '%.0f'|format(j.completed_bottles) }}/{{ '%.0f'|format(j.target_bottles) }} bottles · {{ '%.0f'|format(j.progress_pct) }}%</div>
+          <div class="progress" style="height:8px; background:#222;">
+            <div class="progress-bar" role="progressbar" style="width: {{ j.progress_bar_pct }}%; background:#2ecc71;"></div>
+          </div>
+        </td>
+        <td class="small text-secondary">{{ j.updated_at }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Sales Control - Old Goat Lab{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h3 mb-1">Sales Control</h1>
+    <div class="text-secondary small">Consignment, direct sales, client balances, and field stock.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-light btn-sm" href="{{ url_for('master_admin.production_home') }}">Production</a>
+    <a class="btn btn-warning btn-sm" href="{{ url_for('master_admin.sales_new_delivery') }}">+ New Delivery</a>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-12 col-lg-3"><div class="card border-0 h-100" style="background:#151515; border:1px solid #333 !important;"><div class="card-body"><div class="text-secondary small">Outstanding Balances</div><div class="h4 mb-0">R {{ "%.2f"|format(summary.total_outstanding_balances or 0) }}</div></div></div></div>
+  <div class="col-12 col-lg-3"><div class="card border-0 h-100" style="background:#151515; border:1px solid #333 !important;"><div class="card-body"><div class="text-secondary small">Stock At Clients</div><div class="h4 mb-0">{{ summary.total_stock_currently_at_clients or 0 }} bottles</div></div></div></div>
+  <div class="col-12 col-lg-3"><div class="card border-0 h-100" style="background:#151515; border:1px solid #333 !important;"><div class="card-body"><div class="text-secondary small">Payments This Month</div><div class="h4 mb-0">R {{ "%.2f"|format(summary.payments_received_this_month or 0) }}</div></div></div></div>
+  <div class="col-12 col-lg-3"><div class="card border-0 h-100" style="background:#151515; border:1px solid #333 !important;"><div class="card-body"><div class="text-secondary small">Active Clients</div><div class="h4 mb-0">{{ summary.client_count or 0 }}</div></div></div></div>
+</div>
+
+<div class="d-flex gap-2 mb-3 flex-wrap">
+  <a class="btn btn-outline-light btn-sm" href="{{ url_for('master_admin.sales_clients') }}">Clients</a>
+  <a class="btn btn-outline-light btn-sm" href="{{ url_for('master_admin.sales_finished_goods') }}">Finished Goods</a>
+  <a class="btn btn-outline-light btn-sm" href="{{ url_for('master_admin.sales_deliveries') }}">Deliveries</a>
+  <a class="btn btn-outline-light btn-sm" href="{{ url_for('master_admin.sales_payments') }}">Payments</a>
+  <a class="btn btn-outline-light btn-sm" href="{{ url_for('master_admin.sales_outstanding_csv') }}">Export Outstanding CSV</a>
+  <a class="btn btn-outline-light btn-sm" href="{{ url_for('master_admin.sales_stock_at_clients_csv') }}">Export Stock At Client CSV</a>
+  <a class="btn btn-outline-light btn-sm" href="{{ url_for('master_admin.sales_top_selling_csv') }}">Export Top Selling CSV</a>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-xl-6">
+    <div class="card border-0" style="background:#151515; border:1px solid #333 !important;">
+      <div class="card-body">
+        <h2 class="h5 mb-2">Top Selling Products</h2>
+        <div class="table-responsive"><table class="table table-dark table-sm align-middle mb-0"><thead><tr><th>Product</th><th class="text-end">Size</th><th class="text-end">Sold</th></tr></thead><tbody>
+          {% for p in summary.top_selling_products %}
+          <tr><td>{{ p.product_name_snapshot }}</td><td class="text-end">{{ "%.0f"|format(p.bottle_size_ml or 0) }}ml</td><td class="text-end">{{ p.sold_qty or 0 }}</td></tr>
+          {% else %}<tr><td colspan="3" class="text-center text-secondary py-3">No sold history yet.</td></tr>{% endfor %}
+        </tbody></table></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-xl-6">
+    <div class="card border-0" style="background:#151515; border:1px solid #333 !important;">
+      <div class="card-body">
+        <h2 class="h5 mb-2">Recent Deliveries</h2>
+        <div class="table-responsive"><table class="table table-dark table-sm align-middle mb-0"><thead><tr><th>#</th><th>Client</th><th>Status</th><th class="text-end">Due</th></tr></thead><tbody>
+          {% for d in summary.recent_deliveries %}
+          <tr><td><a href="{{ url_for('master_admin.sales_delivery_detail', delivery_id=d.id) }}">{{ d.delivery_number }}</a></td><td>{{ d.client_name }}</td><td>{{ d.status }}</td><td class="text-end">R {{ "%.2f"|format(d.due_value or 0) }}</td></tr>
+          {% else %}<tr><td colspan="4" class="text-center text-secondary py-3">No deliveries yet.</td></tr>{% endfor %}
+        </tbody></table></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

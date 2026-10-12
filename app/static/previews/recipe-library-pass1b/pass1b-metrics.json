@@ -1,0 +1,274 @@
+{
+  "viewports": {
+    "1920x1080": {
+      "screenshot": "C:\\Users\\Wynand\\OneDrive - Nemtek (Pty) Ltd\\Desktop\\The_Vape_Workshop_Calculator\\app\\scripts\\..\\static\\previews\\recipe-library-pass1b\\recipe-library-1920x1080.png",
+      "metrics": {
+        "title": {
+          "fontSize": "34px",
+          "width": 1264,
+          "height": 41,
+          "padding": "0px"
+        },
+        "counts": {
+          "fontSize": "17px",
+          "width": 1264,
+          "height": 25,
+          "padding": "0px"
+        },
+        "searchInput": {
+          "fontSize": "17px",
+          "width": 1320,
+          "height": 51,
+          "padding": "12.8px 16.8px"
+        },
+        "searchBtn": {
+          "fontSize": "17px",
+          "width": 108,
+          "height": 51,
+          "padding": "0px 21.6px"
+        },
+        "scopeTab": {
+          "fontSize": "16px",
+          "width": 113,
+          "height": 44,
+          "padding": "8px 18px"
+        },
+        "filtersBtn": {
+          "fontSize": "16px",
+          "width": 82,
+          "height": 45,
+          "padding": "8px 18px"
+        },
+        "card": {
+          "fontSize": "16px",
+          "width": 711,
+          "height": 213,
+          "padding": "22px 22.4px"
+        },
+        "cardTitle": {
+          "fontSize": "22px",
+          "width": 151,
+          "height": 28,
+          "padding": "0px"
+        },
+        "cardMeta": {
+          "fontSize": "16px",
+          "width": 664,
+          "height": 22,
+          "padding": "0px"
+        },
+        "cardSubmeta": {
+          "fontSize": "16px",
+          "width": 664,
+          "height": 22,
+          "padding": "0px"
+        },
+        "cardBtn": {
+          "fontSize": "16px",
+          "width": 72,
+          "height": 46,
+          "padding": "8px 16.8px"
+        },
+        "favoriteBtn": {
+          "fontSize": "16px",
+          "width": 44,
+          "height": 44,
+          "padding": "6.4px 12px"
+        },
+        "moreBtn": {
+          "fontSize": "16px",
+          "width": 74,
+          "height": 46,
+          "padding": "8px 16.8px"
+        },
+        "gridColumns": "711.203px 711.203px",
+        "cardCount": 3,
+        "overflowX": false,
+        "viewport": {
+          "w": 1920,
+          "h": 1080
+        }
+      }
+    },
+    "1366x768": {
+      "screenshot": "C:\\Users\\Wynand\\OneDrive - Nemtek (Pty) Ltd\\Desktop\\The_Vape_Workshop_Calculator\\app\\scripts\\..\\static\\previews\\recipe-library-pass1b\\recipe-library-1366x768.png",
+      "metrics": {
+        "title": {
+          "fontSize": "34px",
+          "width": 1126,
+          "height": 41,
+          "padding": "0px"
+        },
+        "counts": {
+          "fontSize": "17px",
+          "width": 1126,
+          "height": 25,
+          "padding": "0px"
+        },
+        "searchInput": {
+          "fontSize": "17px",
+          "width": 1182,
+          "height": 51,
+          "padding": "12.8px 16.8px"
+        },
+        "searchBtn": {
+          "fontSize": "17px",
+          "width": 108,
+          "height": 51,
+          "padding": "0px 21.6px"
+        },
+        "scopeTab": {
+          "fontSize": "16px",
+          "width": 113,
+          "height": 44,
+          "padding": "8px 18px"
+        },
+        "filtersBtn": {
+          "fontSize": "16px",
+          "width": 82,
+          "height": 45,
+          "padding": "8px 18px"
+        },
+        "card": {
+          "fontSize": "16px",
+          "width": 642,
+          "height": 213,
+          "padding": "22px 22.4px"
+        },
+        "cardTitle": {
+          "fontSize": "22px",
+          "width": 151,
+          "height": 28,
+          "padding": "0px"
+        },
+        "cardMeta": {
+          "fontSize": "16px",
+          "width": 595,
+          "height": 22,
+          "padding": "0px"
+        },
+        "cardSubmeta": {
+          "fontSize": "16px",
+          "width": 595,
+          "height": 22,
+          "padding": "0px"
+        },
+        "cardBtn": {
+          "fontSize": "16px",
+          "width": 72,
+          "height": 46,
+          "padding": "8px 16.8px"
+        },
+        "favoriteBtn": {
+          "fontSize": "16px",
+          "width": 44,
+          "height": 44,
+          "padding": "6.4px 12px"
+        },
+        "moreBtn": {
+          "fontSize": "16px",
+          "width": 74,
+          "height": 46,
+          "padding": "8px 16.8px"
+        },
+        "gridColumns": "642.203px 642.203px",
+        "cardCount": 3,
+        "overflowX": false,
+        "viewport": {
+          "w": 1366,
+          "h": 768
+        }
+      }
+    },
+    "390x844": {
+      "screenshot": "C:\\Users\\Wynand\\OneDrive - Nemtek (Pty) Ltd\\Desktop\\The_Vape_Workshop_Calculator\\app\\scripts\\..\\static\\previews\\recipe-library-pass1b\\recipe-library-390x844.png",
+      "metrics": {
+        "title": {
+          "fontSize": "28px",
+          "width": 358,
+          "height": 34,
+          "padding": "0px"
+        },
+        "counts": {
+          "fontSize": "17px",
+          "width": 358,
+          "height": 25,
+          "padding": "0px"
+        },
+        "searchInput": {
+          "fontSize": "17px",
+          "width": 358,
+          "height": 51,
+          "padding": "12.8px 16.8px"
+        },
+        "searchBtn": {
+          "fontSize": "17px",
+          "width": 358,
+          "height": 48,
+          "padding": "0px 21.6px"
+        },
+        "scopeTab": {
+          "fontSize": "16px",
+          "width": 113,
+          "height": 44,
+          "padding": "8px 18px"
+        },
+        "filtersBtn": {
+          "fontSize": "16px",
+          "width": 82,
+          "height": 45,
+          "padding": "8px 18px"
+        },
+        "card": {
+          "fontSize": "16px",
+          "width": 358,
+          "height": 267,
+          "padding": "22px 22.4px"
+        },
+        "cardTitle": {
+          "fontSize": "22px",
+          "width": 151,
+          "height": 28,
+          "padding": "0px"
+        },
+        "cardMeta": {
+          "fontSize": "16px",
+          "width": 311,
+          "height": 22,
+          "padding": "0px"
+        },
+        "cardSubmeta": {
+          "fontSize": "16px",
+          "width": 311,
+          "height": 22,
+          "padding": "0px"
+        },
+        "cardBtn": {
+          "fontSize": "16px",
+          "width": 72,
+          "height": 46,
+          "padding": "8px 16.8px"
+        },
+        "favoriteBtn": {
+          "fontSize": "16px",
+          "width": 114,
+          "height": 44,
+          "padding": "6.4px 12px"
+        },
+        "moreBtn": {
+          "fontSize": "16px",
+          "width": 74,
+          "height": 46,
+          "padding": "8px 16.8px"
+        },
+        "gridColumns": "358px",
+        "cardCount": 3,
+        "overflowX": false,
+        "viewport": {
+          "w": 390,
+          "h": 844
+        }
+      }
+    }
+  }
+}

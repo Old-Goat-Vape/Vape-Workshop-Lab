@@ -1,0 +1,79 @@
+# --- Secrets & local env ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+**/secrets/
+
+# --- Databases (never commit live TVW / Lab data) ---
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+*.sqlite-shm
+*.sqlite-wal
+*.sqbpro
+instance/
+**/instance/
+
+# --- Virtual environments ---
+venv/
+.venv/
+env/
+ENV/
+
+# --- Python caches / tooling ---
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.Python
+
+# --- Logs & temp ---
+logs/
+*.log
+*.tmp
+*.swp
+*.bak
+*.backup
+*.orig
+
+# --- Local backups ---
+backup/
+backups/
+*_backup.db
+
+# --- Release / packaging artefacts (may contain DBs) ---
+release/
+*.zip
+
+# --- Editor / OS ---
+.vscode/
+.idea/
+*.code-workspace
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# --- Cursor / local previews ---
+.cursor_screenshots/
+.cursor/
+agent-transcripts/
+
+# --- Scraper / browser session noise ---
+*.cookie
+cookies.txt
+storage_state.json
+playwright-report/
+test-results/
+.cache/

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Old Goat Lab – Recipes{% endblock %}
+
+{% block content %}
+<h1>🐐 Recipes</h1>
+<p>
+Logged in as <strong>{{ user.username }}</strong> ({{ user.role }}) |
+<a href="/">Dashboard</a> |
+<a href="/logout">Logout</a>
+</p>
+
+{% for r in recipes %}
+<div style="border:1px solid #333; padding:15px; margin-bottom:15px;">
+    <h3>{{ r.name }}</h3>
+    <p>Total flavour: {{ r.total_flavour_percent }}%</p>
+    <form id="mix-form-{{ r.id }}"
+          action="{{ url_for('mix.init_batch') }}"
+          method="POST"
+          onsubmit="return handleMixSubmit(event, '{{ r.id }}')"
+          style="display:inline;">
+        <input type="hidden" name="recipe_id" value="{{ r.id }}">
+        <input type="hidden" name="version_id" value="{{ r.latest_version_id }}">
+        <input type="hidden" name="vessel_size" value="30">
+        <input type="hidden" name="style" value="MTL">
+        <input type="hidden" name="mix_mode" value="longfill">
+        <button type="submit">Mix This Recipe</button>
+    </form>
+</div>
+{% endfor %}
+{% endblock %}

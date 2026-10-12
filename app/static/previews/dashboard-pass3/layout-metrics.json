@@ -1,0 +1,682 @@
+{
+  "viewports": {
+    "1920x1080": {
+      "shell": {
+        "fontSize": "16px",
+        "width": 1440,
+        "height": 76
+      },
+      "dashboard": {
+        "fontSize": "16px",
+        "width": 1440,
+        "height": 1085
+      },
+      "actionGrid": {
+        "fontSize": "16px",
+        "width": 1440,
+        "height": 431
+      },
+      "brand": {
+        "fontSize": "22px",
+        "width": 189,
+        "height": 40
+      },
+      "nav": {
+        "fontSize": "17px",
+        "width": 85,
+        "height": 48
+      },
+      "title": {
+        "fontSize": "44px",
+        "width": 1440,
+        "height": 48
+      },
+      "welcome": {
+        "fontSize": "16px",
+        "width": 1440,
+        "height": 111
+      },
+      "primaryCard": {
+        "fontSize": "16px",
+        "width": 879,
+        "height": 431
+      },
+      "secondaryCard": {
+        "fontSize": "16px",
+        "width": 543,
+        "height": 190
+      },
+      "bottomCard": {
+        "fontSize": "16px",
+        "width": 543,
+        "height": 223
+      },
+      "cardTitle": {
+        "fontSize": "36px",
+        "width": 430,
+        "height": 40
+      },
+      "cardBody": {
+        "fontSize": "16px",
+        "width": 430,
+        "height": 22
+      },
+      "mixIllus": {
+        "fontSize": "16px",
+        "width": 280,
+        "height": 210
+      },
+      "createIllus": {
+        "fontSize": "16px",
+        "width": 124,
+        "height": 99
+      },
+      "primaryBtn": {
+        "fontSize": "16px",
+        "width": 137,
+        "height": 48
+      },
+      "secondaryBtn": {
+        "fontSize": "16px",
+        "width": 149,
+        "height": 48
+      },
+      "discoveryTitle": {
+        "fontSize": "32px",
+        "width": 1440,
+        "height": 37
+      },
+      "discoverFeatured": {
+        "fontSize": "16px",
+        "width": 566,
+        "height": 367
+      },
+      "discoverTab": {
+        "fontSize": "16px",
+        "width": 161,
+        "height": 44
+      },
+      "discoverCard": {
+        "fontSize": "16px",
+        "width": 418,
+        "height": 259
+      },
+      "recipeTitle": {
+        "fontSize": "22px",
+        "width": 379,
+        "height": 26
+      },
+      "actionAreaBottom": 671,
+      "viewport": {
+        "w": 1920,
+        "h": 1080,
+        "zoom": 1
+      }
+    },
+    "1366x768": {
+      "shell": {
+        "fontSize": "16px",
+        "width": 1302,
+        "height": 76
+      },
+      "dashboard": {
+        "fontSize": "16px",
+        "width": 1302,
+        "height": 1293
+      },
+      "actionGrid": {
+        "fontSize": "16px",
+        "width": 1302,
+        "height": 445
+      },
+      "brand": {
+        "fontSize": "22px",
+        "width": 189,
+        "height": 40
+      },
+      "nav": {
+        "fontSize": "17px",
+        "width": 85,
+        "height": 48
+      },
+      "title": {
+        "fontSize": "34.15px",
+        "width": 1302,
+        "height": 38
+      },
+      "welcome": {
+        "fontSize": "16px",
+        "width": 1302,
+        "height": 98
+      },
+      "primaryCard": {
+        "fontSize": "16px",
+        "width": 794,
+        "height": 445
+      },
+      "secondaryCard": {
+        "fontSize": "16px",
+        "width": 490,
+        "height": 208
+      },
+      "bottomCard": {
+        "fontSize": "16px",
+        "width": 490,
+        "height": 218
+      },
+      "cardTitle": {
+        "fontSize": "28px",
+        "width": 384,
+        "height": 31
+      },
+      "cardBody": {
+        "fontSize": "16px",
+        "width": 384,
+        "height": 22
+      },
+      "mixIllus": {
+        "fontSize": "16px",
+        "width": 280,
+        "height": 210
+      },
+      "createIllus": {
+        "fontSize": "16px",
+        "width": 124,
+        "height": 99
+      },
+      "primaryBtn": {
+        "fontSize": "16px",
+        "width": 137,
+        "height": 48
+      },
+      "secondaryBtn": {
+        "fontSize": "16px",
+        "width": 149,
+        "height": 48
+      },
+      "discoveryTitle": {
+        "fontSize": "28px",
+        "width": 1302,
+        "height": 32
+      },
+      "discoverFeatured": {
+        "fontSize": "16px",
+        "width": 511,
+        "height": 360
+      },
+      "discoverTab": {
+        "fontSize": "16px",
+        "width": 161,
+        "height": 44
+      },
+      "discoverCard": {
+        "fontSize": "16px",
+        "width": 767,
+        "height": 235
+      },
+      "recipeTitle": {
+        "fontSize": "19px",
+        "width": 728,
+        "height": 23
+      },
+      "actionAreaBottom": 672,
+      "viewport": {
+        "w": 1366,
+        "h": 768,
+        "zoom": 1
+      }
+    },
+    "1024x768": {
+      "shell": {
+        "fontSize": "16px",
+        "width": 960,
+        "height": 132
+      },
+      "dashboard": {
+        "fontSize": "16px",
+        "width": 960,
+        "height": 1579
+      },
+      "actionGrid": {
+        "fontSize": "16px",
+        "width": 960,
+        "height": 703
+      },
+      "brand": {
+        "fontSize": "22px",
+        "width": 189,
+        "height": 40
+      },
+      "nav": {
+        "fontSize": "17px",
+        "width": 85,
+        "height": 48
+      },
+      "title": {
+        "fontSize": "32px",
+        "width": 960,
+        "height": 35
+      },
+      "welcome": {
+        "fontSize": "16px",
+        "width": 960,
+        "height": 95
+      },
+      "primaryCard": {
+        "fontSize": "16px",
+        "width": 960,
+        "height": 262
+      },
+      "secondaryCard": {
+        "fontSize": "16px",
+        "width": 960,
+        "height": 186
+      },
+      "bottomCard": {
+        "fontSize": "16px",
+        "width": 960,
+        "height": 218
+      },
+      "cardTitle": {
+        "fontSize": "28px",
+        "width": 474,
+        "height": 31
+      },
+      "cardBody": {
+        "fontSize": "16px",
+        "width": 448,
+        "height": 22
+      },
+      "mixIllus": {
+        "fontSize": "16px",
+        "width": 280,
+        "height": 210
+      },
+      "createIllus": {
+        "fontSize": "16px",
+        "width": 124,
+        "height": 99
+      },
+      "primaryBtn": {
+        "fontSize": "16px",
+        "width": 137,
+        "height": 48
+      },
+      "secondaryBtn": {
+        "fontSize": "16px",
+        "width": 149,
+        "height": 48
+      },
+      "discoveryTitle": {
+        "fontSize": "28px",
+        "width": 960,
+        "height": 32
+      },
+      "discoverFeatured": {
+        "fontSize": "16px",
+        "width": 960,
+        "height": 260
+      },
+      "discoverTab": {
+        "fontSize": "16px",
+        "width": 161,
+        "height": 44
+      },
+      "discoverCard": {
+        "fontSize": "16px",
+        "width": 473,
+        "height": 235
+      },
+      "recipeTitle": {
+        "fontSize": "19px",
+        "width": 434,
+        "height": 23
+      },
+      "actionAreaBottom": 983,
+      "viewport": {
+        "w": 1024,
+        "h": 768,
+        "zoom": 1
+      }
+    },
+    "390x844": {
+      "shell": {
+        "fontSize": "16px",
+        "width": 358,
+        "height": 76
+      },
+      "dashboard": {
+        "fontSize": "16px",
+        "width": 358,
+        "height": 2586
+      },
+      "actionGrid": {
+        "fontSize": "16px",
+        "width": 358,
+        "height": 1035
+      },
+      "brand": {
+        "fontSize": "22px",
+        "width": 189,
+        "height": 40
+      },
+      "nav": {
+        "fontSize": "17px",
+        "width": 0,
+        "height": 0
+      },
+      "title": {
+        "fontSize": "32px",
+        "width": 358,
+        "height": 70
+      },
+      "welcome": {
+        "fontSize": "16px",
+        "width": 358,
+        "height": 130
+      },
+      "primaryCard": {
+        "fontSize": "16px",
+        "width": 358,
+        "height": 496
+      },
+      "secondaryCard": {
+        "fontSize": "16px",
+        "width": 358,
+        "height": 280
+      },
+      "bottomCard": {
+        "fontSize": "16px",
+        "width": 358,
+        "height": 222
+      },
+      "cardTitle": {
+        "fontSize": "28px",
+        "width": 268,
+        "height": 31
+      },
+      "cardBody": {
+        "fontSize": "16px",
+        "width": 268,
+        "height": 45
+      },
+      "mixIllus": {
+        "fontSize": "16px",
+        "width": 208,
+        "height": 156
+      },
+      "createIllus": {
+        "fontSize": "16px",
+        "width": 104,
+        "height": 83
+      },
+      "primaryBtn": {
+        "fontSize": "16px",
+        "width": 268,
+        "height": 52
+      },
+      "secondaryBtn": {
+        "fontSize": "16px",
+        "width": 308,
+        "height": 48
+      },
+      "discoveryTitle": {
+        "fontSize": "28px",
+        "width": 358,
+        "height": 32
+      },
+      "discoverFeatured": {
+        "fontSize": "16px",
+        "width": 358,
+        "height": 508
+      },
+      "discoverTab": {
+        "fontSize": "16px",
+        "width": 161,
+        "height": 44
+      },
+      "discoverCard": {
+        "fontSize": "16px",
+        "width": 358,
+        "height": 312
+      },
+      "recipeTitle": {
+        "fontSize": "19px",
+        "width": 319,
+        "height": 23
+      },
+      "actionAreaBottom": 1294,
+      "viewport": {
+        "w": 390,
+        "h": 844,
+        "zoom": 1
+      }
+    },
+    "1366x768@125": {
+      "shell": {
+        "fontSize": "16px",
+        "width": 1302,
+        "height": 76
+      },
+      "dashboard": {
+        "fontSize": "16px",
+        "width": 1302,
+        "height": 1293
+      },
+      "actionGrid": {
+        "fontSize": "16px",
+        "width": 1302,
+        "height": 445
+      },
+      "brand": {
+        "fontSize": "22px",
+        "width": 189,
+        "height": 40
+      },
+      "nav": {
+        "fontSize": "17px",
+        "width": 85,
+        "height": 48
+      },
+      "title": {
+        "fontSize": "34.15px",
+        "width": 1302,
+        "height": 38
+      },
+      "welcome": {
+        "fontSize": "16px",
+        "width": 1302,
+        "height": 98
+      },
+      "primaryCard": {
+        "fontSize": "16px",
+        "width": 794,
+        "height": 445
+      },
+      "secondaryCard": {
+        "fontSize": "16px",
+        "width": 490,
+        "height": 208
+      },
+      "bottomCard": {
+        "fontSize": "16px",
+        "width": 490,
+        "height": 218
+      },
+      "cardTitle": {
+        "fontSize": "28px",
+        "width": 384,
+        "height": 31
+      },
+      "cardBody": {
+        "fontSize": "16px",
+        "width": 384,
+        "height": 22
+      },
+      "mixIllus": {
+        "fontSize": "16px",
+        "width": 280,
+        "height": 210
+      },
+      "createIllus": {
+        "fontSize": "16px",
+        "width": 124,
+        "height": 99
+      },
+      "primaryBtn": {
+        "fontSize": "16px",
+        "width": 137,
+        "height": 48
+      },
+      "secondaryBtn": {
+        "fontSize": "16px",
+        "width": 149,
+        "height": 48
+      },
+      "discoveryTitle": {
+        "fontSize": "28px",
+        "width": 1302,
+        "height": 32
+      },
+      "discoverFeatured": {
+        "fontSize": "16px",
+        "width": 511,
+        "height": 360
+      },
+      "discoverTab": {
+        "fontSize": "16px",
+        "width": 161,
+        "height": 44
+      },
+      "discoverCard": {
+        "fontSize": "16px",
+        "width": 767,
+        "height": 235
+      },
+      "recipeTitle": {
+        "fontSize": "19px",
+        "width": 728,
+        "height": 23
+      },
+      "actionAreaBottom": 672,
+      "viewport": {
+        "w": 1366,
+        "h": 768,
+        "zoom": 1
+      }
+    },
+    "1366x768@150": {
+      "shell": {
+        "fontSize": "16px",
+        "width": 1302,
+        "height": 76
+      },
+      "dashboard": {
+        "fontSize": "16px",
+        "width": 1302,
+        "height": 1293
+      },
+      "actionGrid": {
+        "fontSize": "16px",
+        "width": 1302,
+        "height": 445
+      },
+      "brand": {
+        "fontSize": "22px",
+        "width": 189,
+        "height": 40
+      },
+      "nav": {
+        "fontSize": "17px",
+        "width": 85,
+        "height": 48
+      },
+      "title": {
+        "fontSize": "34.15px",
+        "width": 1302,
+        "height": 38
+      },
+      "welcome": {
+        "fontSize": "16px",
+        "width": 1302,
+        "height": 98
+      },
+      "primaryCard": {
+        "fontSize": "16px",
+        "width": 794,
+        "height": 445
+      },
+      "secondaryCard": {
+        "fontSize": "16px",
+        "width": 490,
+        "height": 208
+      },
+      "bottomCard": {
+        "fontSize": "16px",
+        "width": 490,
+        "height": 218
+      },
+      "cardTitle": {
+        "fontSize": "28px",
+        "width": 384,
+        "height": 31
+      },
+      "cardBody": {
+        "fontSize": "16px",
+        "width": 384,
+        "height": 22
+      },
+      "mixIllus": {
+        "fontSize": "16px",
+        "width": 280,
+        "height": 210
+      },
+      "createIllus": {
+        "fontSize": "16px",
+        "width": 124,
+        "height": 99
+      },
+      "primaryBtn": {
+        "fontSize": "16px",
+        "width": 137,
+        "height": 48
+      },
+      "secondaryBtn": {
+        "fontSize": "16px",
+        "width": 149,
+        "height": 48
+      },
+      "discoveryTitle": {
+        "fontSize": "28px",
+        "width": 1302,
+        "height": 32
+      },
+      "discoverFeatured": {
+        "fontSize": "16px",
+        "width": 511,
+        "height": 360
+      },
+      "discoverTab": {
+        "fontSize": "16px",
+        "width": 161,
+        "height": 44
+      },
+      "discoverCard": {
+        "fontSize": "16px",
+        "width": 767,
+        "height": 235
+      },
+      "recipeTitle": {
+        "fontSize": "19px",
+        "width": 728,
+        "height": 23
+      },
+      "actionAreaBottom": 672,
+      "viewport": {
+        "w": 1366,
+        "h": 768,
+        "zoom": 1
+      }
+    }
+  }
+}

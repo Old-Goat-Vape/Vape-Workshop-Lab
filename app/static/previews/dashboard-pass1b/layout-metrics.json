@@ -1,0 +1,346 @@
+{
+  "viewports": {
+    "1920x1080": {
+      "shell": {
+        "fontSize": "16px",
+        "width": 1440,
+        "height": 76
+      },
+      "dashboard": {
+        "fontSize": "16px",
+        "width": 1440,
+        "height": 924
+      },
+      "brand": {
+        "fontSize": "22px",
+        "width": 189,
+        "height": 40
+      },
+      "nav": {
+        "fontSize": "17px",
+        "width": 85,
+        "height": 48
+      },
+      "title": {
+        "fontSize": "44px",
+        "width": 1440,
+        "height": 48
+      },
+      "cardTitle": {
+        "fontSize": "36px",
+        "width": 795,
+        "height": 41
+      },
+      "cardBody": {
+        "fontSize": "19px",
+        "width": 672,
+        "height": 108
+      },
+      "primaryBtn": {
+        "fontSize": "18px",
+        "width": 150,
+        "height": 55
+      },
+      "discoveryTitle": {
+        "fontSize": "20px",
+        "width": 171,
+        "height": 24
+      },
+      "recipeTitle": {
+        "fontSize": "16px",
+        "width": 632,
+        "height": 22
+      },
+      "viewport": {
+        "w": 1920,
+        "h": 1080,
+        "zoom": 1
+      }
+    },
+    "1366x768": {
+      "shell": {
+        "fontSize": "16px",
+        "width": 1302,
+        "height": 76
+      },
+      "dashboard": {
+        "fontSize": "16px",
+        "width": 1302,
+        "height": 888
+      },
+      "brand": {
+        "fontSize": "22px",
+        "width": 189,
+        "height": 40
+      },
+      "nav": {
+        "fontSize": "17px",
+        "width": 85,
+        "height": 48
+      },
+      "title": {
+        "fontSize": "34.15px",
+        "width": 1302,
+        "height": 38
+      },
+      "cardTitle": {
+        "fontSize": "28.686px",
+        "width": 709,
+        "height": 33
+      },
+      "cardBody": {
+        "fontSize": "17px",
+        "width": 672,
+        "height": 94
+      },
+      "primaryBtn": {
+        "fontSize": "18px",
+        "width": 150,
+        "height": 55
+      },
+      "discoveryTitle": {
+        "fontSize": "18px",
+        "width": 154,
+        "height": 22
+      },
+      "recipeTitle": {
+        "fontSize": "16px",
+        "width": 563,
+        "height": 22
+      },
+      "viewport": {
+        "w": 1366,
+        "h": 768,
+        "zoom": 1
+      }
+    },
+    "1024x768": {
+      "shell": {
+        "fontSize": "16px",
+        "width": 960,
+        "height": 132
+      },
+      "dashboard": {
+        "fontSize": "16px",
+        "width": 960,
+        "height": 1033
+      },
+      "brand": {
+        "fontSize": "22px",
+        "width": 189,
+        "height": 40
+      },
+      "nav": {
+        "fontSize": "17px",
+        "width": 85,
+        "height": 48
+      },
+      "title": {
+        "fontSize": "32px",
+        "width": 960,
+        "height": 35
+      },
+      "cardTitle": {
+        "fontSize": "28px",
+        "width": 878,
+        "height": 32
+      },
+      "cardBody": {
+        "fontSize": "17px",
+        "width": 672,
+        "height": 26
+      },
+      "primaryBtn": {
+        "fontSize": "18px",
+        "width": 150,
+        "height": 55
+      },
+      "discoveryTitle": {
+        "fontSize": "18px",
+        "width": 154,
+        "height": 22
+      },
+      "recipeTitle": {
+        "fontSize": "16px",
+        "width": 392,
+        "height": 22
+      },
+      "viewport": {
+        "w": 1024,
+        "h": 768,
+        "zoom": 1
+      }
+    },
+    "390x844": {
+      "shell": {
+        "fontSize": "16px",
+        "width": 358,
+        "height": 76
+      },
+      "dashboard": {
+        "fontSize": "16px",
+        "width": 358,
+        "height": 1711
+      },
+      "brand": {
+        "fontSize": "22px",
+        "width": 189,
+        "height": 40
+      },
+      "nav": {
+        "fontSize": "17px",
+        "width": 0,
+        "height": 0
+      },
+      "title": {
+        "fontSize": "32px",
+        "width": 358,
+        "height": 70
+      },
+      "cardTitle": {
+        "fontSize": "28px",
+        "width": 308,
+        "height": 32
+      },
+      "cardBody": {
+        "fontSize": "17px",
+        "width": 308,
+        "height": 77
+      },
+      "primaryBtn": {
+        "fontSize": "18px",
+        "width": 308,
+        "height": 55
+      },
+      "discoveryTitle": {
+        "fontSize": "18px",
+        "width": 154,
+        "height": 22
+      },
+      "recipeTitle": {
+        "fontSize": "16px",
+        "width": 282,
+        "height": 22
+      },
+      "viewport": {
+        "w": 390,
+        "h": 844,
+        "zoom": 1
+      }
+    },
+    "1366x768@125": {
+      "shell": {
+        "fontSize": "16px",
+        "width": 1302,
+        "height": 76
+      },
+      "dashboard": {
+        "fontSize": "16px",
+        "width": 1302,
+        "height": 888
+      },
+      "brand": {
+        "fontSize": "22px",
+        "width": 189,
+        "height": 40
+      },
+      "nav": {
+        "fontSize": "17px",
+        "width": 85,
+        "height": 48
+      },
+      "title": {
+        "fontSize": "34.15px",
+        "width": 1302,
+        "height": 38
+      },
+      "cardTitle": {
+        "fontSize": "28.686px",
+        "width": 709,
+        "height": 33
+      },
+      "cardBody": {
+        "fontSize": "17px",
+        "width": 672,
+        "height": 94
+      },
+      "primaryBtn": {
+        "fontSize": "18px",
+        "width": 150,
+        "height": 55
+      },
+      "discoveryTitle": {
+        "fontSize": "18px",
+        "width": 154,
+        "height": 22
+      },
+      "recipeTitle": {
+        "fontSize": "16px",
+        "width": 563,
+        "height": 22
+      },
+      "viewport": {
+        "w": 1366,
+        "h": 768,
+        "zoom": 1
+      }
+    },
+    "1366x768@150": {
+      "shell": {
+        "fontSize": "16px",
+        "width": 1302,
+        "height": 76
+      },
+      "dashboard": {
+        "fontSize": "16px",
+        "width": 1302,
+        "height": 888
+      },
+      "brand": {
+        "fontSize": "22px",
+        "width": 189,
+        "height": 40
+      },
+      "nav": {
+        "fontSize": "17px",
+        "width": 85,
+        "height": 48
+      },
+      "title": {
+        "fontSize": "34.15px",
+        "width": 1302,
+        "height": 38
+      },
+      "cardTitle": {
+        "fontSize": "28.686px",
+        "width": 709,
+        "height": 33
+      },
+      "cardBody": {
+        "fontSize": "17px",
+        "width": 672,
+        "height": 94
+      },
+      "primaryBtn": {
+        "fontSize": "18px",
+        "width": 150,
+        "height": 55
+      },
+      "discoveryTitle": {
+        "fontSize": "18px",
+        "width": 154,
+        "height": 22
+      },
+      "recipeTitle": {
+        "fontSize": "16px",
+        "width": 563,
+        "height": 22
+      },
+      "viewport": {
+        "w": 1366,
+        "h": 768,
+        "zoom": 1
+      }
+    }
+  }
+}

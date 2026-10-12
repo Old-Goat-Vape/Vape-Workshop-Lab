@@ -1,0 +1,140 @@
+{% extends "base_public.html" %}
+{% block title %}{{ recipe.name }} · Batch history{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw.css') }}">
+
+<div class="tvw-page">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-1">Batch history · {{ recipe.name }}</h1>
+      <p class="small text-secondary mb-0">Completed guided mixes for this recipe — automatic batch logs and mixer notes.</p>
+    </div>
+    <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_recipe_detail', slug=(recipe.slug or recipe.id)) }}">Back to recipe</a>
+  </div>
+
+  <p class="small text-secondary mb-3">{{ total }} completed guided batch(es)</p>
+
+  {% if entries %}
+    <div class="vstack gap-3">
+      {% for entry in entries %}
+        {% set summary = entry.mix_summary or {} %}
+        <section class="card shadow-sm border-secondary">
+          <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+              <div>
+                <h2 class="h6 mb-1">
+                  {% if entry.completed_at %}{{ entry.completed_at }}{% else %}Batch{% endif %}
+                  {% if entry.mixer_username %} · {{ entry.mixer_username }}{% endif %}
+                </h2>
+                <p class="small text-secondary mb-0">
+                  {{ entry.batch_size_ml|int }} ml · {{ entry.target_pgvg }} PG/VG
+                  {% if entry.version_number is not none %} · v{{ entry.version_number }}{% endif %}
+                  {% if entry.target_nic %} · {{ entry.target_nic }} mg/ml nic{% endif %}
+                </p>
+              </div>
+              {% if viewer_user_id and entry.mixer_user_id == viewer_user_id %}
+                <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_guided_mix_session', session_id=entry.session_id) }}">Review session</a>
+              {% endif %}
+            </div>
+
+            {% if entry.user_notes %}
+              <div class="border border-secondary rounded p-3 mb-3">
+                <h3 class="h6 mb-2">Mixer notes</h3>
+                <div class="small mb-0" style="white-space: pre-wrap;">{{ entry.user_notes }}</div>
+                {% if entry.user_notes_updated_at %}
+                  <div class="small text-secondary mt-2 mb-0">Saved {{ entry.user_notes_updated_at }}</div>
+                {% endif %}
+              </div>
+            {% endif %}
+
+            {% if summary %}
+              <dl class="row small mb-3 g-2">
+                <div class="col-6 col-md-3">
+                  <dt class="text-secondary">Final volume</dt>
+                  <dd class="mb-0">{{ summary.estimated_final_volume_ml }} ml</dd>
+                </div>
+                <div class="col-6 col-md-3">
+                  <dt class="text-secondary">Final ratio</dt>
+                  <dd class="mb-0">{{ summary.estimated_final_ratio_label or '—' }} PG/VG</dd>
+                </div>
+                <div class="col-12 col-md-6">
+                  <dt class="text-secondary">Status</dt>
+                  <dd class="mb-0">{{ summary.completion_status or 'Complete' }}</dd>
+                </div>
+              </dl>
+
+              {% if summary.ratio_shift_explanation %}
+                <p class="small text-warning-emphasis mb-3">{{ summary.ratio_shift_explanation }}</p>
+              {% endif %}
+
+              {% if summary.pg_adjustments %}
+                <div class="mb-3">
+                  <h3 class="h6 mb-1">Adjustments made</h3>
+                  <p class="small text-secondary mb-1">{{ summary.pg_adjustments_heading or 'PG adjusted after accepted flavour overpours' }}</p>
+                  <ul class="small mb-0">
+                    {% for row in summary.pg_adjustments %}
+                      <li>{{ row.label }}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              {% endif %}
+
+              {% if summary.accepted_deviations %}
+                <div class="mb-3">
+                  <h3 class="h6 mb-1">Accepted deviations</h3>
+                  <ul class="small mb-0">
+                    {% for row in summary.accepted_deviations %}
+                      <li>{{ row.label }}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              {% endif %}
+
+              {% if summary.nicotine_events %}
+                <div class="mb-3">
+                  <h3 class="h6 mb-1">Nicotine</h3>
+                  <ul class="small mb-0">
+                    {% for row in summary.nicotine_events %}
+                      <li>{{ row.label }}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              {% endif %}
+
+              {% if summary.notes_for_next_time %}
+                <div class="mb-0">
+                  <h3 class="h6 mb-1">Notes for next time</h3>
+                  <ul class="small text-secondary mb-0">
+                    {% for note in summary.notes_for_next_time %}
+                      <li>{{ note }}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              {% endif %}
+            {% endif %}
+          </div>
+        </section>
+      {% endfor %}
+    </div>
+
+    {% if total_pages > 1 %}
+      <nav class="d-flex flex-wrap gap-2 mt-3" aria-label="Batch history pages">
+        {% if page > 1 %}
+          <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_recipe_mix_logs', slug=(recipe.slug or recipe.id), page=page - 1) }}">Previous</a>
+        {% endif %}
+        <span class="small text-secondary align-self-center">Page {{ page }} of {{ total_pages }}</span>
+        {% if page < total_pages %}
+          <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_recipe_mix_logs', slug=(recipe.slug or recipe.id), page=page + 1) }}">Next</a>
+        {% endif %}
+      </nav>
+    {% endif %}
+  {% else %}
+    <section class="card shadow-sm">
+      <div class="card-body">
+        <p class="small text-secondary mb-0">No completed guided batches logged for this recipe yet.</p>
+      </div>
+    </section>
+  {% endif %}
+</div>
+{% endblock %}

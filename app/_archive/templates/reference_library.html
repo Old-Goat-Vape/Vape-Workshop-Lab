@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}Master Catalog - Old Goat Lab{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --tab-inactive: #222;
+        --tab-active: #ff8c00;
+    }
+    .tabs { display: flex; gap: 5px; margin-bottom: 20px; border-bottom: 2px solid #333; }
+    .tab-btn { background: var(--tab-inactive); border: none; color: #888; padding: 12px 20px; cursor: pointer; border-radius: 5px 5px 0 0; transition: 0.2s; font-size: 0.9rem; }
+    .tab-btn.active { background: var(--tab-active); color: #000; font-weight: bold; }
+    .hidden-row { display: none !important; }
+    .badge-stock { color: #28a745; font-weight: bold; font-size: 0.75rem; background: rgba(40, 167, 69, 0.1); padding: 4px 8px; border-radius: 4px; }
+    .flavor-table tr:hover { background: #1a1a1a; transition: 0.1s; }
+    
+    /* Ensure table text is readable */
+    .flavor-table td { color: #ccc; }
+    .flavor-table strong { color: #fff; }
+</style>
+
+<div class="nav-header" style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; margin-top: 20px;">
+    <div>
+        <h2 style="color: var(--tab-active); margin: 0; font-weight: 800;">📚 MASTER CATALOG</h2>
+        <p style="color: #666; margin: 5px 0 0 0; font-size: 0.85rem;">Global database benchmarks vs local inventory.</p>
+    </div>
+    <a href="{{ url_for('dashboard_index') }}" class="btn-back" style="text-decoration: none; color: #fff; background: #333; padding: 10px 18px; border-radius: 6px; font-weight: bold; font-size: 0.8rem; border: 1px solid #444;">
+        ← BACK TO TERMINAL
+    </a>
+</div>
+
+<div class="tabs">
+    <button class="tab-btn active" onclick="filterTab('Flavor', this)">🍓 Flavors</button>
+    <button class="tab-btn" onclick="filterTab('Base', this)">⚗️ Bases</button>
+    <button class="tab-btn" onclick="filterTab('Hardware', this)">⚖️ Lab & Bottles</button>
+</div>
+
+<div class="card" style="background: #111; padding: 25px; border: 1px solid #222; border-radius: 12px;">
+    <div style="position: relative; margin-bottom: 20px;">
+        <input type="text" id="ref-search" style="width: 100%; padding: 15px; background: #0a0a0a; border: 1px solid #333; color: #fff; border-radius: 8px; font-size: 1rem; box-sizing: border-box;" 
+               placeholder="Search master catalog..." onkeyup="runFilter()">
+    </div>
+
+    <table class="flavor-table" style="width: 100%; border-collapse: collapse; text-align: left;">
+        <thead>
+            <tr style="border-bottom: 2px solid #222; color: #555; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 1px;">
+                <th style="padding: 12px;">Brand</th>
+                <th>Item Name</th>
+                <th>Benchmark Price</th>
+                <th>Cost/ml</th> 
+                <th>Order</th>
+                <th>Lab Status</th>
+            </tr>
+        </thead>
+        <tbody id="catalog-body">
+            {% for item in items %}
+            {# FIX 1: Ensure category defaults to 'Flavor' if NULL #}
+            {% set item_cat = item.category if item.category else 'Flavor' %}
+            
+            <tr class="item-row" data-category="{{ item_cat }}" style="border-bottom: 1px solid #1a1a1a;">
+                <td style="padding: 15px;"><strong>{{ item.brand }}</strong></td>
+                <td>{{ item.name }}</td>
+                
+                {# FIX 2: Formatting currency safely #}
+                <td style="color: var(--tab-active); font-weight: 500;">R {{ "%.2f"|format(item.price_10ml or 0.0) }}</td>
+                
+                <td style="color: #666; font-size: 0.85rem;">
+                    {% if item_cat != 'Hardware' %}
+                        R {{ "%.2f"|format(item.price_per_ml or 0.0) }}
+                    {% else %}
+                        --
+                    {% endif %}
+                </td>
+                
+                <td>
+                    {% if item.url and item.url != '#' %}
+                        <a href="{{ item.url }}" target="_blank" style="color: #3498db; text-decoration: none; font-size: 0.8rem; border: 1px solid #3498db33; padding: 4px 8px; border-radius: 4px;">🛒 Link</a>
+                    {% else %}
+                        <span style="color: #444; font-size: 0.8rem;">Manual Entry</span>
+                    {% endif %}
+                </td>
+                
+                <td>
+                    {% if item.in_stock %}
+                        <span class="badge-stock">✅ OWNED</span>
+                    {% else %}
+                        <button onclick="quickAdd({{ item.id }}, this)" style="background: #28a745; border: none; color: white; padding: 6px 12px; cursor: pointer; border-radius: 4px; font-weight: bold; font-size: 0.75rem;">➕ ADD TO LAB</button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+let activeTab = 'Flavor';
+
+function filterTab(cat, btn) {
+    activeTab = cat;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    runFilter();
+}
+
+function runFilter() {
+    const q = document.getElementById('ref-search').value.toLowerCase();
+    document.querySelectorAll('.item-row').forEach(row => {
+        const matchesTab = row.dataset.category === activeTab;
+        const text = row.innerText.toLowerCase();
+        
+        if (matchesTab && text.includes(q)) {
+            row.classList.remove('hidden-row');
+        } else {
+            row.classList.add('hidden-row');
+        }
+    });
+}
+
+async function quickAdd(id, btn) {
+    const originalContent = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerText = "...";
+    
+    try {
+        const res = await fetch('/api/inventory/quick-add', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ reference_id: id })
+        });
+        if (res.ok) {
+            btn.parentElement.innerHTML = '<span class="badge-stock">✅ Added</span>';
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
+            alert("Error adding to stock. Ensure API route /api/inventory/quick-add exists.");
+        }
+    } catch (e) {
+        btn.disabled = false;
+        btn.innerHTML = originalContent;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const flavorBtn = document.querySelector('.tab-btn');
+    if(flavorBtn) filterTab('Flavor', flavorBtn);
+});
+</script>
+{% endblock %}

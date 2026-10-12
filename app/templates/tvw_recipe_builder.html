@@ -1,0 +1,255 @@
+{% extends "base_public.html" %}
+{% block title %}{% if mode == 'edit' %}Edit Recipe{% else %}Create Recipe{% endif %} | The Vape Workshop Calculator{% endblock %}
+{% block body_class %}tvw-recipe-builder-route{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw-recipe-builder.css') }}">
+
+{% set fv = form_values or {} %}
+{% set vis = fv.get('visibility', (recipe.visibility if recipe else 'private')) %}
+{% set st = fv.get('status', (recipe.status if recipe else 'wip'))|lower %}
+{% set name_val = fv.get('name', (recipe.name if recipe else '')) %}
+{% set tags_val = fv.get('tags', (tags|join(', ') if tags else '')) %}
+{% set notes_val = fv.get('notes', (active_version.notes if active_version and active_version.notes else '')) %}
+{% set ratio_val = fv.get('target_ratio', (active_version.target_vg_pg_ratio if active_version else '70/30')) %}
+
+<div class="tvw-recipe-builder">
+  <header class="tvw-rb-header">
+    <div>
+      <h1 class="tvw-rb-title">{% if mode == 'edit' %}Edit recipe{% else %}Create a recipe{% endif %}</h1>
+      <p class="tvw-rb-subtitle">Build your recipe, check the mix and save it to your library.</p>
+    </div>
+    <a class="btn btn-outline-light tvw-rb-back" href="{{ url_for('tvw_recipes.tvw_recipe_library') }}">Back to recipes</a>
+  </header>
+
+  {% if form_errors %}
+  <div class="tvw-rb-errors" id="formErrorSummary" tabindex="-1" role="alert">
+    <strong>Please fix the following:</strong>
+    <ul>
+      {% for key, msg in form_errors.items() if not key.startswith('_') %}
+      <li>{{ msg }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('tvw_recipes.tvw_recipe_save') }}" id="recipeBuilderForm" novalidate>
+    {% if recipe %}<input type="hidden" name="recipe_id" value="{{ recipe.id }}">{% endif %}
+    <input type="hidden" name="target_ratio" id="targetRatioField" value="{{ ratio_val }}">
+    <input type="hidden" name="calc_target_ml" id="calcTargetMlHidden" value="{{ fv.get('calc_target_ml', '60') }}">
+    <input type="hidden" name="calc_target_nic" id="calcTargetNicHidden" value="{{ fv.get('calc_target_nic', '3') }}">
+    <input type="hidden" name="calc_pg_ratio" id="calcPgRatioHidden" value="{{ fv.get('calc_pg_ratio', '30') }}">
+    <input type="hidden" name="calc_vg_ratio" id="calcVgRatioHidden" value="{{ fv.get('calc_vg_ratio', '70') }}">
+    <input type="hidden" name="calc_nic_base" id="calcNicBaseHidden" value="{{ fv.get('calc_nic_base', '100') }}">
+    <input type="hidden" name="calc_nicotine_carrier" id="calcNicCarrierHidden" value="{{ fv.get('calc_nicotine_carrier', 'PG') }}">
+
+    <div class="tvw-rb-layout">
+      <div class="tvw-rb-main">
+        <section class="tvw-rb-panel" aria-labelledby="rbDetailsHeading">
+          <h2 class="tvw-rb-section-title" id="rbDetailsHeading">Recipe details</h2>
+          <div class="tvw-rb-details-grid">
+            <div class="tvw-rb-span-2">
+              <label class="tvw-rb-label" for="recipeName">Recipe name</label>
+              <input id="recipeName" name="name" class="tvw-rb-input tvw-rb-name{% if form_errors.get('name') %} is-invalid{% endif %}"
+                     required placeholder="e.g. Malva Pudding" value="{{ name_val }}" autofocus>
+              {% if form_errors.get('name') %}<div class="tvw-rb-field-error">{{ form_errors.name }}</div>{% endif %}
+            </div>
+            <div>
+              <span class="tvw-rb-label">Visibility</span>
+              {% if vis == 'unlisted' and mode == 'edit' %}
+              <input type="hidden" name="visibility" value="unlisted">
+              <p class="mb-0 mt-1" style="color: var(--tvw-text-secondary);">Unlisted (legacy visibility preserved).</p>
+              {% else %}
+              <div class="tvw-rb-choice-group" role="radiogroup" aria-label="Visibility">
+                <label class="tvw-rb-choice">
+                  <input type="radio" name="visibility" value="private" {% if vis == 'private' %}checked{% endif %}>
+                  <strong>Private</strong>
+                  <span>Only you and authorised admins can see it.</span>
+                </label>
+                <label class="tvw-rb-choice">
+                  <input type="radio" name="visibility" value="public" {% if vis == 'public' %}checked{% endif %}>
+                  <strong>Public</strong>
+                  <span>Visible to the community.</span>
+                </label>
+              </div>
+              {% endif %}
+              {% if form_errors.get('visibility') %}<div class="tvw-rb-field-error">{{ form_errors.visibility }}</div>{% endif %}
+            </div>
+            <div>
+              <label class="tvw-rb-label" for="recipeStatus">Status</label>
+              <select id="recipeStatus" name="status" class="tvw-rb-select{% if form_errors.get('status') %} is-invalid{% endif %}">
+                <option value="wip" {% if st in ('wip', 'work in progress') %}selected{% endif %}>Work in progress</option>
+                <option value="help" {% if st == 'help' %}selected{% endif %}>I need help</option>
+                <option value="ready" {% if st == 'ready' %}selected{% endif %}>Ready</option>
+              </select>
+              {% if form_errors.get('status') %}<div class="tvw-rb-field-error">{{ form_errors.status }}</div>{% endif %}
+            </div>
+            <div class="tvw-rb-span-2">
+              <label class="tvw-rb-label" for="recipeTags">Tags</label>
+              <input id="recipeTags" name="tags" class="tvw-rb-input" value="{{ tags_val }}" placeholder="dessert, custard">
+              <div class="tvw-rb-field-error" style="color: var(--tvw-text-muted); margin-top:0.25rem;">Separate tags with commas.</div>
+            </div>
+            <div class="tvw-rb-span-2">
+              <label class="tvw-rb-label" for="recipeNotes">Notes</label>
+              <textarea id="recipeNotes" name="notes" class="tvw-rb-textarea" rows="3" placeholder="Steep time, pairing ideas, or mixing notes…">{{ notes_val }}</textarea>
+            </div>
+          </div>
+        </section>
+
+        <section class="tvw-rb-panel" aria-labelledby="rbFlavoursHeading">
+          <div class="tvw-rb-flavours-head">
+            <div>
+              <h2 class="tvw-rb-section-title" id="rbFlavoursHeading">Flavours</h2>
+              <p class="tvw-rb-section-lead mb-0">Search your flavour library, add each concentrate and set its percentage.</p>
+            </div>
+            <button type="button" class="btn btn-outline-light tvw-rb-add-flavour" id="addFlavourBtn">Add flavour</button>
+          </div>
+          {% if form_errors.get('flavours') %}<div class="tvw-rb-field-error mb-2">{{ form_errors.flavours }}</div>{% endif %}
+          <div class="tvw-rb-flavour-table-head" aria-hidden="true">
+            <span>Flavour</span>
+            <span>Brand</span>
+            <span>%</span>
+            <span>ml</span>
+            <span>g</span>
+            <span></span>
+          </div>
+          <div class="tvw-rb-flavour-rows" id="ingredientRows"></div>
+          <div class="mt-3">
+            <button type="button" class="btn btn-outline-light tvw-rb-add-flavour" id="addFlavourBtnBottom">Add flavour</button>
+          </div>
+        </section>
+      </div>
+
+      <aside class="tvw-rb-summary tvw-rb-panel" aria-labelledby="rbSummaryHeading">
+        <h2 class="tvw-rb-section-title" id="rbSummaryHeading">Recipe summary</h2>
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="tvw-rb-label" for="calcTargetMl">Batch size (ml)</label>
+            <input id="calcTargetMl" type="number" min="1" step="1" class="tvw-rb-input" value="{{ fv.get('calc_target_ml', '60') }}">
+          </div>
+          <div class="col-6">
+            <label class="tvw-rb-label" for="calcTargetNic">Nicotine (mg/ml)</label>
+            <input id="calcTargetNic" type="number" min="0" step="0.1" class="tvw-rb-input" value="{{ fv.get('calc_target_nic', '3') }}">
+          </div>
+          <div class="col-6">
+            <label class="tvw-rb-label" for="calcPgRatio">PG %</label>
+            <input id="calcPgRatio" type="number" min="0" step="1" class="tvw-rb-input" value="{{ fv.get('calc_pg_ratio', '30') }}">
+          </div>
+          <div class="col-6">
+            <label class="tvw-rb-label" for="calcVgRatio">VG %</label>
+            <input id="calcVgRatio" type="number" min="0" step="1" class="tvw-rb-input" value="{{ fv.get('calc_vg_ratio', '70') }}">
+          </div>
+          <div class="col-6">
+            <label class="tvw-rb-label" for="calcNicBase">Nicotine base (mg/ml)</label>
+            <input id="calcNicBase" type="number" min="1" step="1" class="tvw-rb-input" value="{{ fv.get('calc_nic_base', '100') }}">
+          </div>
+          <div class="col-6">
+            <label class="tvw-rb-label" for="calcNicCarrier">Nicotine carrier</label>
+            <select id="calcNicCarrier" class="tvw-rb-select">
+              <option value="PG" {% if fv.get('calc_nicotine_carrier', 'PG') == 'PG' %}selected{% endif %}>PG</option>
+              <option value="VG" {% if fv.get('calc_nicotine_carrier', 'PG') == 'VG' %}selected{% endif %}>VG</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="tvw-rb-summary-stats">
+          <div class="tvw-rb-stat">
+            <span class="tvw-rb-stat-label">Total flavour</span>
+            <span class="tvw-rb-stat-value" id="summaryTotalPct">0.00%</span>
+          </div>
+          <div class="tvw-rb-stat">
+            <span class="tvw-rb-stat-label">Total flavour ml</span>
+            <span class="tvw-rb-stat-value" id="summaryFlvMl">0.00</span>
+          </div>
+          <div class="tvw-rb-stat">
+            <span class="tvw-rb-stat-label">Remaining PG</span>
+            <span class="tvw-rb-stat-value" id="summaryPgMl">0.00 ml</span>
+          </div>
+          <div class="tvw-rb-stat">
+            <span class="tvw-rb-stat-label">Remaining VG</span>
+            <span class="tvw-rb-stat-value" id="summaryVgMl">0.00 ml</span>
+          </div>
+          <div class="tvw-rb-stat tvw-rb-span-2" style="grid-column:1/-1;">
+            <span class="tvw-rb-stat-label">Total batch</span>
+            <span class="tvw-rb-stat-value" id="summaryTotalMl">0.00 ml</span>
+          </div>
+        </div>
+
+        <div class="tvw-rb-composition">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="tvw-rb-label mb-0">Composition</span>
+          </div>
+          <div class="progress">
+            <div id="barFlv" class="progress-bar bg-warning text-dark" style="width:0%">Flavour</div>
+            <div id="barPg" class="progress-bar bg-info" style="width:0%">PG</div>
+            <div id="barVg" class="progress-bar bg-success" style="width:0%">VG</div>
+            <div id="barNic" class="progress-bar bg-danger" style="width:0%">Nicotine</div>
+          </div>
+          <div class="tvw-rb-composition-labels">
+            <span>Flavour · PG · VG · Nicotine</span>
+          </div>
+        </div>
+
+        {% if form_errors.get('calc') or form_errors.get('calc_ratio') %}
+        <div class="tvw-rb-field-error mt-2">{{ form_errors.get('calc') or form_errors.get('calc_ratio') }}</div>
+        {% endif %}
+        <div class="tvw-rb-calc-status" id="calcStatus" aria-live="polite">Ready</div>
+        <div id="policyBox" class="alert alert-warning py-2 px-3 mt-2 mb-0 d-none small"></div>
+      </aside>
+    </div>
+
+    <footer class="tvw-rb-footer">
+      <div class="tvw-rb-footer-meta" id="saveMeta">Review your mix before saving.</div>
+      <div class="tvw-rb-footer-actions">
+        <a class="btn btn-outline-light" href="{{ url_for('tvw_recipes.tvw_recipe_library') }}">Cancel</a>
+        <button type="submit" class="btn btn-warning tvw-rb-save" id="saveRecipeBtn">
+          {% if mode == 'edit' %}Save new version{% else %}Create recipe{% endif %}
+        </button>
+      </div>
+    </footer>
+  </form>
+</div>
+
+<template id="ingredientRowTemplate">
+  <div class="tvw-rb-flavour-row ingredient-row">
+    <div class="tvw-flavor-ac position-relative">
+      <input class="tvw-rb-input flavor-input" placeholder="Search or select flavour…" autocomplete="off" aria-autocomplete="list" aria-expanded="false">
+      <div class="tvw-flavor-ac-menu d-none" role="listbox"></div>
+      <input type="hidden" name="ingredient_id[]" class="ingredient-id" value="">
+      <input type="hidden" name="ingredient_name[]" class="ingredient-name" value="">
+      <input type="hidden" name="ingredient_brand[]" class="ingredient-brand" value="">
+    </div>
+    <div class="tvw-rb-brand-badge row-brand">—</div>
+    <div class="tvw-rb-col-num tvw-rb-pct-col">
+      <input name="ingredient_percent[]" type="number" min="0" step="0.01" class="tvw-rb-input ingredient-pct" placeholder="0.00" inputmode="decimal">
+    </div>
+    <div class="tvw-rb-col-num tvw-rb-ml-col"><span class="row-out-ml">0.00</span></div>
+    <div class="tvw-rb-col-num tvw-rb-g-col"><span class="row-out-g">0.00</span></div>
+    <div>
+      <button type="button" class="btn btn-sm btn-outline-danger w-100 remove-row" style="min-height:44px;">Remove</button>
+    </div>
+  </div>
+</template>
+
+<script src="{{ url_for('static', filename='policy_feedback.js') }}"></script>
+<script>
+  window.TVW_RECIPE_BUILDER = {
+    mode: {{ mode|tojson }},
+    flavourCatalog: {{ flavour_options|tojson }},
+    initialRows: [
+      {% if flavour_rows %}
+        {% for row in flavour_rows %}
+        { ingredient_id: {{ row.ingredient_id|tojson }}, percent: {{ row.percent|tojson }}, name: {{ row.name|tojson }}, brand: {{ row.brand|tojson }} },
+        {% endfor %}
+      {% elif items %}
+        {% for item in items %}
+        { ingredient_id: {{ item.ingredient_id|tojson }}, percent: {{ item.percent|tojson }}, name: {{ (item.name or '')|tojson }}, brand: {{ (item.brand or '')|tojson }} },
+        {% endfor %}
+      {% endif %}
+    ],
+    savedRatio: {{ ratio_val|tojson }},
+    hasErrors: {{ (form_errors|length > 0)|tojson }}
+  };
+</script>
+<script src="{{ url_for('static', filename='tvw-recipe-builder.js') }}"></script>
+{% endblock %}

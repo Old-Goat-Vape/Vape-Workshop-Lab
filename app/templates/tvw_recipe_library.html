@@ -1,0 +1,401 @@
+{% extends "base_public.html" %}
+{% block title %}Recipe Library | The Vape Workshop Calculator{% endblock %}
+{% block body_class %}tvw-recipe-library-route{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw-recipe-library.css') }}">
+
+{% macro stash_badge(sig) -%}
+  {% if sig == 'ready' %}<span class="badge text-bg-success">Can make now</span>
+  {% elif sig == 'low_stock' %}<span class="badge text-bg-warning text-dark">Low stock</span>
+  {% elif sig == 'short_batch' %}<span class="badge text-bg-danger">Not enough for batch</span>
+  {% elif sig == 'missing_1' %}<span class="badge text-bg-secondary">Missing 1</span>
+  {% elif sig == 'missing_2' %}<span class="badge text-bg-dark">Missing 2</span>
+  {% elif sig == 'missing_more' %}<span class="badge text-bg-dark">Missing 3+</span>
+  {% else %}{% endif %}
+{%- endmacro %}
+
+{% macro lib_query(page_num=none) -%}
+{{ url_for('tvw_recipes.tvw_recipe_library',
+  page=page_num if page_num else page,
+  search=filters.search or none,
+  status=filters.status or none,
+  visibility=filters.visibility or none,
+  tag=filters.tag or none,
+  sort=filters.sort or none,
+  dir=filters.dir or none,
+  batch_ml=filters.batch_ml or none,
+  mine=1 if filters.mine else none,
+  favorites=1 if filters.favorites else none) }}
+{%- endmacro %}
+
+{% macro scope_href(scope_key) -%}
+{% if scope_key == 'all' %}
+  {{ url_for('tvw_recipes.tvw_recipe_library', search=filters.search or none, status=filters.status or none, tag=filters.tag or none, sort=filters.sort or none, dir=filters.dir or none, batch_ml=filters.batch_ml or none) }}
+{% elif scope_key == 'mine' %}
+  {{ url_for('tvw_recipes.tvw_recipe_library', mine=1, search=filters.search or none, status=filters.status or none, tag=filters.tag or none, sort=filters.sort or none, dir=filters.dir or none, batch_ml=filters.batch_ml or none) }}
+{% elif scope_key == 'public' %}
+  {{ url_for('tvw_recipes.tvw_recipe_library', visibility='public', search=filters.search or none, status=filters.status or none, tag=filters.tag or none, sort=filters.sort or none, dir=filters.dir or none, batch_ml=filters.batch_ml or none) }}
+{% elif scope_key == 'favorites' %}
+  {{ url_for('tvw_recipes.tvw_recipe_library', favorites=1, search=filters.search or none, status=filters.status or none, tag=filters.tag or none, sort=filters.sort or none, dir=filters.dir or none, batch_ml=filters.batch_ml or none) }}
+{% elif scope_key == 'private' %}
+  {{ url_for('tvw_recipes.tvw_recipe_library', visibility='private', search=filters.search or none, status=filters.status or none, tag=filters.tag or none, sort=filters.sort or none, dir=filters.dir or none, batch_ml=filters.batch_ml or none) }}
+{% endif %}
+{%- endmacro %}
+
+<div class="tvw-recipe-library">
+  <header class="tvw-lib-header">
+    <div class="tvw-lib-header-main">
+      <h1 class="tvw-lib-title">Recipe Library</h1>
+      <p class="tvw-lib-counts">
+        <strong>{{ scope_counts.total }}</strong> recipes
+        · <strong>{{ scope_counts.mine }}</strong> mine
+        · <strong>{{ scope_counts.public }}</strong> community
+      </p>
+    </div>
+    <a class="btn btn-warning tvw-lib-create" href="{{ url_for('tvw_recipes.tvw_recipe_new') }}">Create recipe</a>
+  </header>
+
+  {% if viewer_is_old_goat %}
+    <div class="tvw-lib-admin-notice" role="status">
+      <span aria-hidden="true">⚙</span>
+      <div><strong>Admin view:</strong> Private and hidden recipes are included. Ordinary users only see public recipes plus their own private work.</div>
+    </div>
+  {% endif %}
+
+  {% if stash_meta and stash_meta.total_match_count > stash_meta.stash_rank_pool %}
+    <div class="alert alert-secondary py-2 mb-3">
+      Stash priority covers the <strong>{{ stash_meta.stash_rank_pool }}</strong> most recently updated matches
+      (of <strong>{{ stash_meta.total_match_count }}</strong> total). Refine filters or switch sort to see older recipes first.
+    </div>
+  {% endif %}
+
+  <form class="tvw-lib-search-form" method="get" action="{{ url_for('tvw_recipes.tvw_recipe_library') }}" role="search">
+    {% if filters.mine %}<input type="hidden" name="mine" value="1">{% endif %}
+    {% if filters.favorites %}<input type="hidden" name="favorites" value="1">{% endif %}
+    {% if filters.visibility and active_scope in ['public', 'private'] %}
+      <input type="hidden" name="visibility" value="{{ filters.visibility }}">
+    {% endif %}
+    {% if filters.status %}<input type="hidden" name="status" value="{{ filters.status }}">{% endif %}
+    {% if filters.tag %}<input type="hidden" name="tag" value="{{ filters.tag }}">{% endif %}
+    {% if filters.sort and filters.sort != 'updated' %}<input type="hidden" name="sort" value="{{ filters.sort }}">{% endif %}
+    {% if filters.dir and filters.dir != 'desc' %}<input type="hidden" name="dir" value="{{ filters.dir }}">{% endif %}
+    {% if filters.batch_ml %}<input type="hidden" name="batch_ml" value="{{ filters.batch_ml }}">{% endif %}
+    <div class="tvw-lib-search-row">
+      <label class="visually-hidden" for="tvwLibSearch">Search recipes</label>
+      <input class="tvw-lib-search-input form-control"
+             id="tvwLibSearch"
+             name="search"
+             type="search"
+             placeholder="Search recipe names, authors, tags or flavours"
+             value="{{ filters.search }}"
+             autocomplete="off">
+      <button class="btn btn-warning tvw-lib-search-btn" type="submit">Search</button>
+    </div>
+  </form>
+
+  <div class="tvw-lib-scope-row">
+    <nav class="tvw-lib-scope-tabs" aria-label="Recipe scope">
+      <a class="tvw-lib-scope-tab{% if active_scope == 'all' %} is-active{% endif %}"
+         href="{{ scope_href('all') }}"
+         {% if active_scope == 'all' %}aria-current="true"{% endif %}>All recipes</a>
+      <a class="tvw-lib-scope-tab{% if active_scope == 'mine' %} is-active{% endif %}"
+         href="{{ scope_href('mine') }}"
+         {% if active_scope == 'mine' %}aria-current="true"{% endif %}>My recipes</a>
+      <a class="tvw-lib-scope-tab{% if active_scope == 'public' %} is-active{% endif %}"
+         href="{{ scope_href('public') }}"
+         {% if active_scope == 'public' %}aria-current="true"{% endif %}>Public recipes</a>
+      <a class="tvw-lib-scope-tab{% if active_scope == 'favorites' %} is-active{% endif %}"
+         href="{{ scope_href('favorites') }}"
+         {% if active_scope == 'favorites' %}aria-current="true"{% endif %}>Favourites</a>
+      {% if viewer_is_old_goat %}
+        <a class="tvw-lib-scope-tab{% if active_scope == 'private' %} is-active{% endif %}"
+           href="{{ scope_href('private') }}"
+           {% if active_scope == 'private' %}aria-current="true"{% endif %}>Private recipes</a>
+      {% endif %}
+    </nav>
+    <button type="button"
+            class="tvw-lib-filters-toggle"
+            id="tvwLibFiltersToggle"
+            aria-expanded="{{ 'true' if advanced_filters_active else 'false' }}"
+            aria-controls="tvwLibFiltersPanel">
+      Filters{% if advanced_filters_active %} · active{% endif %}
+    </button>
+  </div>
+
+  <div class="tvw-lib-filters-panel{% if not advanced_filters_active %} d-none{% endif %}"
+       id="tvwLibFiltersPanel">
+    <form method="get" action="{{ url_for('tvw_recipes.tvw_recipe_library') }}">
+      {% if filters.search %}<input type="hidden" name="search" value="{{ filters.search }}">{% endif %}
+      {% if filters.mine %}<input type="hidden" name="mine" value="1">{% endif %}
+      {% if filters.favorites %}<input type="hidden" name="favorites" value="1">{% endif %}
+      {% if filters.visibility and active_scope in ['public', 'private'] %}
+        <input type="hidden" name="visibility" value="{{ filters.visibility }}">
+      {% endif %}
+      <div class="row g-3">
+        <div class="col-12 col-md-4 col-lg-3">
+          <label class="form-label" for="filterStatus">Status</label>
+          <select class="form-select" name="status" id="filterStatus">
+            <option value="" {% if not filters.status %}selected{% endif %}>Any status</option>
+            <option value="wip" {% if filters.status == 'wip' %}selected{% endif %}>Work in progress</option>
+            <option value="help" {% if filters.status == 'help' %}selected{% endif %}>I need help</option>
+            <option value="ready" {% if filters.status == 'ready' %}selected{% endif %}>Ready</option>
+          </select>
+        </div>
+        {% if active_scope not in ['public', 'private'] %}
+        <div class="col-12 col-md-4 col-lg-3">
+          <label class="form-label" for="filterVisibility">Visibility</label>
+          <select class="form-select" name="visibility" id="filterVisibility">
+            <option value="" {% if not filters.visibility %}selected{% endif %}>Any visibility</option>
+            <option value="public" {% if filters.visibility == 'public' %}selected{% endif %}>Public</option>
+            <option value="private" {% if filters.visibility == 'private' %}selected{% endif %}>Private</option>
+            <option value="unlisted" {% if filters.visibility == 'unlisted' %}selected{% endif %}>Unlisted</option>
+          </select>
+        </div>
+        {% endif %}
+        <div class="col-12 col-md-4 col-lg-3">
+          <label class="form-label" for="filterTag">Tag</label>
+          <input class="form-control" name="tag" id="filterTag" placeholder="e.g. dessert" value="{{ filters.tag }}">
+        </div>
+        <div class="col-12 col-md-4 col-lg-3">
+          <label class="form-label" for="filterSort">Sort</label>
+          <select class="form-select" name="sort" id="filterSort">
+            <option value="updated" {% if filters.sort == 'updated' %}selected{% endif %}>Recently updated</option>
+            <option value="newest" {% if filters.sort == 'newest' %}selected{% endif %}>Newest posted</option>
+            <option value="rating" {% if filters.sort == 'rating' %}selected{% endif %}>Top rated</option>
+            <option value="favorites" {% if filters.sort == 'favorites' %}selected{% endif %}>Most favorited</option>
+            <option value="name" {% if filters.sort == 'name' %}selected{% endif %}>Name</option>
+            <option value="stash" {% if filters.sort == 'stash' %}selected{% endif %}>Stash availability</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-4 col-lg-3">
+          <label class="form-label" for="filterOrder">Order</label>
+          <select class="form-select" name="dir" id="filterOrder" title="Ignored when sort is Stash availability">
+            <option value="desc" {% if filters.dir == 'desc' %}selected{% endif %}>Newest first</option>
+            <option value="asc" {% if filters.dir == 'asc' %}selected{% endif %}>Oldest first</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-4 col-lg-3">
+          <label class="form-label" for="filterBatchMl">Stash batch (ml)</label>
+          <select class="form-select" name="batch_ml" id="filterBatchMl">
+            {% set bm = (filters.batch_ml or '30') %}
+            {% for n in [15, 30, 50, 60, 100] %}
+              <option value="{{ n }}" {% if bm == (n|string) %}selected{% endif %}>{{ n }} ml</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="tvw-lib-filters-actions">
+        <button class="btn btn-warning" type="submit">Apply filters</button>
+        <a class="btn btn-outline-light" href="{{ scope_href(active_scope) }}">Clear all</a>
+      </div>
+    </form>
+  </div>
+
+  <div class="tvw-lib-results-meta">
+    <span>Sort: <strong>{{ sort_label }}</strong></span>
+    <span><strong>{{ total }}</strong> result{{ '' if total == 1 else 's' }}</span>
+  </div>
+
+  <div class="tvw-lib-card-grid">
+    {% for recipe in recipes %}
+      {% set slug = recipe.slug or recipe.id %}
+      {% set detail_url = url_for('tvw_recipes.tvw_recipe_detail', slug=slug) %}
+      {% set mix_url = url_for('tvw_recipes.tvw_guided_mix_start', slug=slug) %}
+      {% set edit_url = url_for('tvw_recipes.tvw_recipe_edit', slug=slug) %}
+      {% set logs_url = url_for('tvw_recipes.tvw_recipe_mix_logs', slug=slug) %}
+      {% set pill = recipe.library_visibility_pill|lower %}
+      <article class="tvw-lib-card">
+        <div class="tvw-lib-card-top">
+          <h2 class="tvw-lib-card-title">
+            <a href="{{ detail_url }}">{{ recipe.name }}</a>
+          </h2>
+          <div class="tvw-lib-pills">
+            {% if pill == 'public' %}
+              <span class="tvw-lib-pill tvw-lib-pill-public">Public</span>
+            {% elif pill == 'private' %}
+              <span class="tvw-lib-pill tvw-lib-pill-private">Private</span>
+            {% elif pill == 'reference' %}
+              <span class="tvw-lib-pill tvw-lib-pill-reference">Reference</span>
+            {% elif pill == 'unlisted' %}
+              <span class="tvw-lib-pill tvw-lib-pill-unlisted">Unlisted</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <p class="tvw-lib-card-meta">
+          {% if recipe.library_category %}
+            <span class="tvw-lib-card-category">{{ recipe.library_category }}</span>
+          {% else %}
+            <span class="tvw-lib-card-category">Recipe</span>
+          {% endif %}
+          {% if recipe.current_total_flavour_pct is not none %}
+            · {{ "%.1f"|format(recipe.current_total_flavour_pct|float) }}% flavour
+          {% endif %}
+          {% if recipe.recipe_rating_count and recipe.avg_recipe_rating is not none %}
+            · ★ {{ "%.1f"|format(recipe.avg_recipe_rating|float) }}
+          {% endif %}
+        </p>
+
+        <p class="tvw-lib-card-submeta">
+          {% if recipe.library_owner_label %}
+            <span class="tvw-lib-card-author">By {{ recipe.library_owner_label }}</span>
+          {% endif %}
+          {% if recipe.library_updated_label %}
+            {% if recipe.library_owner_label %} · {% endif %}<span class="tvw-lib-card-date">{{ recipe.library_updated_label }}</span>
+          {% elif recipe.library_added_label %}
+            {% if recipe.library_owner_label %} · {% endif %}<span class="tvw-lib-card-date">{{ recipe.library_added_label }}</span>
+          {% endif %}
+        </p>
+
+        {% if recipe.stash_summary and (recipe.stash_summary.wcm_qty and recipe.stash_summary.wcm_qty.reason or recipe.stash_summary.stash_signal) %}
+          <div class="tvw-lib-card-stash">
+            {{ stash_badge(recipe.stash_summary.stash_signal if recipe.stash_summary else '') }}
+            {% if recipe.stash_summary.wcm_qty and recipe.stash_summary.wcm_qty.reason %}
+              <span class="ms-1">{{ recipe.stash_summary.wcm_qty.reason }}</span>
+            {% endif %}
+          </div>
+        {% endif %}
+
+        <div class="tvw-lib-card-actions">
+          {% if recipe.library_is_mine %}
+            <a class="btn btn-warning" href="{{ detail_url }}">Open</a>
+            <a class="btn btn-outline-warning" href="{{ mix_url }}">Mix</a>
+            <a class="btn btn-outline-light" href="{{ edit_url }}">Edit</a>
+          {% else %}
+            <a class="btn btn-warning" href="{{ detail_url }}">View</a>
+            <a class="btn btn-outline-warning" href="{{ mix_url }}">Mix</a>
+          {% endif %}
+
+          <button type="button"
+                  class="tvw-lib-favorite-btn tvw-lib-favorite{% if recipe.is_favorited %} is-favorited{% endif %}"
+                  data-recipe-id="{{ recipe.id }}"
+                  data-favorited="{{ 1 if recipe.is_favorited else 0 }}"
+                  aria-pressed="{{ 'true' if recipe.is_favorited else 'false' }}"
+                  aria-label="{{ 'Remove from favourites' if recipe.is_favorited else 'Add to favourites' }}"
+                  title="{{ 'Remove from favourites' if recipe.is_favorited else 'Add to favourites' }}">
+            <span class="tvw-lib-favorite-star" aria-hidden="true">{% if recipe.is_favorited %}★{% else %}☆{% endif %}</span>
+            <span class="tvw-lib-favorite-label visually-hidden-sm-up">Favourite</span>
+          </button>
+
+          <details class="tvw-lib-more-menu">
+            <summary>More</summary>
+            <div class="tvw-lib-more-panel">
+              <button type="button"
+                      class="tvw-lib-more-favorite"
+                      data-recipe-id="{{ recipe.id }}"
+                      data-favorited="{{ 1 if recipe.is_favorited else 0 }}">
+                {% if recipe.is_favorited %}Remove favourite{% else %}Add favourite{% endif %}
+              </button>
+              <a href="{{ logs_url }}">Batch history</a>
+              {% if recipe.library_is_mine %}
+                <a href="{{ edit_url }}">Edit recipe</a>
+              {% else %}
+                <a href="{{ detail_url }}">View recipe</a>
+              {% endif %}
+            </div>
+          </details>
+        </div>
+      </article>
+    {% else %}
+      <div class="tvw-lib-empty">
+        {% if filters.favorites %}
+          No visible favourites matched this view.
+        {% elif filters.mine %}
+          You have no recipes matching these filters yet.
+        {% else %}
+          No recipes matched your search. Try a different scope or clear filters.
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+
+  {% if total_pages > 1 %}
+    <nav class="tvw-lib-pagination" aria-label="Recipe library pages">
+      {% if page > 1 %}
+        <a class="btn btn-outline-light" href="{{ lib_query(page - 1) }}">Previous</a>
+      {% endif %}
+      <span>Page {{ page }} of {{ total_pages }}</span>
+      {% if page < total_pages %}
+        <a class="btn btn-outline-light" href="{{ lib_query(page + 1) }}">Next</a>
+      {% endif %}
+    </nav>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  const toggle = document.getElementById("tvwLibFiltersToggle");
+  const panel = document.getElementById("tvwLibFiltersPanel");
+  if (toggle && panel) {
+    toggle.addEventListener("click", () => {
+      const open = panel.classList.toggle("d-none") === false;
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+  }
+
+  const applyStar = (btn, favorited) => {
+    btn.dataset.favorited = favorited ? "1" : "0";
+    btn.setAttribute("aria-pressed", favorited ? "true" : "false");
+    btn.setAttribute("aria-label", favorited ? "Remove from favourites" : "Add to favourites");
+    btn.title = favorited ? "Remove from favourites" : "Add to favourites";
+    btn.classList.toggle("is-favorited", favorited);
+    const star = btn.querySelector(".tvw-lib-favorite-star");
+    if (star) star.textContent = favorited ? "★" : "☆";
+  };
+
+  const toggleFavorite = async (recipeId, next, buttons) => {
+    const response = await fetch(`/api/recipes/${recipeId}/favorite`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ favorited: next }),
+    });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.message || "Request failed");
+    buttons.forEach((btn) => {
+      if (btn.classList.contains("tvw-lib-favorite-btn")) {
+        applyStar(btn, !!body.is_favorited);
+      } else if (btn.classList.contains("tvw-lib-more-favorite")) {
+        btn.dataset.favorited = body.is_favorited ? "1" : "0";
+        btn.textContent = body.is_favorited ? "Remove favourite" : "Add favourite";
+      }
+    });
+  };
+
+  document.querySelectorAll(".tvw-lib-favorite").forEach((btn) => {
+    btn.addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      const id = Number(btn.dataset.recipeId);
+      const next = btn.dataset.favorited !== "1";
+      const related = Array.from(document.querySelectorAll(`[data-recipe-id="${id}"]`));
+      try {
+        await toggleFavorite(id, next, related);
+      } catch (e) {
+        const msg = String(e.message || "");
+        if (msg.toLowerCase().includes("not found")) {
+          window.alert("That recipe is no longer visible to your account.");
+          return;
+        }
+        window.alert(msg || "Could not update favourite.");
+      }
+    });
+  });
+
+  document.querySelectorAll(".tvw-lib-more-favorite").forEach((btn) => {
+    btn.addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      const id = Number(btn.dataset.recipeId);
+      const next = btn.dataset.favorited !== "1";
+      const related = Array.from(document.querySelectorAll(`[data-recipe-id="${id}"]`));
+      try {
+        await toggleFavorite(id, next, related);
+      } catch (e) {
+        window.alert(String(e.message || "Could not update favourite."));
+      }
+    });
+  });
+})();
+</script>
+{% endblock %}

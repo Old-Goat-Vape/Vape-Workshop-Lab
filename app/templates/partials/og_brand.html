@@ -1,0 +1,18 @@
+{# Reusable logo + wordmark. Optional: logo_href (defaults to dashboard), show_wordmark (default true). Primary asset: static/logo/logo.jpg; falls back to gear mark SVG if missing. #}
+{% set _href = logo_href if logo_href is defined else url_for('dashboard_index') %}
+{% set _word = show_wordmark if show_wordmark is defined else true %}
+{% set _fallback = url_for('static', filename='img/og_lab_mark.svg') %}
+<a href="{{ _href }}" class="og-brand d-inline-flex align-items-center gap-2 text-decoration-none">
+    <img
+        src="{{ url_for('static', filename='logo/logo.jpg') }}"
+        width="48"
+        height="48"
+        alt=""
+        class="og-logo-img flex-shrink-0"
+        data-og-logo-fallback="{{ _fallback }}"
+        onerror="if(this.dataset.ogLogoFallback){this.src=this.dataset.ogLogoFallback;this.removeAttribute('data-og-logo-fallback');}"
+    />
+    {% if _word %}
+    <span class="og-wordmark sidebar-brand fs-5 mb-0">GOAT LAB</span>
+    {% endif %}
+</a>

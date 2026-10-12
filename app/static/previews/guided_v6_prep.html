@@ -1,0 +1,1670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bakery Test · mix</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/industrial.css">
+    <style>
+        .brand { color: var(--primary-orange); letter-spacing: 0.12em; font-weight: 800; text-decoration: none; font-family: var(--font-display, 'Segoe UI', sans-serif); }
+    </style>
+</head>
+<body data-bs-theme="dark">
+    
+    <nav class="navbar navbar-expand border-bottom">
+        <div class="container px-3">
+            <a class="navbar-brand brand py-1" href="/community">The Vape Workshop Calculator</a>
+            <div class="ms-auto d-flex gap-2">
+                <a class="btn btn-sm btn-outline-light" href="/recipes">Recipes</a>
+                <a class="btn btn-sm btn-outline-light" href="/my-mixes" title="Your quick and guided mix history">My mixes</a>
+                <a class="btn btn-sm btn-outline-light" href="/what-can-i-make">What can I make</a>
+                <a class="btn btn-sm btn-outline-light" href="/flavours">Flavours</a>
+                <a class="btn btn-sm btn-outline-light" href="/stash">Stash</a>
+                
+                
+                <a class="btn btn-sm btn-outline-danger" href="/logout">Logout</a>
+            </div>
+        </div>
+    </nav>
+    
+    <main class="min-vh-100 d-flex flex-column justify-content-center py-4">
+        <div class="container px-3">
+            
+              
+            
+            
+
+<link rel="stylesheet" href="/static/tvw.css">
+
+<script>document.body.classList.add("tvw-bench-mode");</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="tvw-workstation" id="guidedRoot"
+
+     data-session-id="1"
+
+     data-batch-ml="100"
+
+     data-recipe-name="Bakery Test"
+
+     data-version="v1"
+
+     data-target-nic="3.0"
+
+     data-pgvg="30/70">
+
+
+
+  <header class="tvw-ws-header">
+
+    <div class="tvw-ws-header-main">
+
+      <span class="tvw-ws-kicker">Guided mix</span>
+
+      <h1 class="tvw-ws-recipe" id="wsRecipeName">Bakery Test</h1>
+
+      <span class="tvw-ws-version" id="wsVersion">v1</span>
+
+    </div>
+
+    <div class="tvw-ws-telemetry" aria-label="Session status">
+
+      <span class="tvw-ws-led" id="roleChip">—</span>
+
+      <span class="tvw-ws-counter" id="focusStepBadge">—</span>
+
+      <span class="tvw-ws-batch" id="batchReadout">100 ml</span>
+
+    </div>
+
+  </header>
+
+
+
+  <div class="tvw-ws-body">
+
+    <aside class="tvw-ws-panel tvw-ws-prep" id="contextPanel" aria-label="Session context"></aside>
+
+
+
+    <section class="tvw-ws-panel tvw-ws-face tvw-step-add-ingredient" id="focusCard" aria-live="polite">
+
+      <div class="tvw-ws-face-head">
+
+        <p class="tvw-ws-face-role" id="focusRole"></p>
+
+        <h2 class="tvw-ws-face-ingredient" id="focusIngredient"></h2>
+
+        <p class="tvw-ws-face-brand" id="focusBrand"></p>
+
+        <p class="tvw-ws-face-phase" id="workflowPhase"></p>
+
+        <p class="tvw-ws-face-title visually-hidden" id="focusTitle">…</p>
+
+      </div>
+
+
+
+      <div class="tvw-ws-lcd" id="scaleHero">
+
+        <div class="tvw-ws-lcd-cell tvw-ws-lcd-target">
+
+          <span class="tvw-ws-lcd-label" id="targetScaleLabel">Target</span>
+
+          <div class="tvw-ws-lcd-value">
+
+            <span class="tvw-ws-readout" id="focusG">0.00</span><span class="tvw-ws-unit">g</span>
+
+          </div>
+
+        </div>
+
+        <div class="tvw-ws-lcd-cell tvw-ws-lcd-live" id="scaleLiveBlock">
+
+          <span class="tvw-ws-lcd-label">Scale</span>
+
+          <div class="tvw-ws-lcd-value">
+
+            <span class="tvw-ws-readout" id="focusMeasuredDisplay">—</span><span class="tvw-ws-unit">g</span>
+
+          </div>
+
+        </div>
+
+        <div class="tvw-ws-delta" id="deltaReadout"></div>
+
+      </div>
+
+
+
+      <p class="tvw-ws-pct" id="focusPctWrap"><span id="focusPct"></span></p>
+
+      <p class="tvw-ws-face-why" id="focusWhy"></p>
+
+      <p class="tvw-ws-goat-inline" id="goatLine"></p>
+
+
+
+      <div id="guidedPolicyBox" class="tvw-ws-alarm d-none" role="alert"></div>
+
+
+
+      <div class="tvw-ws-primary-zone" id="focusActions"></div>
+
+
+
+      <div class="tvw-ws-next" id="nextPreviewCard">Next <strong id="nextPreviewText">—</strong></div>
+
+    </section>
+
+  </div>
+
+
+
+  <div id="completionSummary" class="tvw-ws-panel tvw-ws-complete d-none">
+
+    <div class="tvw-ws-complete-readout">DONE</div>
+
+    <p>Label it. Steep it. Argue about it later.</p>
+
+    <div class="tvw-ws-complete-actions">
+
+      <a class="tvw-ws-exit-primary" href="/recipes/bakery-test/guided-mix?version_id=1&amp;target_ml=100.0&amp;target_nic_mg_ml=3.0&amp;pg_ratio=30&amp;vg_ratio=70&amp;nic_base_mg_ml=100&amp;nicotine_carrier=PG">Mix again</a>
+
+      <a class="tvw-ws-exit" href="/recipes/bakery-test?version_id=1">Recipe</a>
+
+    </div>
+
+  </div>
+
+
+
+  <span class="visually-hidden" id="progBar" aria-hidden="true"></span>
+
+  <span class="visually-hidden" id="progLabel">0/16</span>
+
+  <span class="visually-hidden" id="nowLabel"></span>
+
+  <span class="visually-hidden" id="focusMl"></span>
+
+  <span class="visually-hidden" id="focusMeasured"></span>
+
+  <span class="visually-hidden" id="focusHint"></span>
+
+  <span class="visually-hidden" id="focusWhat"></span>
+
+  <span class="visually-hidden" id="mixCoachPanel"></span>
+
+  <span class="visually-hidden" id="mixCoachLabel"></span>
+
+  <span class="visually-hidden" id="mixCoachDetail"></span>
+
+  <div id="guidedToast" class="tvw-ws-toast d-none" role="status" aria-live="polite"></div>
+
+</div>
+
+<script type="application/json" id="guidedSessionBundle">{"coach_summary": {"detail": "Steady control. Keep your normal approach.", "label": "Coach status", "severity": "info"}, "completed_at": null, "created_at": "2026-07-08 06:46:57", "id": 1, "mode": "guided", "nic_base_mg_ml": 100.0, "nicotine_carrier": "PG", "performance_summary": {"near_miss_count": 0, "overshoot_count": 0, "precise_pour_count": 0, "recovery_count": 0, "undershoot_count": 0}, "progress": {"all_done": false, "completed_steps": 0, "current_step_no": 1, "total_steps": 16}, "recipe_id": 1, "recipe_name": "Bakery Test", "recipe_slug": "bakery-test", "recipe_version_id": 1, "result_json": "{\"steps\": [{\"step\": 1, \"step_type\": \"instruction\", \"title\": \"Prepare your station\", \"what\": \"Set bottle, scale, and ingredients within reach so each step feels smooth.\", \"why\": \"Good setup lowers stress and helps you hit each target cleanly.\", \"tip\": \"Check your scale settles at 0.00 g before each confirmation.\", \"action_label\": \"Station ready\", \"severity\": \"info\"}, {\"step\": 2, \"step_type\": \"tare\", \"title\": \"Tare before Nicotine base\", \"what\": \"Zero the scale and confirm stable 0.00 g.\", \"why\": \"Nicotine dosing starts with a clean tare to prevent hidden carry-over in a safety-critical step.\", \"tip\": \"If the scale drifts, re-tare before touching the bottle.\", \"action_label\": \"I tared to 0.00g\", \"severity\": \"info\", \"name\": \"Nicotine base\", \"brand\": \"\", \"category\": \"nicotine\"}, {\"step\": 3, \"step_type\": \"caution\", \"title\": \"Nicotine handling caution\", \"what\": \"Pause and verify PPE, bottle identity, and nicotine carrier before pouring.\", \"why\": \"Nicotine handling has higher safety consequence and needs deliberate control.\", \"tip\": \"If uncertain, stop and re-check strength/carrier first.\", \"action_label\": \"Safety confirmed\", \"severity\": \"warning\", \"name\": \"Nicotine base\", \"brand\": \"\", \"category\": \"nicotine\"}, {\"step\": 4, \"step_type\": \"add_ingredient\", \"title\": \"Add 3.11g Nicotine base\", \"what\": \"Add 3.11 g of Nicotine base, then confirm measured amount.\", \"why\": \"This nicotine step sets final strength trajectory, so precision matters immediately.\", \"tip\": \"Approach target slowly in the last 0.10 g.\", \"action_label\": \"Confirm pour\", \"severity\": \"info\", \"ingredient_id\": null, \"name\": \"Nicotine base\", \"brand\": \"\", \"category\": \"nicotine\", \"target_grams\": 3.108, \"pct\": null, \"ingredient_role\": \"micro_accent\", \"ingredient_family\": \"generic\", \"flavor_profile\": null}, {\"step\": 5, \"step_type\": \"transition\", \"title\": \"Checkpoint\", \"what\": \"Confirm this step before moving to the next action.\", \"why\": \"Checkpointing catches drift early and keeps the session recoverable.\", \"tip\": \"Proceed only when this pour record is clean.\", \"action_label\": \"Continue\", \"severity\": \"info\", \"name\": \"Nicotine base\", \"brand\": \"\", \"category\": \"nicotine\"}, {\"step\": 6, \"step_type\": \"tare\", \"title\": \"Tare before Biscuit\", \"what\": \"Zero the scale and confirm stable 0.00 g.\", \"why\": \"Tare removes carry-over from prior pours. Bakery layers carry depth and can quickly get heavy when overdosed.\", \"tip\": \"Treat tare as mandatory before every ingredient.\", \"action_label\": \"I tared to 0.00g\", \"severity\": \"info\", \"name\": \"Biscuit\", \"brand\": \"INW\", \"category\": \"concentrate\"}, {\"step\": 7, \"step_type\": \"add_ingredient\", \"title\": \"Add 5.18g Biscuit\", \"what\": \"Add 5.18 g of Biscuit, then confirm measured amount.\", \"why\": \"This is a main-note layer that defines most of the recipe identity. Bakery layers carry depth and can quickly get heavy when overdosed. At 5.00%, dose control matters for consistency.\", \"tip\": \"Approach target slowly in the last 0.10 g.\", \"action_label\": \"Confirm pour\", \"severity\": \"info\", \"ingredient_id\": null, \"name\": \"Biscuit\", \"brand\": \"INW\", \"category\": \"concentrate\", \"target_grams\": 5.18, \"pct\": 5.0, \"ingredient_role\": \"base_main_note\", \"ingredient_family\": \"bakery\", \"flavor_profile\": null}, {\"step\": 8, \"step_type\": \"transition\", \"title\": \"Checkpoint\", \"what\": \"Confirm this step before moving to the next action.\", \"why\": \"Checkpointing catches drift early and keeps the session recoverable.\", \"tip\": \"Read back target vs actual before continuing.\", \"action_label\": \"Continue\", \"severity\": \"info\", \"name\": \"Biscuit\", \"brand\": \"INW\", \"category\": \"concentrate\"}, {\"step\": 9, \"step_type\": \"tare\", \"title\": \"Tare before PG (base)\", \"what\": \"Tare to 0.00 g now so this step starts clean.\", \"why\": \"Base-liquid tare protects final ratio closure accuracy.\", \"tip\": \"Do not pour until tare is confirmed.\", \"action_label\": \"I tared to 0.00g\", \"severity\": \"info\", \"name\": \"PG (base)\", \"brand\": \"\", \"category\": \"pg\"}, {\"step\": 10, \"step_type\": \"add_ingredient\", \"title\": \"Add 22.79g PG (base)\", \"what\": \"Add 22.79 g of PG (base), then confirm measured amount.\", \"why\": \"PG is part of final carrier balance, so this step stabilizes consistency.\", \"tip\": \"Pulse-pour near target to avoid overshoot.\", \"action_label\": \"Confirm pour\", \"severity\": \"info\", \"ingredient_id\": null, \"name\": \"PG (base)\", \"brand\": \"\", \"category\": \"pg\", \"target_grams\": 22.792, \"pct\": null, \"ingredient_role\": \"micro_accent\", \"ingredient_family\": \"generic\", \"flavor_profile\": null}, {\"step\": 11, \"step_type\": \"transition\", \"title\": \"Checkpoint\", \"what\": \"Confirm this step before moving to the next action.\", \"why\": \"Checkpointing catches drift early and keeps the session recoverable.\", \"tip\": \"Read back target vs actual before continuing.\", \"action_label\": \"Continue\", \"severity\": \"info\", \"name\": \"PG (base)\", \"brand\": \"\", \"category\": \"pg\"}, {\"step\": 12, \"step_type\": \"tare\", \"title\": \"Tare before VG (base)\", \"what\": \"Zero the scale and confirm stable 0.00 g.\", \"why\": \"Base-liquid tare protects final ratio closure accuracy.\", \"tip\": \"Treat tare as mandatory before every ingredient.\", \"action_label\": \"I tared to 0.00g\", \"severity\": \"info\", \"name\": \"VG (base)\", \"brand\": \"\", \"category\": \"vg\"}, {\"step\": 13, \"step_type\": \"add_ingredient\", \"title\": \"Add 88.20g VG (base)\", \"what\": \"Add 88.20 g of VG (base), then confirm measured amount.\", \"why\": \"VG builds density and vapor body, so this step sets final smoothness.\", \"tip\": \"Pulse-pour near target to avoid overshoot.\", \"action_label\": \"Confirm pour\", \"severity\": \"info\", \"ingredient_id\": null, \"name\": \"VG (base)\", \"brand\": \"\", \"category\": \"vg\", \"target_grams\": 88.2, \"pct\": null, \"ingredient_role\": \"micro_accent\", \"ingredient_family\": \"generic\", \"flavor_profile\": null}, {\"step\": 14, \"step_type\": \"transition\", \"title\": \"Checkpoint\", \"what\": \"Confirm this step before moving to the next action.\", \"why\": \"Checkpointing catches drift early and keeps the session recoverable.\", \"tip\": \"Proceed only when this pour record is clean.\", \"action_label\": \"Continue\", \"severity\": \"info\", \"name\": \"VG (base)\", \"brand\": \"\", \"category\": \"vg\"}, {\"step\": 15, \"step_type\": \"recovery\", \"title\": \"Recovery guidance\", \"what\": \"If a deviation occurs, run reconcile before sign-off.\", \"why\": \"Recovery protects the recipe trajectory after mistakes.\", \"tip\": \"Use recovery early to avoid larger downstream corrections.\", \"action_label\": \"Recovery checked\", \"severity\": \"warning\"}, {\"step\": 16, \"step_type\": \"completion\", \"title\": \"Completion\", \"what\": \"Seal, label, and save this mix session.\", \"why\": \"Good close-out helps you repeat what worked next time.\", \"tip\": \"Verify your batch record is complete before ending session.\", \"action_label\": \"Session complete\", \"severity\": \"success\"}], \"step_model\": \"guided_assistant_v1\", \"tone_profile\": \"tvw\", \"nicotine_carrier\": \"PG\", \"nic_base_mg_ml\": 100.0, \"vessel_size_ml\": 100.0, \"performance\": {\"overshoot_count\": 0, \"undershoot_count\": 0, \"recovery_count\": 0, \"near_miss_count\": 0, \"precise_pour_count\": 0}}", "steps": [{"completed_at": null, "id": 1, "mix_session_id": 1, "payload": {"action_label": "Station ready", "severity": "info", "step": 1, "step_type": "instruction", "tip": "Check your scale settles at 0.00 g before each confirmation.", "title": "Prepare your station", "what": "Set bottle, scale, and ingredients within reach so each step feels smooth.", "why": "Good setup lowers stress and helps you hit each target cleanly."}, "payload_json": "{\"step\": 1, \"step_type\": \"instruction\", \"title\": \"Prepare your station\", \"what\": \"Set bottle, scale, and ingredients within reach so each step feels smooth.\", \"why\": \"Good setup lowers stress and helps you hit each target cleanly.\", \"tip\": \"Check your scale settles at 0.00 g before each confirmation.\", \"action_label\": \"Station ready\", \"severity\": \"info\"}", "step_no": 1, "step_type": "instruction"}, {"completed_at": null, "id": 2, "mix_session_id": 1, "payload": {"action_label": "I tared to 0.00g", "brand": "", "category": "nicotine", "name": "Nicotine base", "severity": "info", "step": 2, "step_type": "tare", "tip": "If the scale drifts, re-tare before touching the bottle.", "title": "Tare before Nicotine base", "what": "Zero the scale and confirm stable 0.00 g.", "why": "Nicotine dosing starts with a clean tare to prevent hidden carry-over in a safety-critical step."}, "payload_json": "{\"step\": 2, \"step_type\": \"tare\", \"title\": \"Tare before Nicotine base\", \"what\": \"Zero the scale and confirm stable 0.00 g.\", \"why\": \"Nicotine dosing starts with a clean tare to prevent hidden carry-over in a safety-critical step.\", \"tip\": \"If the scale drifts, re-tare before touching the bottle.\", \"action_label\": \"I tared to 0.00g\", \"severity\": \"info\", \"name\": \"Nicotine base\", \"brand\": \"\", \"category\": \"nicotine\"}", "step_no": 2, "step_type": "tare"}, {"completed_at": null, "id": 3, "mix_session_id": 1, "payload": {"action_label": "Safety confirmed", "brand": "", "category": "nicotine", "name": "Nicotine base", "severity": "warning", "step": 3, "step_type": "caution", "tip": "If uncertain, stop and re-check strength/carrier first.", "title": "Nicotine handling caution", "what": "Pause and verify PPE, bottle identity, and nicotine carrier before pouring.", "why": "Nicotine handling has higher safety consequence and needs deliberate control."}, "payload_json": "{\"step\": 3, \"step_type\": \"caution\", \"title\": \"Nicotine handling caution\", \"what\": \"Pause and verify PPE, bottle identity, and nicotine carrier before pouring.\", \"why\": \"Nicotine handling has higher safety consequence and needs deliberate control.\", \"tip\": \"If uncertain, stop and re-check strength/carrier first.\", \"action_label\": \"Safety confirmed\", \"severity\": \"warning\", \"name\": \"Nicotine base\", \"brand\": \"\", \"category\": \"nicotine\"}", "step_no": 3, "step_type": "caution"}, {"completed_at": null, "id": 4, "mix_session_id": 1, "payload": {"action_label": "Confirm pour", "brand": "", "category": "nicotine", "flavor_profile": null, "ingredient_family": "generic", "ingredient_id": null, "ingredient_role": "micro_accent", "name": "Nicotine base", "pct": null, "severity": "info", "step": 4, "step_type": "add_ingredient", "target_grams": 3.108, "tip": "Approach target slowly in the last 0.10 g.", "title": "Add 3.11g Nicotine base", "what": "Add 3.11 g of Nicotine base, then confirm measured amount.", "why": "This nicotine step sets final strength trajectory, so precision matters immediately."}, "payload_json": "{\"step\": 4, \"step_type\": \"add_ingredient\", \"title\": \"Add 3.11g Nicotine base\", \"what\": \"Add 3.11 g of Nicotine base, then confirm measured amount.\", \"why\": \"This nicotine step sets final strength trajectory, so precision matters immediately.\", \"tip\": \"Approach target slowly in the last 0.10 g.\", \"action_label\": \"Confirm pour\", \"severity\": \"info\", \"ingredient_id\": null, \"name\": \"Nicotine base\", \"brand\": \"\", \"category\": \"nicotine\", \"target_grams\": 3.108, \"pct\": null, \"ingredient_role\": \"micro_accent\", \"ingredient_family\": \"generic\", \"flavor_profile\": null}", "step_no": 4, "step_type": "add_ingredient"}, {"completed_at": null, "id": 5, "mix_session_id": 1, "payload": {"action_label": "Continue", "brand": "", "category": "nicotine", "name": "Nicotine base", "severity": "info", "step": 5, "step_type": "transition", "tip": "Proceed only when this pour record is clean.", "title": "Checkpoint", "what": "Confirm this step before moving to the next action.", "why": "Checkpointing catches drift early and keeps the session recoverable."}, "payload_json": "{\"step\": 5, \"step_type\": \"transition\", \"title\": \"Checkpoint\", \"what\": \"Confirm this step before moving to the next action.\", \"why\": \"Checkpointing catches drift early and keeps the session recoverable.\", \"tip\": \"Proceed only when this pour record is clean.\", \"action_label\": \"Continue\", \"severity\": \"info\", \"name\": \"Nicotine base\", \"brand\": \"\", \"category\": \"nicotine\"}", "step_no": 5, "step_type": "transition"}, {"completed_at": null, "id": 6, "mix_session_id": 1, "payload": {"action_label": "I tared to 0.00g", "brand": "INW", "category": "concentrate", "name": "Biscuit", "severity": "info", "step": 6, "step_type": "tare", "tip": "Treat tare as mandatory before every ingredient.", "title": "Tare before Biscuit", "what": "Zero the scale and confirm stable 0.00 g.", "why": "Tare removes carry-over from prior pours. Bakery layers carry depth and can quickly get heavy when overdosed."}, "payload_json": "{\"step\": 6, \"step_type\": \"tare\", \"title\": \"Tare before Biscuit\", \"what\": \"Zero the scale and confirm stable 0.00 g.\", \"why\": \"Tare removes carry-over from prior pours. Bakery layers carry depth and can quickly get heavy when overdosed.\", \"tip\": \"Treat tare as mandatory before every ingredient.\", \"action_label\": \"I tared to 0.00g\", \"severity\": \"info\", \"name\": \"Biscuit\", \"brand\": \"INW\", \"category\": \"concentrate\"}", "step_no": 6, "step_type": "tare"}, {"completed_at": null, "id": 7, "mix_session_id": 1, "payload": {"action_label": "Confirm pour", "brand": "INW", "category": "concentrate", "flavor_profile": null, "ingredient_family": "bakery", "ingredient_id": null, "ingredient_role": "base_main_note", "name": "Biscuit", "pct": 5.0, "severity": "info", "step": 7, "step_type": "add_ingredient", "target_grams": 5.18, "tip": "Approach target slowly in the last 0.10 g.", "title": "Add 5.18g Biscuit", "what": "Add 5.18 g of Biscuit, then confirm measured amount.", "why": "This is a main-note layer that defines most of the recipe identity. Bakery layers carry depth and can quickly get heavy when overdosed. At 5.00%, dose control matters for consistency."}, "payload_json": "{\"step\": 7, \"step_type\": \"add_ingredient\", \"title\": \"Add 5.18g Biscuit\", \"what\": \"Add 5.18 g of Biscuit, then confirm measured amount.\", \"why\": \"This is a main-note layer that defines most of the recipe identity. Bakery layers carry depth and can quickly get heavy when overdosed. At 5.00%, dose control matters for consistency.\", \"tip\": \"Approach target slowly in the last 0.10 g.\", \"action_label\": \"Confirm pour\", \"severity\": \"info\", \"ingredient_id\": null, \"name\": \"Biscuit\", \"brand\": \"INW\", \"category\": \"concentrate\", \"target_grams\": 5.18, \"pct\": 5.0, \"ingredient_role\": \"base_main_note\", \"ingredient_family\": \"bakery\", \"flavor_profile\": null}", "step_no": 7, "step_type": "add_ingredient"}, {"completed_at": null, "id": 8, "mix_session_id": 1, "payload": {"action_label": "Continue", "brand": "INW", "category": "concentrate", "name": "Biscuit", "severity": "info", "step": 8, "step_type": "transition", "tip": "Read back target vs actual before continuing.", "title": "Checkpoint", "what": "Confirm this step before moving to the next action.", "why": "Checkpointing catches drift early and keeps the session recoverable."}, "payload_json": "{\"step\": 8, \"step_type\": \"transition\", \"title\": \"Checkpoint\", \"what\": \"Confirm this step before moving to the next action.\", \"why\": \"Checkpointing catches drift early and keeps the session recoverable.\", \"tip\": \"Read back target vs actual before continuing.\", \"action_label\": \"Continue\", \"severity\": \"info\", \"name\": \"Biscuit\", \"brand\": \"INW\", \"category\": \"concentrate\"}", "step_no": 8, "step_type": "transition"}, {"completed_at": null, "id": 9, "mix_session_id": 1, "payload": {"action_label": "I tared to 0.00g", "brand": "", "category": "pg", "name": "PG (base)", "severity": "info", "step": 9, "step_type": "tare", "tip": "Do not pour until tare is confirmed.", "title": "Tare before PG (base)", "what": "Tare to 0.00 g now so this step starts clean.", "why": "Base-liquid tare protects final ratio closure accuracy."}, "payload_json": "{\"step\": 9, \"step_type\": \"tare\", \"title\": \"Tare before PG (base)\", \"what\": \"Tare to 0.00 g now so this step starts clean.\", \"why\": \"Base-liquid tare protects final ratio closure accuracy.\", \"tip\": \"Do not pour until tare is confirmed.\", \"action_label\": \"I tared to 0.00g\", \"severity\": \"info\", \"name\": \"PG (base)\", \"brand\": \"\", \"category\": \"pg\"}", "step_no": 9, "step_type": "tare"}, {"completed_at": null, "id": 10, "mix_session_id": 1, "payload": {"action_label": "Confirm pour", "brand": "", "category": "pg", "flavor_profile": null, "ingredient_family": "generic", "ingredient_id": null, "ingredient_role": "micro_accent", "name": "PG (base)", "pct": null, "severity": "info", "step": 10, "step_type": "add_ingredient", "target_grams": 22.792, "tip": "Pulse-pour near target to avoid overshoot.", "title": "Add 22.79g PG (base)", "what": "Add 22.79 g of PG (base), then confirm measured amount.", "why": "PG is part of final carrier balance, so this step stabilizes consistency."}, "payload_json": "{\"step\": 10, \"step_type\": \"add_ingredient\", \"title\": \"Add 22.79g PG (base)\", \"what\": \"Add 22.79 g of PG (base), then confirm measured amount.\", \"why\": \"PG is part of final carrier balance, so this step stabilizes consistency.\", \"tip\": \"Pulse-pour near target to avoid overshoot.\", \"action_label\": \"Confirm pour\", \"severity\": \"info\", \"ingredient_id\": null, \"name\": \"PG (base)\", \"brand\": \"\", \"category\": \"pg\", \"target_grams\": 22.792, \"pct\": null, \"ingredient_role\": \"micro_accent\", \"ingredient_family\": \"generic\", \"flavor_profile\": null}", "step_no": 10, "step_type": "add_ingredient"}, {"completed_at": null, "id": 11, "mix_session_id": 1, "payload": {"action_label": "Continue", "brand": "", "category": "pg", "name": "PG (base)", "severity": "info", "step": 11, "step_type": "transition", "tip": "Read back target vs actual before continuing.", "title": "Checkpoint", "what": "Confirm this step before moving to the next action.", "why": "Checkpointing catches drift early and keeps the session recoverable."}, "payload_json": "{\"step\": 11, \"step_type\": \"transition\", \"title\": \"Checkpoint\", \"what\": \"Confirm this step before moving to the next action.\", \"why\": \"Checkpointing catches drift early and keeps the session recoverable.\", \"tip\": \"Read back target vs actual before continuing.\", \"action_label\": \"Continue\", \"severity\": \"info\", \"name\": \"PG (base)\", \"brand\": \"\", \"category\": \"pg\"}", "step_no": 11, "step_type": "transition"}, {"completed_at": null, "id": 12, "mix_session_id": 1, "payload": {"action_label": "I tared to 0.00g", "brand": "", "category": "vg", "name": "VG (base)", "severity": "info", "step": 12, "step_type": "tare", "tip": "Treat tare as mandatory before every ingredient.", "title": "Tare before VG (base)", "what": "Zero the scale and confirm stable 0.00 g.", "why": "Base-liquid tare protects final ratio closure accuracy."}, "payload_json": "{\"step\": 12, \"step_type\": \"tare\", \"title\": \"Tare before VG (base)\", \"what\": \"Zero the scale and confirm stable 0.00 g.\", \"why\": \"Base-liquid tare protects final ratio closure accuracy.\", \"tip\": \"Treat tare as mandatory before every ingredient.\", \"action_label\": \"I tared to 0.00g\", \"severity\": \"info\", \"name\": \"VG (base)\", \"brand\": \"\", \"category\": \"vg\"}", "step_no": 12, "step_type": "tare"}, {"completed_at": null, "id": 13, "mix_session_id": 1, "payload": {"action_label": "Confirm pour", "brand": "", "category": "vg", "flavor_profile": null, "ingredient_family": "generic", "ingredient_id": null, "ingredient_role": "micro_accent", "name": "VG (base)", "pct": null, "severity": "info", "step": 13, "step_type": "add_ingredient", "target_grams": 88.2, "tip": "Pulse-pour near target to avoid overshoot.", "title": "Add 88.20g VG (base)", "what": "Add 88.20 g of VG (base), then confirm measured amount.", "why": "VG builds density and vapor body, so this step sets final smoothness."}, "payload_json": "{\"step\": 13, \"step_type\": \"add_ingredient\", \"title\": \"Add 88.20g VG (base)\", \"what\": \"Add 88.20 g of VG (base), then confirm measured amount.\", \"why\": \"VG builds density and vapor body, so this step sets final smoothness.\", \"tip\": \"Pulse-pour near target to avoid overshoot.\", \"action_label\": \"Confirm pour\", \"severity\": \"info\", \"ingredient_id\": null, \"name\": \"VG (base)\", \"brand\": \"\", \"category\": \"vg\", \"target_grams\": 88.2, \"pct\": null, \"ingredient_role\": \"micro_accent\", \"ingredient_family\": \"generic\", \"flavor_profile\": null}", "step_no": 13, "step_type": "add_ingredient"}, {"completed_at": null, "id": 14, "mix_session_id": 1, "payload": {"action_label": "Continue", "brand": "", "category": "vg", "name": "VG (base)", "severity": "info", "step": 14, "step_type": "transition", "tip": "Proceed only when this pour record is clean.", "title": "Checkpoint", "what": "Confirm this step before moving to the next action.", "why": "Checkpointing catches drift early and keeps the session recoverable."}, "payload_json": "{\"step\": 14, \"step_type\": \"transition\", \"title\": \"Checkpoint\", \"what\": \"Confirm this step before moving to the next action.\", \"why\": \"Checkpointing catches drift early and keeps the session recoverable.\", \"tip\": \"Proceed only when this pour record is clean.\", \"action_label\": \"Continue\", \"severity\": \"info\", \"name\": \"VG (base)\", \"brand\": \"\", \"category\": \"vg\"}", "step_no": 14, "step_type": "transition"}, {"completed_at": null, "id": 15, "mix_session_id": 1, "payload": {"action_label": "Recovery checked", "severity": "warning", "step": 15, "step_type": "recovery", "tip": "Use recovery early to avoid larger downstream corrections.", "title": "Recovery guidance", "what": "If a deviation occurs, run reconcile before sign-off.", "why": "Recovery protects the recipe trajectory after mistakes."}, "payload_json": "{\"step\": 15, \"step_type\": \"recovery\", \"title\": \"Recovery guidance\", \"what\": \"If a deviation occurs, run reconcile before sign-off.\", \"why\": \"Recovery protects the recipe trajectory after mistakes.\", \"tip\": \"Use recovery early to avoid larger downstream corrections.\", \"action_label\": \"Recovery checked\", \"severity\": \"warning\"}", "step_no": 15, "step_type": "recovery"}, {"completed_at": null, "id": 16, "mix_session_id": 1, "payload": {"action_label": "Session complete", "severity": "success", "step": 16, "step_type": "completion", "tip": "Verify your batch record is complete before ending session.", "title": "Completion", "what": "Seal, label, and save this mix session.", "why": "Good close-out helps you repeat what worked next time."}, "payload_json": "{\"step\": 16, \"step_type\": \"completion\", \"title\": \"Completion\", \"what\": \"Seal, label, and save this mix session.\", \"why\": \"Good close-out helps you repeat what worked next time.\", \"tip\": \"Verify your batch record is complete before ending session.\", \"action_label\": \"Session complete\", \"severity\": \"success\"}", "step_no": 16, "step_type": "completion"}], "target_ml": 100.0, "target_nic": 3.0, "target_pgvg": "30/70", "user_id": 1, "version_number": "1"}</script>
+
+<script src="/static/policy_feedback.js"></script>
+
+<script>
+
+(() => {
+
+  const root = document.getElementById("guidedRoot");
+
+  const sessionId = Number(root.dataset.sessionId);
+
+  const sessionMeta = {
+
+    recipeName: root.dataset.recipeName || "",
+
+    version: root.dataset.version || "",
+
+    targetMl: Number(root.dataset.batchMl) || 0,
+
+    targetNic: Number(root.dataset.targetNic) || 0,
+
+    pgvg: root.dataset.pgvg || "30/70",
+
+  };
+
+
+
+  const completionSummary = document.getElementById("completionSummary");
+
+  const focusCard = document.getElementById("focusCard");
+
+  const contextPanel = document.getElementById("contextPanel");
+
+  const guidedPolicyBox = document.getElementById("guidedPolicyBox");
+
+  const roleChip = document.getElementById("roleChip");
+
+  const focusTitle = document.getElementById("focusTitle");
+
+  const focusRole = document.getElementById("focusRole");
+
+  const focusIngredient = document.getElementById("focusIngredient");
+
+  const focusBrand = document.getElementById("focusBrand");
+
+  const focusWhy = document.getElementById("focusWhy");
+
+  const workflowPhase = document.getElementById("workflowPhase");
+
+  const focusG = document.getElementById("focusG");
+
+  const focusMeasured = document.getElementById("focusMeasured");
+
+  const focusMeasuredDisplay = document.getElementById("focusMeasuredDisplay");
+
+  const focusPct = document.getElementById("focusPct");
+
+  const focusPctWrap = document.getElementById("focusPctWrap");
+
+  const goatLine = document.getElementById("goatLine");
+
+  const microFlash = document.getElementById("microFlash");
+
+  const focusActions = document.getElementById("focusActions");
+
+  const focusStepBadge = document.getElementById("focusStepBadge");
+
+  const nextPreviewText = document.getElementById("nextPreviewText");
+
+  const nextPreviewCard = document.getElementById("nextPreviewCard");
+
+  const scaleHero = document.getElementById("scaleHero");
+
+  const scaleLiveBlock = document.getElementById("scaleLiveBlock");
+
+  const targetScaleLabel = document.getElementById("targetScaleLabel");
+
+  const deltaReadout = document.getElementById("deltaReadout");
+
+  const progLabel = document.getElementById("progLabel");
+
+  const guidedToast = document.getElementById("guidedToast");
+
+  let coachCache = {};
+
+  let toastTimer = null;
+
+
+
+  const apiJson = async (url, options = {}) => {
+
+    const res = await fetch(url, { headers: { "Content-Type": "application/json" }, ...options });
+
+    const body = await res.json();
+
+    if (!res.ok) {
+
+      const err = new Error(body.message || "Request failed");
+
+      err.policy = body.policy || {};
+
+      err.session = body.session;
+
+      throw err;
+
+    }
+
+    return body;
+
+  };
+
+
+
+  const stepTypeFor = (step) => String((step.payload || {}).step_type || "instruction").toLowerCase();
+
+  const stepTypeClass = (stepType) => `tvw-step-${String(stepType || "instruction").toLowerCase().replaceAll("_", "-")}`;
+
+
+
+  const LED_CLASS = {
+
+    "Main Flavour": "is-main",
+
+    "Supporting Flavour": "is-support",
+
+    "Accent": "is-accent",
+
+    "Sweetener": "is-sweetener",
+
+    "Cooling": "is-cooling",
+
+    "Base Liquid": "is-base",
+
+    "Nicotine": "is-nic",
+
+    "Safety": "is-safety",
+
+    "Scale": "is-scale",
+
+    "Recovery": "is-recovery",
+
+    "Pour": "is-main",
+
+    "Checkpoint": "is-base",
+
+    "Setup": "is-scale",
+
+    "Done": "is-main",
+
+  };
+
+
+
+  const roleLabelFor = (p, stepType) => {
+
+    const cat = String(p.category || "").toLowerCase();
+
+    if (cat === "nicotine") return "Nicotine";
+
+    if (cat === "pg" || cat === "vg") return "Base Liquid";
+
+    const role = String(p.ingredient_role || "").toLowerCase();
+
+    const map = {
+
+      base_main_note: "Main Flavour",
+
+      support: "Supporting Flavour",
+
+      accent: "Accent",
+
+      micro_accent: "Accent",
+
+      sweetener: "Sweetener",
+
+      coolant: "Cooling",
+
+      additive: "Accent",
+
+    };
+
+    if (map[role]) return map[role];
+
+    if (stepType === "tare") return "Scale";
+
+    if (stepType === "caution") return "Safety";
+
+    if (stepType === "recovery") return "Recovery";
+
+    if (stepType === "transition") return "Checkpoint";
+
+    if (stepType === "completion") return "Done";
+
+    if (stepType === "add_ingredient") return "Pour";
+
+    return "Setup";
+
+  };
+
+
+
+  const setRoleLed = (label) => {
+
+    const led = LED_CLASS[label] || "is-scale";
+
+    roleChip.textContent = label;
+
+    roleChip.className = "tvw-ws-led " + led;
+
+  };
+
+
+
+  const bottleName = (p, stepType) => {
+
+    const name = p.name || p.ingredient_name || p.title || "";
+
+    if (stepType === "caution") return "Nicotine — gloves on";
+
+    if (stepType === "recovery") return "Fix the pour";
+
+    if (stepType === "transition") return name || "Checkpoint";
+
+    if (stepType === "completion") return "Finished";
+
+    if (stepType === "instruction") return "Prepare your bench";
+
+    return name || "—";
+
+  };
+
+
+
+  const ingredientLabel = (p) => {
+
+    const brand = String(p.brand || "").trim();
+
+    const name = String(p.name || p.ingredient_name || "").trim();
+
+    if (brand && name) return `${brand} ${name}`;
+
+    return name || brand || "—";
+
+  };
+
+
+
+  const peekLinkedPourStep = (steps, current) => {
+
+    if (!current || !steps) return null;
+
+    const type = stepTypeFor(current);
+
+    if (type === "add_ingredient") return current;
+
+    if (type !== "tare") return null;
+
+    const no = Number(current.step_no);
+
+    return steps.find((s) => Number(s.step_no) === no + 1 && stepTypeFor(s) === "add_ingredient") || null;
+
+  };
+
+
+
+  const computeBottleFill = (steps, targetMl) => {
+
+    const pours = (steps || []).filter((s) => stepTypeFor(s) === "add_ingredient");
+
+    const totalG = pours.reduce((sum, s) => sum + Number((s.payload || {}).target_grams || (s.payload || {}).grams || 0), 0);
+
+    let doneG = 0;
+
+    for (const s of pours) {
+
+      if (!s.completed_at) continue;
+
+      const p = s.payload || {};
+
+      const g = p.measured_grams != null && p.measured_grams !== ""
+
+        ? Number(p.measured_grams)
+
+        : Number(p.target_grams || p.grams || 0);
+
+      if (Number.isFinite(g)) doneG += g;
+
+    }
+
+    const pct = totalG > 0 ? Math.min(100, Math.round((doneG / totalG) * 100)) : 0;
+
+    const ml = Number(targetMl) || 0;
+
+    const doneMl = totalG > 0 && ml > 0 ? (doneG / totalG) * ml : 0;
+
+    return { pct, doneG, totalG, doneMl, targetMl: ml };
+
+  };
+
+
+
+  const benchStatusFor = (steps, current, stepType) => {
+
+    const plan = (steps || [])
+
+      .filter((s) => stepTypeFor(s) === "add_ingredient")
+
+      .map((s) => {
+
+        const p = s.payload || {};
+
+        return {
+
+          label: ingredientLabel(p),
+
+          shortName: String(p.name || p.ingredient_name || ingredientLabel(p)).trim(),
+
+          completed: !!s.completed_at,
+
+        };
+
+      });
+
+    const done = plan.filter((x) => x.completed);
+
+    let toAdd = plan.filter((x) => !x.completed);
+
+    let inHand = "";
+
+    if (stepType === "instruction") {
+
+      return {
+
+        done: [],
+
+        inHand: "Set up first",
+
+        toAdd: plan,
+
+      };
+
+    }
+
+    if (current) {
+
+      const type = stepTypeFor(current);
+
+      const pour = peekLinkedPourStep(steps, current);
+
+      const dp = (pour && pour.payload) || current.payload || {};
+
+      const handName = String(dp.name || ingredientLabel(dp)).trim();
+
+      if (type === "tare" || type === "add_ingredient") {
+
+        inHand = handName;
+
+        toAdd = toAdd.filter((x) => x.shortName !== handName);
+
+      }
+
+    }
+
+    return { done, inHand, toAdd };
+
+  };
+
+
+
+  const benchLanesHtml = (bench) => {
+
+    const doneLines = bench.done.length
+
+      ? bench.done.map((x) => `<li class="tvw-ws-bench-item is-done">✓ ${esc(x.shortName)}</li>`).join("")
+
+      : `<li class="tvw-ws-bench-item is-empty">—</li>`;
+
+    const handLine = bench.inHand
+
+      ? `<li class="tvw-ws-bench-item is-hand">→ ${esc(bench.inHand)}</li>`
+
+      : `<li class="tvw-ws-bench-item is-empty">—</li>`;
+
+    const todoLines = bench.toAdd.length
+
+      ? bench.toAdd.map((x) => `<li class="tvw-ws-bench-item">○ ${esc(x.shortName)}</li>`).join("")
+
+      : `<li class="tvw-ws-bench-item is-empty">—</li>`;
+
+    return `
+
+      <div class="tvw-ws-bench-lanes">
+
+        <div class="tvw-ws-bench-lane is-done-lane">
+
+          <p class="tvw-ws-bench-lane-title">DONE</p>
+
+          <ul class="tvw-ws-bench-list">${doneLines}</ul>
+
+        </div>
+
+        <div class="tvw-ws-bench-lane is-hand-lane">
+
+          <p class="tvw-ws-bench-lane-title">IN HAND</p>
+
+          <ul class="tvw-ws-bench-list">${handLine}</ul>
+
+        </div>
+
+        <div class="tvw-ws-bench-lane is-todo-lane">
+
+          <p class="tvw-ws-bench-lane-title">TO ADD</p>
+
+          <ul class="tvw-ws-bench-list">${todoLines}</ul>
+
+        </div>
+
+      </div>
+
+    `;
+
+  };
+
+
+
+  const physicalActionFor = (stepType, p, targetG) => {
+
+    const name = ingredientLabel(p);
+
+    const role = roleLabelFor(p, stepType === "tare" ? "add_ingredient" : stepType);
+
+    if (stepType === "instruction") {
+
+      return {
+
+        action: "Prepare your bench",
+
+        ingredient: sessionMeta.recipeName || "Today's mix",
+
+        role: "",
+
+        phase: "Lay everything out before you touch the scale.",
+
+      };
+
+    }
+
+    if (stepType === "tare") {
+
+      return {
+
+        action: "Pick up",
+
+        ingredient: name,
+
+        role,
+
+        phase: "Zero your scale.",
+
+      };
+
+    }
+
+    if (stepType === "add_ingredient") {
+
+      const g = Number.isFinite(targetG) && targetG > 0 ? targetG.toFixed(2) : "—";
+
+      return {
+
+        action: `Pour until the display reads ${g} g`,
+
+        ingredient: name,
+
+        role,
+
+        phase: "",
+
+      };
+
+    }
+
+    if (stepType === "transition") {
+
+      const shortName = String(p.name || p.ingredient_name || name).trim();
+
+      return {
+
+        action: `Move ${shortName} to the LEFT side`,
+
+        ingredient: name,
+
+        role,
+
+        phase: "after pouring",
+
+      };
+
+    }
+
+    if (stepType === "caution") {
+
+      return {
+
+        action: "Put gloves on.",
+
+        ingredient: "Nicotine",
+
+        role: "Safety",
+
+        phase: String(p.what || "Verify bottle strength before you pour.").trim(),
+
+      };
+
+    }
+
+    if (stepType === "recovery") {
+
+      return {
+
+        action: "Slow down and re-weigh.",
+
+        ingredient: name || "This pour",
+
+        role: "Recovery",
+
+        phase: String(p.what || "").trim(),
+
+      };
+
+    }
+
+    if (stepType === "completion") {
+
+      return {
+
+        action: "Label and steep.",
+
+        ingredient: "Finished mix",
+
+        role: "",
+
+        phase: "",
+
+      };
+
+    }
+
+    return {
+
+      action: String(p.what || "Continue.").trim(),
+
+      ingredient: bottleName(p, stepType),
+
+      role,
+
+      phase: "",
+
+    };
+
+  };
+
+
+
+  const showUndoFor = (stepType) => {
+
+    if (stepType === "tare") return false;
+
+    if (stepType === "instruction") return false;
+
+    if (stepType === "transition") return false;
+
+    if (stepType === "completion") return false;
+
+    if (stepType === "caution") return false;
+
+    return stepType === "add_ingredient" || stepType === "recovery";
+
+  };
+
+
+
+  const stepAckMessage = (sess, completedStepNo) => {
+
+    const steps = sess.steps || [];
+
+    const completed = steps.find((s) => Number(s.step_no) === Number(completedStepNo));
+
+    if (!completed) return "";
+
+    const type = stepTypeFor(completed);
+
+    const p = completed.payload || {};
+
+    const name = ingredientLabel(p);
+
+    const shortName = String(p.name || p.ingredient_name || name).trim();
+
+    const next = steps.find((s) => Number(s.step_no) === Number(completedStepNo) + 1);
+
+    let nextName = "";
+
+    if (next) {
+
+      if (stepTypeFor(next) === "tare") {
+
+        const pourNext = steps.find((s) => Number(s.step_no) === Number(next.step_no) + 1);
+
+        const np = (pourNext && pourNext.payload) || next.payload || {};
+
+        nextName = String(np.name || np.ingredient_name || ingredientLabel(np)).trim();
+
+      } else {
+
+        const np = next.payload || {};
+
+        nextName = stepTypeFor(next) === "add_ingredient"
+
+          ? String(np.name || np.ingredient_name || ingredientLabel(np)).trim()
+
+          : "";
+
+      }
+
+    }
+
+    if (type === "instruction") {
+
+      return nextName ? `✓ Bench is ready. First up: ${nextName}.` : "✓ Bench is ready.";
+
+    }
+
+    if (type === "tare") {
+
+      return nextName ? `✓ Scale is zeroed. Pour ${nextName} next.` : "✓ Scale is zeroed.";
+
+    }
+
+    if (type === "add_ingredient") {
+
+      const move = shortName ? ` Move ${shortName} to the left side.` : " Move the bottle to the left side.";
+
+      const upcoming = nextName ? ` Next up: ${nextName}.` : "";
+
+      return `✓ Nice. ${shortName || "Ingredient"} is in.${move}${upcoming}`;
+
+    }
+
+    if (type === "transition" && nextName) {
+
+      return `✓ Cleared. Next up: ${nextName}.`;
+
+    }
+
+    return "";
+
+  };
+
+
+
+  const showToast = (message) => {
+
+    if (!guidedToast || !message) return;
+
+    if (toastTimer) clearTimeout(toastTimer);
+
+    guidedToast.textContent = message;
+
+    guidedToast.classList.remove("d-none");
+
+    guidedToast.classList.add("is-visible");
+
+    toastTimer = setTimeout(() => {
+
+      guidedToast.classList.remove("is-visible");
+
+      guidedToast.classList.add("d-none");
+
+    }, 2600);
+
+  };
+
+
+
+  const goatSays = (p, stepType, coach) => {
+
+    const generic = ["Steady hands", "Steady control", "Keep your normal approach", "Bench note"];
+
+    const pick = (...lines) => lines.find((l) => l && String(l).trim()) || "";
+
+
+
+    if (stepType === "recovery") {
+
+      return pick(p.tip, p.what, coach.detail, "You overshot. Slow down isn\u2019t optional anymore.");
+
+    }
+
+    if (stepType === "caution") {
+
+      return pick(p.tip, p.what, "Nicotine isn\u2019t forgiving. Verify the bottle.");
+
+    }
+
+    if (stepType === "tare") {
+
+      return pick(
+
+        "Tap tare, then confirm the display reads zero before you pour.",
+
+        p.what,
+
+      );
+
+    }
+
+    if (stepType === "add_ingredient") {
+
+      const tip = pick(p.tip, coach.detail);
+
+      if (tip && !generic.some((g) => tip.includes(g)) && !/tare as mandatory/i.test(tip)) return tip;
+
+      const pct = Number(p.percent != null ? p.percent : p.pct);
+
+      if (pct > 0 && pct < 1) return "Tiny pour. The scale matters more than your wrist speed.";
+
+      if (pct >= 5) return "Main layer — get it right, everything else sits on this.";
+
+      return "Creep up on the number. Last 0.1 g is where people wreck it.";
+
+    }
+
+    const detail = (coach || {}).detail || "";
+
+    if (detail && !generic.some((g) => detail.includes(g))) return detail;
+
+    return pick(p.tip, p.what, "");
+
+  };
+
+
+
+  const actionLabelFor = (stepType, p) => {
+
+    const map = {
+
+      tare: "Scale Zeroed",
+
+      add_ingredient: "Pour Complete",
+
+      transition: "Next Ingredient",
+
+      caution: "Safety Clear",
+
+      recovery: "Continue",
+
+      instruction: "Ready to Pour",
+
+      completion: "Done",
+
+    };
+
+    if (map[stepType]) return map[stepType];
+
+    const fromServer = String(p.action_label || "").trim();
+
+    if (fromServer && fromServer !== "Mark step done") return fromServer;
+
+    return "Next";
+
+  };
+
+
+
+  const undoLabelFor = (stepType) => {
+
+    if (stepType === "add_ingredient") return "Re-weigh";
+
+    if (stepType === "transition") return "Back";
+
+    if (stepType === "recovery") return "Back";
+
+    return "";
+
+  };
+
+
+
+  const esc = (s) => String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
+  const prepChecklistHtml = (targetNic) => {
+
+    const items = [
+
+      "Flavour concentrates on the RIGHT of your bench, in pour order",
+
+      "Empty vessel centred on scale",
+
+      "PG/VG base within reach",
+
+      "Pipettes, labels, and gloves ready",
+
+    ];
+
+    if (targetNic > 0) {
+
+      items.splice(2, 0, "Nicotine bottle strength verified");
+
+    }
+
+    return items.map((t) => `<li class="tvw-ws-check-item"><span class="tvw-ws-check-box" aria-hidden="true"></span>${t}</li>`).join("");
+
+  };
+
+
+
+  const renderContextPanel = (sess, current, stepType) => {
+
+    const prog = sess.progress || {};
+
+    const steps = sess.steps || [];
+
+    const meta = {
+
+      recipeName: sess.recipe_name || sessionMeta.recipeName,
+
+      targetMl: sess.target_ml != null ? sess.target_ml : sessionMeta.targetMl,
+
+    };
+
+    const fill = computeBottleFill(steps, meta.targetMl);
+
+    const pour = current ? (peekLinkedPourStep(steps, current) || (stepType === "add_ingredient" ? current : null)) : null;
+
+    const pp = (pour && pour.payload) || (current && current.payload) || {};
+
+    const bench = benchStatusFor(steps, current, stepType);
+
+    const next = current ? steps.find((x) => Number(x.step_no) === Number(current.step_no) + 1) : null;
+
+    let upcoming = "—";
+
+    if (next) {
+
+      const np = next.payload || {};
+
+      let nextName = "";
+
+      if (stepTypeFor(next) === "tare") {
+
+        const pourNext = steps.find((x) => Number(x.step_no) === Number(next.step_no) + 1);
+
+        const p2 = (pourNext && pourNext.payload) || np;
+
+        nextName = String(p2.name || p2.ingredient_name || ingredientLabel(p2)).trim();
+
+      } else if (stepTypeFor(next) === "add_ingredient") {
+
+        nextName = String(np.name || np.ingredient_name || ingredientLabel(np)).trim();
+
+      }
+
+      if (nextName) upcoming = `Next, pick up ${nextName}`;
+
+      else if (stepTypeFor(next) === "transition") upcoming = "Move the bottle to the left side";
+
+    }
+
+    const isPrep = stepType === "instruction";
+
+    const bottleContents = fill.targetMl > 0
+
+      ? `${fill.doneMl.toFixed(2)} ml of ${Number(fill.targetMl).toFixed(0)} ml`
+
+      : `${fill.doneMl.toFixed(2)} ml`;
+
+    contextPanel.className = "tvw-ws-panel tvw-ws-prep is-pour-mode";
+
+    contextPanel.innerHTML = `
+
+      <div class="tvw-ws-pour-meta">
+
+        <span class="tvw-ws-kicker">Mission control</span>
+
+        <h2 class="tvw-ws-prep-title">${esc(meta.recipeName)}</h2>
+
+        <section class="tvw-ws-prep-block">
+
+          <h3 class="tvw-ws-block-label">Current Bottle Contents</h3>
+
+          <p class="tvw-ws-bench-line">${bottleContents}</p>
+
+          <div class="tvw-ws-fill-track" aria-hidden="true"><div class="tvw-ws-fill-fill" style="width:${fill.pct}%"></div></div>
+
+        </section>
+
+        <section class="tvw-ws-prep-block tvw-ws-bench-status">
+
+          <h3 class="tvw-ws-block-label">Bench</h3>
+
+          ${benchLanesHtml(bench)}
+
+        </section>
+
+        <section class="tvw-ws-prep-block">
+
+          <h3 class="tvw-ws-block-label">What happens next</h3>
+
+          <p class="tvw-ws-bench-line tvw-ws-bench-sub">${esc(upcoming)}</p>
+
+        </section>
+
+        ${isPrep ? `
+
+        <section class="tvw-ws-prep-block">
+
+          <h3 class="tvw-ws-block-label">Checklist</h3>
+
+          <ul class="tvw-ws-checklist">${prepChecklistHtml(Number(sess.target_nic != null ? sess.target_nic : sessionMeta.targetNic))}</ul>
+
+        </section>` : ""}
+
+      </div>
+
+    `;
+
+    if (isPrep) {
+
+      goatLine.textContent = "";
+
+      goatLine.className = "tvw-ws-goat-inline";
+
+    }
+
+  };
+
+
+
+  const updateDelta = (val, targetG) => {
+
+    if (!Number.isFinite(val) || !Number.isFinite(targetG) || targetG <= 0) {
+
+      deltaReadout.textContent = "";
+
+      deltaReadout.className = "tvw-ws-delta";
+
+      return;
+
+    }
+
+    const d = val - targetG;
+
+    const sign = d >= 0 ? "+" : "";
+
+    deltaReadout.textContent = `${sign}${d.toFixed(2)} g`;
+
+    deltaReadout.className = "tvw-ws-delta " + (
+
+      Math.abs(d) <= Math.max(0.02, targetG * 0.008) ? "is-ok" : (d > 0 ? "is-over" : "is-under")
+
+    );
+
+  };
+
+
+
+  const setFocus = (sess) => {
+
+    const prog = sess.progress || {};
+
+    const steps = sess.steps || [];
+
+    const current = steps.find((x) => !x.completed_at) || null;
+
+    const next = current ? steps.find((x) => Number(x.step_no) === Number(current.step_no) + 1) : null;
+
+    const total = prog.total_steps || 0;
+
+    const done = prog.completed_steps || 0;
+
+    coachCache = sess.coach_summary || {};
+
+
+
+    focusCard.classList.remove("d-none");
+
+    if (completionSummary) completionSummary.classList.add("d-none");
+
+
+
+    if (!current) {
+
+      focusCard.classList.add("d-none");
+
+      if (contextPanel) contextPanel.classList.add("d-none");
+
+      if (completionSummary) completionSummary.classList.remove("d-none");
+
+      return;
+
+    }
+
+
+
+    if (contextPanel) contextPanel.classList.remove("d-none");
+
+
+
+    const stepType = stepTypeFor(current);
+
+    const p = current.payload || {};
+
+    const pourStep = peekLinkedPourStep(steps, current);
+
+    const displayP = (pourStep && pourStep.payload) || p;
+
+    const isPrep = stepType === "instruction";
+
+    const isTarePhase = stepType === "tare";
+
+    const isPourPhase = stepType === "add_ingredient";
+
+    const isIngredientFlow = isTarePhase || isPourPhase;
+
+    const role = isIngredientFlow
+
+      ? roleLabelFor(displayP, "add_ingredient")
+
+      : roleLabelFor(p, stepType);
+
+
+
+    renderContextPanel(sess, current, stepType);
+
+
+
+    setRoleLed(role);
+
+    const stepPad = String(current.step_no).padStart(2, "0");
+
+    const totalPad = String(total).padStart(2, "0");
+
+    focusStepBadge.textContent = `${stepPad} / ${totalPad}`;
+
+    progLabel.textContent = `${done}/${total}`;
+
+
+
+    const flowClass = isIngredientFlow ? " is-ingredient-flow" : "";
+
+    const phaseClass = isTarePhase ? " is-tare-phase" : (isPourPhase ? " is-pour-phase" : "");
+
+    focusCard.className = `tvw-ws-panel tvw-ws-face ${stepTypeClass(isIngredientFlow ? "add_ingredient" : stepType)}${flowClass}${phaseClass}`
+
+      + (role === "Nicotine" ? " tvw-role-nicotine-wrap" : "")
+
+      + (isPrep ? " is-prep-face" : "");
+
+
+
+    focusTitle.textContent = bottleName(displayP, isIngredientFlow ? "add_ingredient" : stepType);
+
+
+
+    const targetG = Number(
+
+      displayP.target_grams != null ? displayP.target_grams : (displayP.grams || p.target_grams || p.grams || 0),
+
+    );
+
+    const isWeigh = isPourPhase && targetG > 0;
+
+
+
+    if (isPrep) {
+
+      const prepPhys = physicalActionFor("instruction", p, 0);
+
+      focusRole.textContent = prepPhys.action;
+
+      focusIngredient.textContent = prepPhys.ingredient;
+
+      focusBrand.textContent = "";
+
+      workflowPhase.textContent = prepPhys.phase;
+
+      focusWhy.textContent = String(p.why || "").trim();
+
+      focusWhy.style.display = focusWhy.textContent ? "" : "none";
+
+    } else if (isIngredientFlow) {
+
+      const phys = physicalActionFor(isTarePhase ? "tare" : "add_ingredient", displayP, targetG);
+
+      focusRole.textContent = phys.action;
+
+      focusIngredient.textContent = phys.ingredient;
+
+      focusBrand.textContent = phys.role || "";
+
+      workflowPhase.textContent = phys.phase || "";
+
+      workflowPhase.style.display = phys.phase ? "" : "none";
+
+      const whyLine = String(displayP.why || "").trim();
+
+      focusWhy.textContent = whyLine;
+
+      focusWhy.style.display = whyLine ? "" : "none";
+
+    } else {
+
+      const phys = physicalActionFor(stepType, p, targetG);
+
+      focusRole.textContent = phys.action;
+
+      focusIngredient.textContent = phys.ingredient;
+
+      focusBrand.textContent = phys.role || (p.brand || "");
+
+      workflowPhase.textContent = phys.phase || String(p.what || "").trim();
+
+      workflowPhase.style.display = workflowPhase.textContent ? "" : "none";
+
+      const whyLine = String(p.why || "").trim();
+
+      focusWhy.textContent = whyLine;
+
+      focusWhy.style.display = whyLine ? "" : "none";
+
+    }
+
+
+
+    if (isPrep || isTarePhase) {
+
+      scaleHero.classList.add("is-prep-hidden");
+
+    } else if (isPourPhase) {
+
+      scaleHero.classList.remove("is-prep-hidden", "is-solo");
+
+      focusG.textContent = targetG > 0 ? targetG.toFixed(2) : "—";
+
+      targetScaleLabel.textContent = "Target";
+
+      scaleLiveBlock.style.display = "";
+
+      scaleLiveBlock.innerHTML = `
+
+        <span class="tvw-ws-lcd-label">Scale</span>
+
+        <div class="tvw-ws-lcd-value">
+
+          <label for="focusMeasuredInput" class="visually-hidden">Grams on scale</label>
+
+          <input id="focusMeasuredInput" class="tvw-ws-input" type="number" step="0.01" inputmode="decimal" placeholder="0.00" value="${p.measured_grams != null ? Number(p.measured_grams).toFixed(2) : ""}" aria-label="Grams on scale">
+
+          <span class="tvw-ws-unit">g</span>
+
+        </div>
+
+      `;
+
+      deltaReadout.style.display = "";
+
+    } else {
+
+      scaleHero.classList.remove("is-prep-hidden");
+
+      scaleHero.classList.add("is-solo");
+
+      focusG.textContent = targetG > 0 ? targetG.toFixed(2) : "—";
+
+      targetScaleLabel.textContent = targetG > 0 ? "Target" : "—";
+
+      scaleLiveBlock.style.display = "none";
+
+      deltaReadout.style.display = "none";
+
+    }
+
+
+
+    const pctVal = displayP.percent != null ? displayP.percent : displayP.pct;
+
+    if (pctVal != null && isIngredientFlow) {
+
+      focusPct.textContent = `${Number(pctVal).toFixed(2)}%`;
+
+      focusPctWrap.style.display = "";
+
+    } else {
+
+      focusPctWrap.style.display = "none";
+
+    }
+
+
+
+    if (isPrep) {
+
+      const tip = goatSays(p, stepType, coachCache);
+
+      goatLine.textContent = tip || "Arrange concentrate bottles on the RIGHT side of your bench in the order you will add them.";
+
+      goatLine.className = "tvw-ws-goat-inline";
+
+    } else if (!isPrep) {
+
+      const coachP = isIngredientFlow ? displayP : p;
+
+      const line = goatSays(coachP, stepType, coachCache);
+
+      goatLine.textContent = line;
+
+      goatLine.className = "tvw-ws-goat-inline" + (
+
+        stepType === "recovery" || stepType === "caution" ? " is-warn" : ""
+
+      );
+
+    }
+
+
+
+    const primaryLabel = actionLabelFor(stepType, p);
+
+    const undoVisible = showUndoFor(stepType);
+
+    focusActions.innerHTML = `
+
+      <button type="button" class="tvw-ws-commit js-done-step" data-step-no="${current.step_no}">${primaryLabel}</button>
+
+      ${undoVisible ? `<button type="button" class="tvw-ws-undo js-undo-step" data-step-no="${current.step_no}">${undoLabelFor(stepType)}</button>` : ""}
+
+    `;
+
+
+
+    const measuredInput = document.getElementById("focusMeasuredInput");
+
+    if (measuredInput) {
+
+      measuredInput.addEventListener("input", () => {
+
+        const raw = measuredInput.value;
+
+        if (raw === "" || raw == null) {
+
+          focusMeasured.textContent = "Measured: --";
+
+          deltaReadout.textContent = "";
+
+          return;
+
+        }
+
+        const val = Number(raw);
+
+        if (!Number.isFinite(val)) return;
+
+        focusMeasured.textContent = `Measured: ${val.toFixed(2)} g`;
+
+        updateDelta(val, targetG);
+
+      });
+
+      measuredInput.focus();
+
+      if (measuredInput.value) measuredInput.dispatchEvent(new Event("input"));
+
+    }
+
+
+
+    if (next) {
+
+      let previewRole = "";
+
+      let previewName = "";
+
+      if (stepTypeFor(next) === "tare") {
+
+        const pourNext = steps.find((x) => Number(x.step_no) === Number(next.step_no) + 1);
+
+        const np = (pourNext && pourNext.payload) || next.payload || {};
+
+        previewRole = roleLabelFor(np, "add_ingredient");
+
+        previewName = String(np.name || np.ingredient_name || ingredientLabel(np)).trim();
+
+      } else {
+
+        const np = next.payload || {};
+
+        previewRole = roleLabelFor(np, stepTypeFor(next));
+
+        previewName = stepTypeFor(next) === "add_ingredient" ? String(np.name || np.ingredient_name || ingredientLabel(np)).trim() : bottleName(np, stepTypeFor(next));
+
+      }
+
+      nextPreviewText.textContent = previewName ? `Next, pick up ${previewName}` : (previewRole || "");
+
+      nextPreviewCard.style.display = (isTarePhase || !(previewName || previewRole)) ? "none" : "";
+
+    } else {
+
+      nextPreviewCard.style.display = "none";
+
+    }
+
+  };
+
+
+
+  const applySession = (sess) => {
+
+    const prog = sess.progress || {};
+
+    if (completionSummary) {
+
+      const showDone = !!prog.all_done;
+
+      completionSummary.classList.toggle("d-none", !showDone);
+
+      if (showDone) {
+
+        focusCard.classList.add("d-none");
+
+        if (contextPanel) contextPanel.classList.add("d-none");
+
+      }
+
+    }
+
+    setFocus(sess);
+
+  };
+
+
+
+  const showAlarm = (policy, message) => {
+
+    const cls = window.PolicyFeedback.render(guidedPolicyBox, policy || {}, {
+
+      tone: "tvw",
+
+      warnLead: "Worth a look before you continue.",
+
+      blockLead: "Stop. Fix this first.",
+
+    });
+
+    const hasPolicy = cls.warnings.length || cls.hardStops.length;
+
+    if (!hasPolicy && message) {
+
+      window.PolicyFeedback.notice(guidedPolicyBox, message, { tone: "tvw", severity: "danger" });
+
+      guidedPolicyBox.className = "tvw-ws-alarm is-stop";
+
+      guidedPolicyBox.classList.remove("d-none");
+
+      return;
+
+    }
+
+    if (!hasPolicy) {
+
+      guidedPolicyBox.className = "tvw-ws-alarm d-none";
+
+      return;
+
+    }
+
+    guidedPolicyBox.className = "tvw-ws-alarm" + (cls.blocked ? " is-stop" : "");
+
+    guidedPolicyBox.classList.remove("d-none", "alert", "alert-warning", "alert-danger", "alert-info", "alert-secondary");
+
+  };
+
+
+
+  document.getElementById("guidedRoot").addEventListener("click", async (ev) => {
+
+    const doneBtn = ev.target.closest(".js-done-step");
+
+    const undoBtn = ev.target.closest(".js-undo-step");
+
+    if (!doneBtn && !undoBtn) return;
+
+    const stepNo = Number((doneBtn || undoBtn).dataset.stepNo);
+
+    const measuredInput = document.getElementById("focusMeasuredInput");
+
+    const measured = measuredInput ? measuredInput.value : "";
+
+    try {
+
+      const body = await apiJson(`/api/mix/guided/session/${sessionId}/steps/${stepNo}/complete`, {
+
+        method: "POST",
+
+        body: JSON.stringify({ undo: !!undoBtn, measured_grams: measured }),
+
+      });
+
+      if (!undoBtn) {
+
+        const ack = stepAckMessage(body.session, stepNo);
+
+        if (ack) showToast(ack);
+
+      }
+
+      applySession(body.session);
+
+      showAlarm(body.policy);
+
+    } catch (e) {
+
+      if (e && e.session) applySession(e.session);
+
+      showAlarm(e.policy, e.message);
+
+    }
+
+  });
+
+
+
+  applySession(JSON.parse(document.getElementById("guidedSessionBundle").textContent));
+
+})();
+
+</script>
+
+
+        </div>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

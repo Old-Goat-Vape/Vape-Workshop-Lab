@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+
+{% block title %}E-Liquid Mixer | {{ recipe.name }}{% endblock %}
+
+{% block content %}
+<style>
+    .halt-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+        background: rgba(139, 0, 0, 0.98); z-index: 20000; 
+        display: flex; justify-content: center; align-items: center; 
+        color: white; text-align: center; backdrop-filter: blur(10px);
+    }
+    .scale-readout {
+        font-size: 5rem; font-family: 'Courier New', monospace; font-weight: bold;
+        color: var(--primary-orange); background: #000; padding: 20px;
+        border-radius: 10px; border: 3px solid #222; margin-bottom: 20px;
+        text-shadow: 0 0 15px rgba(255, 165, 0, 0.3);
+    }
+    .step-label { font-size: 1.5rem; margin-bottom: 10px; display: block; color: #fff; }
+    
+    .reality-log {
+        background: #111;
+        border-radius: 8px;
+        padding: 15px;
+        margin-top: 20px;
+    }
+    .log-entry {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #222;
+        font-size: 0.9rem;
+    }
+</style>
+
+<div id="nicotine-halt" class="halt-overlay" style="display: none;">
+    <div class="section-card" style="max-width: 500px; background: #000; border: 2px solid #ff4444; box-shadow: 0 0 50px rgba(255,0,0,0.5);">
+        <h1 style="color: #ff4444; font-size: 3rem; margin-top: 0;">⚠ HALT</h1>
+        <h2 style="color: white;">NICOTINE OVERPOUR</h2>
+        <p style="font-size: 1.2rem;">Target was: <strong id="halt-target" style="color: var(--primary-orange);">0</strong>g</p>
+        <p style="color: #bbb;">The concentration is now outside of safety parameters.</p>
+        <p><strong>DO NOT TARE. CALL SUPERVISOR.</strong></p>
+        <hr style="border-color: #333; margin: 20px 0;">
+        <input type="password" id="halt-pin" placeholder="Supervisor PIN" style="width: 100%; padding: 15px; margin-bottom: 15px; background: #222; color: #fff; border: 1px solid #444; font-size: 1.2rem; text-align: center;">
+        <button onclick="resumeAfterIntervention()" class="btn-primary" style="width: 100%; background: #ff4444; color: white; border: none; padding: 15px; font-weight: bold; cursor: pointer;">Authorize Safety Override</button>
+    </div>
+</div>
+
+<div class="section-card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h1 style="margin: 0;">{{ recipe.name }} <span style="font-size: 1rem; color: #666;">({{ target_ml }}ml Batch)</span></h1>
+        </div>
+        <span class="badge {% if has_nicotine %}badge-experimental{% else %}badge-stable{% endif %}" style="padding: 8px 15px; font-size: 0.9rem;">
+            {% if has_nicotine %}☢ NICOTINE SESSION{% else %}STANDARD MIX{% endif %}
+        </span>
+    </div>
+</div>
+
+{% if needs_supervisor %}
+<div id="supervisor-lock" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 12000; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(10px);">
+    <div class="section-card" style="width: 400px; text-align: center; border: 1px solid var(--primary-orange);">
+        <h2 style="color: var(--primary-orange);">Supervisor Authorization</h2>
+        <p style="color: #888;">Nicotine content detected in this profile. Lab lead must authorize production.</p>
+        <input type="text" id="sup-username" placeholder="Supervisor Username" style="width: 100%; padding: 12px; margin-bottom: 10px; background: #000; color: #fff; border: 1px solid #333;">
+        <input type="password" id="sup-password" placeholder="Supervisor Password" style="width: 100%; padding: 12px; margin-bottom: 20px; background: #000; color: #fff; border: 1px solid #333;">
+        <button onclick="authorizeSupervisor()" class="btn-primary" style="width: 100%; padding: 15px; font-weight: bold; cursor: pointer;">Initialize Batch</button>
+        <p style="margin-top: 15px;"><a href="{{ url_for('recipes.library') }}" style="color: #555; text-decoration: none;">← Cancel & Return</a></p>
+    </div>
+</div>
+{% endif %}
+
+<div id="mixing-interface" style="max-width: 800px; margin: 0 auto; {% if needs_supervisor %}display:none;{% endif %}">
+    <div class="scale-readout" id="current-weight">0.00g</div>
+    
+    <div id="step-area">
+        <div id="ingredient-steps"></div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px;">
+            <button onclick="manualConfirm()" class="btn-edit-secondary" style="padding: 15px; border: 1px solid #444; background: #222; color: #fff; cursor: pointer;">Manual Confirm (Within Tol.)</button>
+            <button onclick="simulateAdd(0.1)" class="btn-edit-secondary" style="padding: 15px; border: 1px solid #444; background: #222; color: #fff; cursor: pointer;">Simulate +0.1g</button>
+        </div>
+    </div>
+
+    <div class="reality-log">
+        <div style="font-size: 0.7rem; color: #555; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 1px;">Session Progress Log</div>
+        <div id="progress-list"></div>
+    </div>
+</div>
+
+<script>
+let recipeData = {
+    ingredients: {{ ingredients_json | safe }},
+    current_step: 0,
+    currentStepWeight: 0.00,
+    supervisor_id: null,
+    target_ml: {{ target_ml }},
+    history: []
+};
+
+function authorizeSupervisor() {
+    const user = document.getElementById('sup-username').value;
+    const pass = document.getElementById('sup-password').value;
+
+    fetch("{{ url_for('eliquid_mix.authorize_supervisor') }}", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({username: user, password: pass})
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.status === 'success') {
+            recipeData.supervisor_id = data.supervisor_id;
+            document.getElementById('supervisor-lock').style.display = 'none';
+            document.getElementById('mixing-interface').style.display = 'block';
+            renderStep();
+        } else { alert(data.message); }
+    });
+}
+
+function renderStep() {
+    const step = recipeData.ingredients[recipeData.current_step];
+    const container = document.getElementById('ingredient-steps');
+    
+    container.innerHTML = `
+        <div class="section-card" style="border-left: 8px solid ${step.is_nicotine ? '#ff4444' : 'var(--primary-orange)'}; background: #1a1a1a;">
+            <span class="step-label">STEP ${recipeData.current_step + 1}: ${step.brand} ${step.name}</span>
+            <div style="font-size: 2.5rem; color: #fff;">Target: <strong style="color: var(--primary-orange);">${step.target_g.toFixed(2)}g</strong></div>
+            <p style="color: #777; margin-top: 10px;">Action: Add component until scale matches target. TARE after each step.</p>
+        </div>
+    `;
+    updateProgressList();
+}
+
+function updateProgressList() {
+    const list = document.getElementById('progress-list');
+    list.innerHTML = recipeData.ingredients.map((ing, idx) => `
+        <div class="log-entry" style="opacity: ${idx > recipeData.current_step ? '0.3' : '1'}">
+            <span style="color: ${idx === recipeData.current_step ? 'var(--primary-orange)' : '#888'}">
+                ${idx < recipeData.current_step ? '✅' : (idx === recipeData.current_step ? '▶' : '⚪')} 
+                ${ing.name}
+            </span>
+            <span style="font-family: monospace;">${idx < recipeData.current_step ? ing.poured_g.toFixed(2) : ing.target_g.toFixed(2)}g</span>
+        </div>
+    `).join('');
+}
+
+// Support for simulation/testing
+function simulateAdd(amt) {
+    handleScaleUpdate(amt);
+}
+
+function handleScaleUpdate(amt) {
+    recipeData.currentStepWeight = parseFloat((recipeData.currentStepWeight + amt).toFixed(2));
+    const display = document.getElementById('current-weight');
+    display.innerText = recipeData.currentStepWeight.toFixed(2) + "g";
+
+    const step = recipeData.ingredients[recipeData.current_step];
+
+    // Overpour Logic
+    if (recipeData.currentStepWeight > (step.target_g + 0.05)) {
+        if (step.is_nicotine) {
+            document.getElementById('halt-target').innerText = step.target_g.toFixed(2);
+            document.getElementById('nicotine-halt').style.display = 'flex';
+            return; 
+        } else {
+            display.style.color = "#ff4444";
+        }
+    } else {
+        display.style.color = "var(--primary-orange)";
+    }
+
+    // Auto-advance if exactly on target
+    if (Math.abs(recipeData.currentStepWeight - step.target_g) < 0.001) {
+        advanceStep();
+    }
+}
+
+function manualConfirm() {
+    const step = recipeData.ingredients[recipeData.current_step];
+    // Allow manual confirmation if within 0.05g tolerance
+    if (Math.abs(recipeData.currentStepWeight - step.target_g) <= 0.05) {
+        advanceStep();
+    } else {
+        alert("Weight outside of acceptable tolerance (0.05g).");
+    }
+}
+
+function advanceStep() {
+    const step = recipeData.ingredients[recipeData.current_step];
+    step.poured_g = recipeData.currentStepWeight; // Log actual poured
+    
+    if (recipeData.current_step < recipeData.ingredients.length - 1) {
+        recipeData.current_step++;
+        recipeData.currentStepWeight = 0; 
+        document.getElementById('current-weight').innerText = "0.00g";
+        document.getElementById('current-weight').style.color = "var(--primary-orange)";
+        renderStep();
+    } else {
+        finalizeMix();
+    }
+}
+
+function resumeAfterIntervention() {
+    const pin = document.getElementById('halt-pin').value;
+    // We reuse the supervisor auth endpoint but for a "Resume" action
+    fetch("{{ url_for('eliquid_mix.authorize_supervisor') }}", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({username: "OVERRIDE", password: pin})
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.status === 'success') {
+            document.getElementById('nicotine-halt').style.display = 'none';
+            document.getElementById('halt-pin').value = '';
+            // Force the weight to the target so they can move on
+            recipeData.currentStepWeight = recipeData.ingredients[recipeData.current_step].target_g;
+            advanceStep();
+        } else { alert("Supervisor PIN Rejected."); }
+    });
+}
+
+function finalizeMix() {
+    document.getElementById('mixing-interface').innerHTML = `
+        <div class="section-card" style="text-align: center; padding: 40px;">
+            <h2 style="color: var(--success);">BATCH READY FOR BOTTLING</h2>
+            <p>All components verified and logged.</p>
+            <button id="final-btn" onclick="submitFinalData()" class="btn-primary" style="width: 100%; padding: 20px; font-size: 1.2rem; cursor: pointer;">Deduct Stock & Print Label</button>
+        </div>
+    `;
+}
+
+function submitFinalData() {
+    const btn = document.getElementById('final-btn');
+    btn.disabled = true;
+    btn.innerText = "Processing...";
+
+    const payload = {
+        recipe_id: {{ recipe.id }},
+        version_id: {{ version.id }},
+        target_ml: recipeData.target_ml,
+        supervisor_id: recipeData.supervisor_id,
+        ingredients: recipeData.ingredients.map(ing => ({
+            ingredient_id: ing.ingredient_id,
+            poured_g: ing.poured_g || ing.target_g 
+        }))
+    };
+
+    fetch("{{ url_for('eliquid_mix.finalize_eliquid') }}", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.status === 'success') {
+            window.location.href = "{{ url_for('recipes.library') }}";
+        } else { 
+            alert("Error: " + data.message); 
+            btn.disabled = false;
+            btn.innerText = "Retry Deduction";
+        }
+    });
+}
+
+// Handle scale simulation via keyboard
+window.addEventListener('keydown', (e) => {
+    if(e.key === 'w') handleScaleUpdate(0.01);
+    if(e.key === 'W') handleScaleUpdate(1.00); // Big pour
+});
+</script>
+{% endblock %}

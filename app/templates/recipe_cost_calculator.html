@@ -1,0 +1,738 @@
+{% extends "base.html" %}
+
+{% block title %}Recipe Cost Calculator - Old Goat Lab{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-start gap-3 mb-3">
+  <div>
+    <div class="og-page-eyebrow mb-1">Costing</div>
+    <h1 class="h3 mb-1">Recipe Cost Calculator</h1>
+    <div class="text-secondary small">Pick one recipe, set batch size and selling price, and see landed cost and profit per bottle.</div>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a href="{{ url_for('dashboard_index') }}" class="btn btn-outline-light btn-sm">Lab Dashboard</a>
+    <a href="{{ url_for('recipes.pricing_sheet') }}" class="btn btn-outline-warning btn-sm">Price List Worksheet</a>
+    <a href="{{ url_for('recipes.library') }}" class="btn btn-outline-light btn-sm">Recipe Library</a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-5">
+    <div class="card border-0 h-100" style="background:#151515; border:1px solid #333 !important;">
+      <div class="card-body">
+        <h2 class="h6 text-warning mb-3">Recipe &amp; assumptions</h2>
+        <div class="vstack gap-2">
+          <div>
+            <label class="form-label small text-secondary" for="recipeSearch">Search Workshop recipes</label>
+            <input type="search" id="recipeSearch" class="form-control bg-black border-secondary" placeholder="Title, id, author, tag…" autocomplete="off">
+          </div>
+          <div>
+            <label class="form-label small text-secondary" for="recipeSelect">Recipe</label>
+            <select id="recipeSelect" class="form-select bg-black border-secondary" size="8">
+              <option value="">Select a recipe…</option>
+              {% for r in recipes %}
+              <option value="{{ r.id }}"
+                      data-current-version="{{ r.current_version_id or '' }}"
+                      data-latest-version="{{ r.latest_version_id or '' }}"
+                      data-search="{{ (r.name ~ ' ' ~ (r.recipe_code or '') ~ ' ' ~ (r.owner_username or '') ~ ' ' ~ ((r.tags or [])|join(' ')) ~ ' ' ~ r.id)|lower }}">
+                {{ r.name }}{% if r.recipe_code %} ({{ r.recipe_code }}){% endif %}
+                {% if r.badges %} · {{ r.badges|join(' · ') }}{% endif %}
+              </option>
+              {% endfor %}
+            </select>
+            <div class="form-text text-secondary">Shows Public / Private / Reference / Workshop badges. Includes newly saved Workshop recipes.</div>
+            <input type="hidden" id="recipeIdField" value="">
+            <input type="hidden" id="versionIdField" value="">
+          </div>
+          <div>
+            <label class="form-label small text-secondary" for="versionSelect">Version</label>
+            <select id="versionSelect" class="form-select bg-black border-secondary" disabled>
+              <option value="">Current / latest</option>
+            </select>
+          </div>
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label small text-secondary" for="batchVolumeMl">Batch volume (ml)</label>
+              <input type="number" step="1" min="1" id="batchVolumeMl" class="form-control bg-black border-secondary" value="500">
+            </div>
+            <div class="col-6">
+              <label class="form-label small text-secondary" for="bottleSizeMl">Bottle size (ml)</label>
+              <input type="number" step="1" min="1" id="bottleSizeMl" class="form-control bg-black border-secondary" value="15">
+            </div>
+          </div>
+          <div>
+            <label class="form-label small text-secondary" for="sellingPrice">Selling price per bottle (R)</label>
+            <input type="number" step="0.01" min="0" id="sellingPrice" class="form-control bg-black border-secondary" value="120">
+          </div>
+          <div>
+            <label class="form-label small text-secondary" for="baseCostPerMl">Manual base override / ml (R)</label>
+            <input type="number" step="0.0001" min="0" id="baseCostPerMl" class="form-control bg-black border-secondary" value="0">
+            <div class="form-check mt-2">
+              <input class="form-check-input" type="checkbox" id="useCanonicalBase" checked>
+              <label class="form-check-label small text-secondary" for="useCanonicalBase">
+                Use BLCK canonical VG/PG (live scrape prices)
+              </label>
+            </div>
+            <div class="row g-2 mt-1">
+              <div class="col-6">
+                <label class="form-label small text-secondary" for="vgRatio">VG %</label>
+                <input type="number" step="1" min="0" max="100" id="vgRatio" class="form-control bg-black border-secondary" value="70">
+              </div>
+              <div class="col-6">
+                <label class="form-label small text-secondary" for="pgRatio">PG %</label>
+                <input type="number" step="1" min="0" max="100" id="pgRatio" class="form-control bg-black border-secondary" value="30">
+              </div>
+            </div>
+          </div>
+          <div class="row g-2">
+            <div class="col-4">
+              <label class="form-label small text-secondary" for="bottleCost">Bottle (R)</label>
+              <input type="number" step="0.01" min="0" id="bottleCost" class="form-control bg-black border-secondary" value="5">
+            </div>
+            <div class="col-4">
+              <label class="form-label small text-secondary" for="labelCost">Label (R)</label>
+              <input type="number" step="0.01" min="0" id="labelCost" class="form-control bg-black border-secondary" value="4">
+            </div>
+            <div class="col-4">
+              <label class="form-label small text-secondary" for="packagingCost">Packaging (R)</label>
+              <input type="number" step="0.01" min="0" id="packagingCost" class="form-control bg-black border-secondary" value="0">
+            </div>
+          </div>
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label small text-secondary" for="labourCost">Labour / overhead per bottle (R)</label>
+              <input type="number" step="0.01" min="0" id="labourCost" class="form-control bg-black border-secondary" value="0">
+            </div>
+            <div class="col-6">
+              <label class="form-label small text-secondary" for="wastePercent">Waste %</label>
+              <input type="number" step="0.1" min="0" id="wastePercent" class="form-control bg-black border-secondary" value="0">
+            </div>
+          </div>
+          <div class="row g-2 align-items-end">
+            <div class="col-6">
+              <label class="form-label small text-secondary" for="rallyBottleQty">Rally bottle quantity</label>
+              <select id="rallyBottleQty" class="form-select bg-black border-secondary">
+                <option value="1">1 bottle</option>
+                <option value="5">5 bottles</option>
+                <option value="10" selected>10 bottles</option>
+                <option value="custom">Custom…</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label small text-secondary" for="rallyCustomQty">Custom qty</label>
+              <input type="number" min="1" step="1" id="rallyCustomQty" class="form-control bg-black border-secondary" value="25" disabled>
+            </div>
+          </div>
+          <div class="small text-secondary">Production cost for selected quantity uses cost per bottle × qty.</div>
+        </div>
+        <div id="calcStatus" class="small text-secondary mt-3">Select a recipe to calculate.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-7">
+    <div class="row g-2 mb-3">
+      <div class="col-6 col-md-3">
+        <div class="card border-0 h-100" style="background:#1a1a1a; border:1px solid #333 !important;">
+          <div class="card-body py-3">
+            <div class="small text-secondary">Cost / bottle</div>
+            <div class="h4 mb-0 text-warning" id="outCostPerBottle">—</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card border-0 h-100" style="background:#1a1a1a; border:1px solid #333 !important;">
+          <div class="card-body py-3">
+            <div class="small text-secondary">Sell price</div>
+            <div class="h4 mb-0" id="outSellPrice">—</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card border-0 h-100" style="background:#1a1a1a; border:1px solid #333 !important;">
+          <div class="card-body py-3">
+            <div class="small text-secondary">Profit / bottle</div>
+            <div class="h4 mb-0 text-success" id="outProfitPerBottle">—</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card border-0 h-100" style="background:#1a1a1a; border:1px solid #333 !important;">
+          <div class="card-body py-3">
+            <div class="small text-secondary">Total profit</div>
+            <div class="h4 mb-0 text-success" id="outTotalProfit">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="warningsBox" class="alert alert-warning d-none py-2 small" role="alert"></div>
+
+    <div class="card border-0 mb-3" style="background:#151515; border:1px solid #333 !important;">
+      <div class="card-body">
+        <h2 class="h6 text-warning mb-3">BLCK purchase prices (canonical)</h2>
+        <div id="canonicalBaseBox" class="small text-secondary">Run a calculation to load live VG / PG / nicotine variants.</div>
+      </div>
+    </div>
+
+    <div class="card border-0 mb-3" style="background:#151515; border:1px solid #333 !important;">
+      <div class="card-body">
+        <h2 class="h6 text-warning mb-3">Batch summary</h2>
+        <div class="table-responsive">
+          <table class="table table-sm table-dark table-borderless mb-0 align-middle">
+            <tbody id="summaryTable">
+              <tr><td class="text-secondary">Full bottles</td><td class="text-end" id="sumFullBottles">—</td></tr>
+              <tr><td class="text-secondary">Leftover ml</td><td class="text-end" id="sumLeftover">—</td></tr>
+              <tr><td class="text-secondary">Total flavour / concentrate cost</td><td class="text-end" id="sumFlavour">—</td></tr>
+              <tr><td class="text-secondary">Total base liquid cost</td><td class="text-end" id="sumBase">—</td></tr>
+              <tr><td class="text-secondary">Total bottle cost</td><td class="text-end" id="sumBottles">—</td></tr>
+              <tr><td class="text-secondary">Total label cost</td><td class="text-end" id="sumLabels">—</td></tr>
+              <tr><td class="text-secondary">Total packaging cost</td><td class="text-end" id="sumPackaging">—</td></tr>
+              <tr><td class="text-secondary">Total labour / overhead</td><td class="text-end" id="sumLabour">—</td></tr>
+              <tr class="border-top border-secondary"><td class="fw-semibold">Total batch cost</td><td class="text-end fw-semibold" id="sumTotal">—</td></tr>
+              <tr><td class="text-secondary">Cost per ml</td><td class="text-end" id="sumCostMl">—</td></tr>
+              <tr><td class="text-secondary">Cost status</td><td class="text-end" id="sumCostStatus">—</td></tr>
+              <tr><td class="text-secondary">Rally production cost</td><td class="text-end fw-semibold text-warning" id="sumRallyTotal">—</td></tr>
+              <tr><td class="text-secondary">Total sales value</td><td class="text-end" id="sumSales">—</td></tr>
+              <tr><td class="text-secondary">Gross profit</td><td class="text-end" id="sumProfit">—</td></tr>
+              <tr><td class="text-secondary">Margin %</td><td class="text-end" id="sumMargin">—</td></tr>
+              <tr><td class="text-secondary">Markup %</td><td class="text-end" id="sumMarkup">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0" style="background:#151515; border:1px solid #333 !important;">
+      <div class="card-body">
+        <h2 class="h6 text-warning mb-3">Ingredient pricing</h2>
+        <div class="table-responsive">
+          <table class="table table-sm table-dark table-striped align-middle mb-0" id="ingredientTable">
+            <thead>
+              <tr>
+                <th>Ingredient</th>
+                <th class="text-end">ml</th>
+                <th>Matched product</th>
+                <th class="text-end">R / ml</th>
+                <th class="text-end">Cost</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="6" class="text-secondary">Select a recipe.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="cataloguePickerModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content bg-dark border-secondary">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title">Pick catalogue item</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="text" id="catalogueSearchInput" class="form-control bg-black border-secondary mb-2" placeholder="Search brand or name…">
+        <div id="catalogueSearchResults" class="list-group list-group-flush"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="application/json" id="recipeVersionData">{{ recipes|tojson }}</script>
+<script type="application/json" id="costCalcApiUrls">{{ api_urls|tojson }}</script>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(() => {
+  const apiUrls = JSON.parse(document.getElementById("costCalcApiUrls").textContent || "{}");
+  const recipeData = JSON.parse(document.getElementById("recipeVersionData").textContent || "[]");
+  const byId = new Map(recipeData.map((r) => [String(r.id), r]));
+  const recipeSelect = document.getElementById("recipeSelect");
+  const versionSelect = document.getElementById("versionSelect");
+  const recipeIdField = document.getElementById("recipeIdField");
+  const versionIdField = document.getElementById("versionIdField");
+  const calcStatus = document.getElementById("calcStatus");
+  const warningsBox = document.getElementById("warningsBox");
+  const fields = [
+    "batchVolumeMl", "bottleSizeMl", "sellingPrice", "baseCostPerMl",
+    "bottleCost", "labelCost", "packagingCost", "labourCost", "wastePercent",
+    "vgRatio", "pgRatio",
+  ].map((id) => document.getElementById(id));
+
+  const catalogueModalEl = document.getElementById("cataloguePickerModal");
+  let catalogueModal = null;
+  const getCatalogueModal = () => {
+    if (!catalogueModalEl || typeof bootstrap === "undefined") return null;
+    if (!catalogueModal) catalogueModal = new bootstrap.Modal(catalogueModalEl);
+    return catalogueModal;
+  };
+  const catalogueSearchInput = document.getElementById("catalogueSearchInput");
+  const catalogueSearchResults = document.getElementById("catalogueSearchResults");
+  let pickContext = null;
+  let lastMeta = { recipe_id: 0, version_id: 0 };
+
+  const money = (v) => `R ${Number(v || 0).toFixed(2)}`;
+  const pct = (v) => `${Number(v || 0).toFixed(2)}%`;
+
+  let timer = null;
+  let priceTimer = null;
+  let seq = 0;
+
+  const populateVersions = (rec) => {
+    versionSelect.innerHTML = '<option value="">Current / latest</option>';
+    if (!rec || !rec.versions || !rec.versions.length) {
+      versionSelect.disabled = true;
+      return;
+    }
+    versionSelect.disabled = false;
+    for (const v of rec.versions) {
+      const opt = document.createElement("option");
+      opt.value = String(v.id);
+      opt.textContent = `v${v.version_number || v.id}`;
+      if (rec.current_version_id && Number(v.id) === Number(rec.current_version_id)) {
+        opt.textContent += " (current)";
+        opt.selected = true;
+      }
+      versionSelect.appendChild(opt);
+    }
+  };
+
+  const resolveVersionId = (rec) => {
+    if (!rec) return "";
+    const selected = String(versionSelect.value || "").trim();
+    if (selected) return selected;
+    if (rec.current_version_id) return String(rec.current_version_id);
+    if (rec.latest_version_id) return String(rec.latest_version_id);
+    if (rec.versions && rec.versions.length) return String(rec.versions[0].id);
+    return "";
+  };
+
+  const getRecipeState = () => {
+    const rid = String(recipeSelect.value || "").trim();
+    const rec = rid ? byId.get(rid) : null;
+    if (!rid || !rec) {
+      return { valid: false, recipe: null, recipeId: "", versionId: "" };
+    }
+    const versionId = resolveVersionId(rec);
+    recipeIdField.value = rid;
+    versionIdField.value = versionId;
+    return { valid: true, recipe: rec, recipeId: rid, versionId };
+  };
+
+  const applyRecipeSelection = () => {
+    const rid = String(recipeSelect.value || "").trim();
+    const rec = rid ? byId.get(rid) : null;
+    if (!rid || !rec) {
+      recipeIdField.value = "";
+      versionIdField.value = "";
+      versionSelect.disabled = true;
+      versionSelect.innerHTML = '<option value="">Current / latest</option>';
+      return { valid: false, recipe: null, recipeId: "", versionId: "" };
+    }
+    populateVersions(rec);
+    const versionId = resolveVersionId(rec);
+    recipeIdField.value = rid;
+    versionIdField.value = versionId;
+    return { valid: true, recipe: rec, recipeId: rid, versionId };
+  };
+
+  const renderWarnings = (warnings) => {
+    if (!warnings || !warnings.length) {
+      warningsBox.classList.add("d-none");
+      warningsBox.textContent = "";
+      return;
+    }
+    warningsBox.classList.remove("d-none");
+    warningsBox.innerHTML = warnings.map((w) => `<div>${w}</div>`).join("");
+  };
+
+  const matchBadge = (ing) => {
+    if (ing.manual_price_active) return '<span class="badge text-bg-info">Manual price</span>';
+    const st = ing.match_status || "";
+    if (st === "missing") return '<span class="badge text-bg-warning">Missing price</span>';
+    if (st === "check_match") return '<span class="badge text-bg-warning">Check match</span>';
+    if (st === "manual" || st === "manual_catalogue") return '<span class="badge text-bg-secondary">Manual pick</span>';
+    return '<span class="badge text-bg-success">Resolved</span>';
+  };
+
+  const resolvedLine = (ing) => {
+    if (ing.manual_price_active) return '<div class="small text-info">Using manual price override</div>';
+    if (ing.resolved_label) return `<div class="small text-secondary">Resolved: ${ing.resolved_label}</div>`;
+    return "";
+  };
+
+  const renderIngredients = (items) => {
+    const tbody = document.querySelector("#ingredientTable tbody");
+    if (!items || !items.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-secondary">No ingredients.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = items.map((ing) => {
+      const label = `${ing.brand || ""} - ${ing.name || ""}`.replace(/^ - /, "");
+      const iid = Number(ing.ingredient_id || 0);
+      const priceVal = ing.manual_price_active
+        ? Number(ing.manual_price_per_ml || ing.price_per_ml || 0).toFixed(4)
+        : (ing.price_per_ml != null ? Number(ing.price_per_ml).toFixed(4) : "");
+      const rowClass = ing.missing_price ? "table-warning" : "";
+      const pickBtn = `<button type="button" class="btn btn-outline-warning btn-sm js-pick-catalogue" data-ingredient-id="${iid}">Pick catalogue</button>`;
+      const clearBtn = ing.manual_price_active
+        ? `<button type="button" class="btn btn-outline-secondary btn-sm js-clear-price" data-ingredient-id="${iid}">Clear price</button>`
+        : "";
+      return `<tr class="${rowClass}" data-ingredient-id="${iid}">
+        <td>
+          <div>${label}</div>
+          <div class="small text-secondary">${Number(ing.amount_percent || 0).toFixed(2)}%</div>
+          <div class="mt-1">${matchBadge(ing)}</div>
+        </td>
+        <td class="text-end">${Number(ing.required_ml || 0).toFixed(2)}</td>
+        <td>
+          <div>${ing.missing_price ? '<span class="text-warning">Price needed</span>' : (ing.resolved_label || "—")}</div>
+          ${resolvedLine(ing)}
+        </td>
+        <td class="text-end" style="min-width:7rem;">
+          <input type="number" step="0.0001" min="0" class="form-control form-control-sm bg-black border-secondary text-end js-price-input" data-ingredient-id="${iid}" value="${priceVal}" placeholder="—">
+        </td>
+        <td class="text-end">${ing.missing_price ? "—" : money(ing.line_cost)}</td>
+        <td class="text-end text-nowrap">${pickBtn} ${clearBtn}</td>
+      </tr>`;
+    }).join("");
+
+    tbody.querySelectorAll(".js-pick-catalogue").forEach((btn) => {
+      btn.addEventListener("click", () => openCataloguePicker(Number(btn.dataset.ingredientId)));
+    });
+    tbody.querySelectorAll(".js-clear-price").forEach((btn) => {
+      btn.addEventListener("click", () => clearManualPrice(Number(btn.dataset.ingredientId)));
+    });
+    tbody.querySelectorAll(".js-price-input").forEach((input) => {
+      input.addEventListener("change", () => saveManualPrice(Number(input.dataset.ingredientId), input.value));
+      input.addEventListener("input", () => {
+        if (priceTimer) clearTimeout(priceTimer);
+        priceTimer = setTimeout(() => saveManualPrice(Number(input.dataset.ingredientId), input.value), 400);
+      });
+    });
+  };
+
+  let lastOutputs = null;
+
+  const rallyQty = () => {
+    const mode = document.getElementById("rallyBottleQty").value;
+    if (mode === "custom") {
+      return Math.max(1, Number(document.getElementById("rallyCustomQty").value || 1));
+    }
+    return Math.max(1, Number(mode || 1));
+  };
+
+  const updateRallyTotal = () => {
+    const el = document.getElementById("sumRallyTotal");
+    if (!el || !lastOutputs) return;
+    const per = Number(lastOutputs.cost_per_bottle || 0);
+    el.textContent = money(per * rallyQty());
+  };
+
+  const renderCanonicalBase = (canonical, outputs) => {
+    const box = document.getElementById("canonicalBaseBox");
+    if (!box) return;
+    if (!canonical) {
+      box.innerHTML = '<span class="text-secondary">Canonical BLCK base not applied (manual override mode).</span>';
+      return;
+    }
+    const fmt = (entry, fallbackLabel) => {
+      if (!entry) return `<div class="mb-2"><strong>${fallbackLabel}</strong> — unavailable</div>`;
+      const bad = entry.status !== "active";
+      const price = Number(entry.pack_price || 0).toFixed(2);
+      const ppm = Number(entry.price_per_ml || 0).toFixed(4);
+      const ml = Number(entry.recipe_ml || 0).toFixed(2);
+      const cost = Number(entry.line_cost || 0).toFixed(2);
+      const warn = bad
+        ? `<div class="text-danger">${entry.unavailable_reason || "Configured costing product unavailable"}</div>`
+        : "";
+      return `
+        <div class="mb-3 ${bad ? "text-danger" : ""}">
+          <div class="fw-semibold text-light">${entry.label || fallbackLabel}</div>
+          <div>${entry.product_title || ""} · ${entry.variant_title || ""}</div>
+          <div>Latest pack price: R${price} · Scraped: ${entry.last_scraped || "—"}</div>
+          <div>${entry.pack_volume_ml || "—"} ml pack · R${ppm}/ml</div>
+          <div>Recipe uses: ${ml} ml · Cost: R${cost}</div>
+          <div class="text-secondary">variant #${entry.source_variant_id || "—"}</div>
+          ${warn}
+        </div>`;
+    };
+    const snap = (canonical.snapshot || {}).roles || {};
+    const nicFree = snap.freebase_nic || {};
+    const nicSalt = snap.salt_nic || {};
+    box.innerHTML = `
+      ${fmt(canonical.vg, "VG")}
+      ${fmt(canonical.pg, "PG")}
+      <div class="mb-2 text-secondary">Base VG+PG total: R${Number((outputs || {}).total_vg_cost || 0).toFixed(2)} VG + R${Number((outputs || {}).total_pg_cost || 0).toFixed(2)} PG</div>
+      <hr class="border-secondary">
+      <div class="mb-2">
+        <div class="fw-semibold text-light">Gold Nic (DTL freebase)</div>
+        <div>${nicFree.label || "—"} · R${Number(nicFree.pack_price || 0).toFixed(2)} · R${Number(nicFree.price_per_ml || 0).toFixed(4)}/ml</div>
+        <div class="text-secondary">Scraped: ${nicFree.last_scraped || "—"} · variant #${nicFree.source_variant_id || "—"} · ${nicFree.status || "pending"}</div>
+      </div>
+      <div class="mb-2">
+        <div class="fw-semibold text-light">AuNic Salt (MTL)</div>
+        <div>${nicSalt.label || "—"} · R${Number(nicSalt.pack_price || 0).toFixed(2)} · R${Number(nicSalt.price_per_ml || 0).toFixed(4)}/ml</div>
+        <div class="text-secondary">Scraped: ${nicSalt.last_scraped || "—"} · variant #${nicSalt.source_variant_id || "—"} · ${nicSalt.status || "pending"}</div>
+      </div>
+      <div class="text-secondary">Nicotine line cost in this recipe: R${Number((outputs || {}).total_nicotine_cost || 0).toFixed(2)}</div>
+    `;
+  };
+
+  const renderResult = (result) => {
+    const o = result.outputs || {};
+    lastOutputs = o;
+    document.getElementById("outCostPerBottle").textContent = money(o.cost_per_bottle);
+    document.getElementById("outSellPrice").textContent = money(o.selling_price_per_bottle);
+    document.getElementById("outProfitPerBottle").textContent = money(o.profit_per_bottle);
+    document.getElementById("outTotalProfit").textContent = money(o.gross_profit);
+
+    document.getElementById("sumFullBottles").textContent = String(o.full_bottles ?? "—");
+    document.getElementById("sumLeftover").textContent = `${Number(o.leftover_ml || 0).toFixed(2)} ml`;
+    document.getElementById("sumFlavour").textContent = money(o.total_flavour_cost);
+    document.getElementById("sumBase").textContent = money(o.total_base_cost);
+    document.getElementById("sumBottles").textContent = money(o.total_bottle_cost);
+    document.getElementById("sumLabels").textContent = money(o.total_label_cost);
+    document.getElementById("sumPackaging").textContent = money(o.total_packaging_cost);
+    document.getElementById("sumLabour").textContent = money(o.total_labour_cost);
+    document.getElementById("sumTotal").textContent = money(o.total_batch_cost);
+    document.getElementById("sumCostMl").textContent = `R ${Number(o.cost_per_ml || 0).toFixed(4)}`;
+    document.getElementById("sumCostStatus").textContent = (result.recipe || {}).cost_status_label || "—";
+    document.getElementById("sumSales").textContent = money(o.total_sales_value);
+    document.getElementById("sumProfit").textContent = money(o.gross_profit);
+    document.getElementById("sumMargin").textContent = pct(o.margin_percent);
+    document.getElementById("sumMarkup").textContent = pct(o.markup_percent);
+    updateRallyTotal();
+
+    renderIngredients((result.recipe || {}).ingredients || []);
+    renderWarnings(result.warnings || []);
+    renderCanonicalBase(result.canonical_base || null, o);
+
+    const meta = result.recipe_meta || {};
+    lastMeta = { recipe_id: Number(meta.recipe_id || 0), version_id: Number(meta.version_id || 0) };
+    recipeIdField.value = String(meta.recipe_id || recipeSelect.value || "");
+    versionIdField.value = String(meta.version_id || "");
+    const versionLabel = meta.version_number || meta.version_id || "current/latest";
+    calcStatus.textContent = meta.recipe_name
+      ? `Recipe loaded: ${meta.recipe_name} · v${versionLabel}`
+      : "Calculated.";
+  };
+
+  const runCalc = async () => {
+    const state = getRecipeState();
+    if (!state.valid) {
+      const hasVisibleSelection = String(recipeSelect.value || "").trim() !== "";
+      calcStatus.textContent = hasVisibleSelection
+        ? "Recipe not fully selected. Please choose it from the list again."
+        : "Select a recipe to calculate.";
+      return;
+    }
+    const params = new URLSearchParams({ recipe_id: state.recipeId });
+    if (state.versionId) params.set("recipe_version_id", state.versionId);
+    params.set("batch_volume_ml", document.getElementById("batchVolumeMl").value || "0");
+    params.set("bottle_size_ml", document.getElementById("bottleSizeMl").value || "0");
+    params.set("selling_price_per_bottle", document.getElementById("sellingPrice").value || "0");
+    params.set("base_cost_per_ml", document.getElementById("baseCostPerMl").value || "0");
+    params.set("use_canonical_base", document.getElementById("useCanonicalBase").checked ? "1" : "0");
+    params.set("vg_ratio", document.getElementById("vgRatio").value || "70");
+    params.set("pg_ratio", document.getElementById("pgRatio").value || "30");
+    params.set("bottle_cost", document.getElementById("bottleCost").value || "5");
+    params.set("label_cost", document.getElementById("labelCost").value || "4");
+    params.set("packaging_cost", document.getElementById("packagingCost").value || "0");
+    params.set("labour_per_bottle", document.getElementById("labourCost").value || "0");
+    params.set("waste_percent", document.getElementById("wastePercent").value || "0");
+
+    const mySeq = ++seq;
+    calcStatus.textContent = "Calculating…";
+    try {
+      const res = await fetch(`${apiUrls.calculate}?${params.toString()}`, {
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      });
+      const body = await res.json();
+      if (mySeq !== seq) return;
+      if (!res.ok) throw new Error(body.message || "Calculation failed");
+      renderResult(body.result || {});
+    } catch (e) {
+      if (mySeq !== seq) return;
+      calcStatus.textContent = e.message || "Calculation error";
+      renderWarnings([e.message || "Calculation error"]);
+    }
+  };
+
+  const queueCalc = () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(runCalc, 150);
+  };
+
+  const searchCatalogue = async (q) => {
+    const res = await fetch(`${apiUrls.catalogue_search}?q=${encodeURIComponent(q)}&limit=50`, {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.message || "Search failed");
+    return body.items || [];
+  };
+
+  const renderCatalogueResults = (items) => {
+    if (!items.length) {
+      catalogueSearchResults.innerHTML = '<div class="text-secondary small p-2">No matches.</div>';
+      return;
+    }
+    catalogueSearchResults.innerHTML = items.map((it) => `
+      <button type="button" class="list-group-item list-group-item-action bg-dark text-light border-secondary js-pick-item"
+              data-catalogue-id="${it.id}">
+        <div class="fw-semibold">${it.label || it.name}</div>
+        <div class="small text-secondary">R ${Number(it.price_per_ml || 0).toFixed(4)}/ml</div>
+      </button>
+    `).join("");
+    catalogueSearchResults.querySelectorAll(".js-pick-item").forEach((btn) => {
+      btn.addEventListener("click", () => selectCatalogueItem(Number(btn.dataset.catalogueId)));
+    });
+  };
+
+  const openCataloguePicker = async (ingredientId) => {
+    pickContext = { ingredient_id: ingredientId };
+    catalogueSearchInput.value = "";
+    getCatalogueModal()?.show();
+    try {
+      renderCatalogueResults(await searchCatalogue(""));
+    } catch (e) {
+      catalogueSearchResults.innerHTML = `<div class="text-danger small p-2">${e.message}</div>`;
+    }
+  };
+
+  const selectCatalogueItem = async (catalogueId) => {
+    if (!pickContext || !lastMeta.recipe_id || !lastMeta.version_id) return;
+    const res = await fetch(apiUrls.save_catalogue_override, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        recipe_id: lastMeta.recipe_id,
+        version_id: lastMeta.version_id,
+        ingredient_id: pickContext.ingredient_id,
+        catalogue_id: catalogueId,
+      }),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.message || "Save failed");
+    getCatalogueModal()?.hide();
+    queueCalc();
+  };
+
+  const saveManualPrice = async (ingredientId, raw) => {
+    if (!lastMeta.recipe_id || !lastMeta.version_id) return;
+    const val = Number(raw);
+    if (!Number.isFinite(val) || val <= 0) return;
+    await fetch(apiUrls.save_price_override, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        recipe_id: lastMeta.recipe_id,
+        version_id: lastMeta.version_id,
+        ingredient_id: ingredientId,
+        manual_price_per_ml: val,
+      }),
+    });
+    queueCalc();
+  };
+
+  const clearManualPrice = async (ingredientId) => {
+    if (!lastMeta.recipe_id || !lastMeta.version_id) return;
+    await fetch(apiUrls.save_price_override, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        recipe_id: lastMeta.recipe_id,
+        version_id: lastMeta.version_id,
+        ingredient_id: ingredientId,
+        clear: true,
+      }),
+    });
+    queueCalc();
+  };
+
+  catalogueSearchInput?.addEventListener("input", () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(async () => {
+      try {
+        renderCatalogueResults(await searchCatalogue(catalogueSearchInput.value || ""));
+      } catch (e) {
+        catalogueSearchResults.innerHTML = `<div class="text-danger small p-2">${e.message}</div>`;
+      }
+    }, 200);
+  });
+
+  recipeSelect.addEventListener("change", () => {
+    applyRecipeSelection();
+    queueCalc();
+  });
+  versionSelect.addEventListener("change", () => {
+    const state = getRecipeState();
+    if (state.valid) versionIdField.value = String(versionSelect.value || state.versionId || "");
+    queueCalc();
+  });
+  fields.forEach((el) => {
+    if (!el) return;
+    el.addEventListener("input", queueCalc);
+    el.addEventListener("change", queueCalc);
+  });
+  document.getElementById("useCanonicalBase")?.addEventListener("change", queueCalc);
+
+  const recipeSearch = document.getElementById("recipeSearch");
+  if (recipeSearch) {
+    recipeSearch.addEventListener("input", () => {
+      const q = String(recipeSearch.value || "").trim().toLowerCase();
+      Array.from(recipeSelect.options).forEach((opt, idx) => {
+        if (idx === 0) return;
+        const hay = String(opt.dataset.search || opt.textContent || "").toLowerCase();
+        opt.hidden = q.length > 0 && !hay.includes(q);
+      });
+    });
+  }
+  const rallySelect = document.getElementById("rallyBottleQty");
+  const rallyCustom = document.getElementById("rallyCustomQty");
+  if (rallySelect && rallyCustom) {
+    const syncRally = () => {
+      rallyCustom.disabled = rallySelect.value !== "custom";
+      updateRallyTotal();
+    };
+    rallySelect.addEventListener("change", syncRally);
+    rallyCustom.addEventListener("input", updateRallyTotal);
+    syncRally();
+  }
+
+  const applyQuerySelection = () => {
+    const qs = new URLSearchParams(window.location.search);
+    const rid = String(qs.get("recipe_id") || "").trim();
+    if (!rid) return;
+    if (!byId.has(rid)) {
+      recipeSelect.value = "";
+      calcStatus.textContent = "Recipe not fully selected. Please choose it from the list again.";
+      renderWarnings(["The linked recipe is not in the calculator list. Please select it from the dropdown."]);
+      return;
+    }
+    recipeSelect.value = rid;
+    applyRecipeSelection();
+    const vid = String(qs.get("recipe_version_id") || "").trim();
+    if (vid && [...versionSelect.options].some((o) => o.value === vid)) {
+      versionSelect.value = vid;
+      versionIdField.value = vid;
+    }
+    if (getRecipeState().valid) queueCalc();
+  };
+
+  applyQuerySelection();
+})();
+</script>
+{% endblock %}

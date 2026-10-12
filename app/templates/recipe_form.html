@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}New Recipe - Old Goat Lab{% endblock %}
+
+{% block content %}
+    <style>
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .flavor-row { 
+            display: grid; 
+            grid-template-columns: 3fr 1fr 1.5fr 40px; 
+            gap: 10px; 
+            background: #1a1a1a; 
+            padding: 10px; 
+            border-radius: 4px; 
+            margin-bottom: 10px; 
+        }
+        .full-width { grid-column: span 2; }
+    </style>
+
+<div class="nav-header">
+    <div class="logo-small">🐐 Old Goat Creator</div>
+    <a href="{{ url_for('recipes.library') }}" class="btn-back">Exit without saving</a>
+</div>
+
+<form action="{{ url_for('recipes.create_recipe') }}" method="POST" style="max-width: 1000px; margin: 20px auto;">
+    <div class="form-grid">
+        <div class="section-card">
+            <div class="section-title">Identity & Specs</div>
+            <label>Recipe Name</label>
+            <input type="text" name="name" class="adjust-input" placeholder="e.g. Midnight Custard" required>
+            
+            <label>Recipe Code (Internal)</label>
+            <input type="text" name="code" class="adjust-input" placeholder="OG-MID-01" required>
+
+            <div style="display: flex; gap: 10px;">
+                <div style="flex: 1;">
+                    <label>Profile</label>
+                    <select name="profile" class="adjust-input">
+                        <option>Dessert</option>
+                        <option>Fruit</option>
+                        <option>Menthol</option>
+                        <option>Tobacco</option>
+                    </select>
+                </div>
+                <div style="flex: 1;">
+                    <label>Status</label>
+                    <select name="status" class="adjust-input">
+                        <option>Draft</option>
+                        <option>Final</option>
+                    </select>
+                </div>
+            </div>
+
+            <label>Target VG/PG Ratio</label>
+            <input type="text" name="ratio" value="70/30" class="adjust-input">
+            
+            <label>Nicotine Target (mg)</label>
+            <input type="number" step="0.1" name="nicotine" value="3" class="adjust-input">
+
+            <label>Device Target (e.g. MTL/DL)</label>
+            <input type="text" name="device" placeholder="DL - Sub-Ohm" class="adjust-input">
+        </div>
+
+        <div class="section-card">
+            <div class="section-title">Flavor Stack</div>
+            <div id="flavor-rows">
+                </div>
+            <button type="button" onclick="addRow()" class="btn-primary" style="width: 100%; background: #333;">+ Add Ingredient</button>
+            
+            <div style="margin-top: 20px;">
+                <label>Master Notes</label>
+                <textarea name="notes" class="adjust-input" style="height: 100px;" placeholder="Steeping time, specific brand of VG used, etc."></textarea>
+                <input type="hidden" name="tags" value="standard">
+            </div>
+        </div>
+    </div>
+
+    <div style="margin-top: 20px; text-align: right;">
+        <button type="submit" class="btn-primary" style="padding: 15px 40px; font-size: 1.1rem;">🚀 Onboard Recipe to Library</button>
+    </div>
+</form>
+
+<script>
+    function addRow() {
+        const container = document.getElementById('flavor-rows');
+        const div = document.createElement('div');
+        div.className = 'flavor-row';
+        div.innerHTML = `
+            <select name="ingredient_id[]" class="adjust-input" required>
+                <option value="">Select Flavor...</option>
+                {% for f in flavors %}
+                <option value="{{ f.id }}">{{ f.name }}</option>
+                {% endfor %}
+            </select>
+            <input type="number" step="0.01" name="percent[]" class="adjust-input" placeholder="%" required>
+            <select name="role[]" class="adjust-input">
+                <option>Primary</option>
+                <option>Supporting</option>
+                <option>Accent</option>
+                <option>Sweetener</option>
+            </select>
+            <button type="button" onclick="this.parentElement.remove()" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:1.2rem;">&times;</button>
+        `;
+        container.appendChild(div);
+    }
+    // Add one starting row
+    addRow();
+</script>
+{% endblock %}

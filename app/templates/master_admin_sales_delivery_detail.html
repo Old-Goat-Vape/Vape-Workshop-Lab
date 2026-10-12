@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}Delivery {{ delivery.delivery_number }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h3 mb-1">Delivery {{ delivery.delivery_number }}</h1>
+    <div class="text-secondary small">{{ delivery.client_name }} • {{ delivery.delivery_type }} • {{ delivery.status }}</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-light btn-sm" href="{{ url_for('master_admin.sales_deliveries') }}">Back</a>
+    <a class="btn btn-outline-warning btn-sm" href="{{ url_for('master_admin.sales_delivery_note_pdf', delivery_id=delivery.id) }}">Delivery Note PDF</a>
+    <a class="btn btn-outline-warning btn-sm" href="{{ url_for('master_admin.sales_delivery_truth_csv', delivery_id=delivery.id) }}">Truth CSV</a>
+  </div>
+</div>
+
+{% if delivery.has_corrections %}
+<div class="alert alert-warning py-2 px-3">
+  This delivery has post-reconciliation corrections.
+</div>
+{% endif %}
+{% if truth and truth.status == 'success' and not truth.overall_consistency_ok %}
+<div class="alert alert-danger py-2 px-3">
+  Delivery Truth Warning: consistency mismatch detected on one or more lines.
+</div>
+{% endif %}
+
+<div class="row g-3 mb-3">
+  <div class="col-12 col-lg-4"><div class="card border-0 h-100" style="background:#151515; border:1px solid #333 !important;"><div class="card-body"><div class="text-secondary small">Sent Value</div><div class="h5 mb-0">R {{ "%.2f"|format(delivery.sent_value or 0) }}</div></div></div></div>
+  <div class="col-12 col-lg-4"><div class="card border-0 h-100" style="background:#151515; border:1px solid #333 !important;"><div class="card-body"><div class="text-secondary small">Recognized Sold Value</div><div class="h5 mb-0">R {{ "%.2f"|format(delivery.sold_value or 0) }}</div></div></div></div>
+  <div class="col-12 col-lg-4"><div class="card border-0 h-100" style="background:#151515; border:1px solid #333 !important;"><div class="card-body"><div class="text-secondary small">Outstanding</div><div class="h5 mb-0">R {{ "%.2f"|format(delivery.due_value or 0) }}</div></div></div></div>
+</div>
+
+<form method="POST" class="card border-0" style="background:#151515; border:1px solid #333 !important;">
+  <div class="card-body">
+    <h2 class="h5 mb-2">Reconcile Lines</h2>
+    <div class="table-responsive">
+      <table class="table table-dark table-hover align-middle">
+        <thead><tr><th>Product</th><th class="text-end">Sent</th><th class="text-end">Sold</th><th class="text-end">Returned</th><th class="text-end">Damaged</th><th class="text-end">Remaining</th><th class="text-end">Price</th></tr></thead>
+        <tbody>
+          {% for ln in delivery.lines %}
+          <tr>
+            <td>
+              <input type="hidden" name="line_id" value="{{ ln.id }}">
+              {{ ln.product_name_snapshot }} {{ "%.0f"|format(ln.bottle_size_ml or 0) }}ml
+            </td>
+            <td class="text-end">{{ ln.qty_sent }}</td>
+            <td><input type="number" min="0" max="{{ ln.qty_sent }}" name="sold_{{ ln.id }}" value="{{ ln.qty_reported_sold }}" class="form-control bg-black border-secondary text-end"></td>
+            <td><input type="number" min="0" max="{{ ln.qty_sent }}" name="returned_{{ ln.id }}" value="{{ ln.qty_returned }}" class="form-control bg-black border-secondary text-end"></td>
+            <td><input type="number" min="0" max="{{ ln.qty_sent }}" name="damaged_{{ ln.id }}" value="{{ ln.qty_damaged }}" class="form-control bg-black border-secondary text-end"></td>
+            <td class="text-end">{{ ln.qty_remaining_with_client }}</td>
+            <td class="text-end">R {{ "%.2f"|format(ln.unit_price_snapshot or 0) }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="text-center text-secondary py-4">No lines.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="d-flex justify-content-end"><button class="btn btn-warning">Save Reconciliation</button></div>
+  </div>
+</form>
+
+{% if truth and truth.status == 'success' %}
+<div class="card border-0 mt-3" style="background:#151515; border:1px solid #333 !important;">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h2 class="h5 mb-0">Delivery Truth Report</h2>
+      <span class="badge {{ 'text-bg-success' if truth.overall_consistency_ok else 'text-bg-danger' }}">
+        {{ 'CONSISTENT' if truth.overall_consistency_ok else 'MISMATCH' }}
+      </span>
+    </div>
+    <div class="row g-2 mb-3">
+      <div class="col-6 col-md-3"><div class="small text-secondary">Type</div><div>{{ truth.delivery_type }}</div></div>
+      <div class="col-6 col-md-3"><div class="small text-secondary">Status</div><div>{{ truth.delivery_status }}</div></div>
+      <div class="col-6 col-md-3"><div class="small text-secondary">Has Corrections</div><div>{{ 'Yes' if truth.has_corrections else 'No' }}</div></div>
+      <div class="col-6 col-md-3"><div class="small text-secondary">Outstanding</div><div>R {{ "%.2f"|format(truth.totals.total_outstanding or 0) }}</div></div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-dark table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th class="text-end">Sent</th>
+            <th class="text-end">Sold</th>
+            <th class="text-end">Returned</th>
+            <th class="text-end">Damaged</th>
+            <th class="text-end">Remaining</th>
+            <th class="text-end">Unit Price</th>
+            <th class="text-end">Sent Value</th>
+            <th class="text-end">Sold Value</th>
+            <th class="text-end">Expected Remaining</th>
+            <th class="text-end">Stored Remaining</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ln in truth.lines %}
+          <tr class="{{ '' if ln.consistency_status == 'ok' else 'table-danger' }}">
+            <td>{{ ln.product_name_snapshot }} {{ "%.0f"|format(ln.bottle_size_ml or 0) }}ml</td>
+            <td class="text-end">{{ ln.qty_sent }}</td>
+            <td class="text-end">{{ ln.qty_reported_sold }}</td>
+            <td class="text-end">{{ ln.qty_returned }}</td>
+            <td class="text-end">{{ ln.qty_damaged }}</td>
+            <td class="text-end">{{ ln.qty_remaining_with_client }}</td>
+            <td class="text-end">R {{ "%.2f"|format(ln.unit_price_snapshot or 0) }}</td>
+            <td class="text-end">R {{ "%.2f"|format(ln.sent_value or 0) }}</td>
+            <td class="text-end">R {{ "%.2f"|format(ln.sold_value or 0) }}</td>
+            <td class="text-end">{{ ln.expected_remaining }}</td>
+            <td class="text-end">{{ ln.stored_remaining }}</td>
+            <td><span class="badge {{ 'text-bg-success' if ln.consistency_status == 'ok' else 'text-bg-danger' }}">{{ ln.consistency_status }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="row g-2 mt-3">
+      <div class="col-6 col-md-3"><div class="small text-secondary">Total Sent Value</div><div>R {{ "%.2f"|format(truth.totals.total_sent_value or 0) }}</div></div>
+      <div class="col-6 col-md-3"><div class="small text-secondary">Total Sold Value</div><div>R {{ "%.2f"|format(truth.totals.total_sold_value or 0) }}</div></div>
+      <div class="col-6 col-md-3"><div class="small text-secondary">Payments Allocated</div><div>R {{ "%.2f"|format(truth.totals.total_payments_allocated or 0) }}</div></div>
+      <div class="col-6 col-md-3"><div class="small text-secondary">Outstanding</div><div>R {{ "%.2f"|format(truth.totals.total_outstanding or 0) }}</div></div>
+      <div class="col-6 col-md-3"><div class="small text-secondary">Qty Remaining @ Client</div><div>{{ truth.totals.total_qty_remaining_with_client or 0 }}</div></div>
+      <div class="col-6 col-md-3"><div class="small text-secondary">Qty Returned</div><div>{{ truth.totals.total_qty_returned or 0 }}</div></div>
+      <div class="col-6 col-md-3"><div class="small text-secondary">Qty Damaged</div><div>{{ truth.totals.total_qty_damaged or 0 }}</div></div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if can_correct %}
+<div class="card border-0 mt-3" style="background:#151515; border:1px solid #8a6d1f !important;">
+  <div class="card-body">
+    <h2 class="h5 mb-2 text-warning">Master Correction Workflow</h2>
+    <div class="small text-secondary mb-2">
+      Use this only for explicit reversals/corrections. Main reconciliation remains monotonic.
+    </div>
+    <form method="POST" action="{{ url_for('master_admin.sales_delivery_correct', delivery_id=delivery.id) }}" class="row g-2 align-items-end">
+      <div class="col-12 col-md-3">
+        <label class="form-label small text-secondary">Delivery Line</label>
+        <select name="delivery_line_id" class="form-select bg-black border-secondary" required>
+          <option value="">Select line...</option>
+          {% for ln in delivery.lines %}
+          <option value="{{ ln.id }}">{{ ln.product_name_snapshot }} {{ "%.0f"|format(ln.bottle_size_ml or 0) }}ml</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label small text-secondary">Correction Type</label>
+        <select name="correction_type" class="form-select bg-black border-secondary" required>
+          <option value="sold_to_remaining">Sold -> Remaining</option>
+          <option value="sold_to_returned">Sold -> Returned</option>
+          <option value="damaged_to_returned">Damaged -> Returned</option>
+          <option value="returned_to_remaining">Returned -> Remaining</option>
+          <option value="wrong_line_reversal">Wrong Line Reversal</option>
+          <option value="admin_adjustment">Admin Adjustment</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small text-secondary">Quantity</label>
+        <input type="number" min="1" name="quantity" class="form-control bg-black border-secondary" required>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label small text-secondary">Reason (required)</label>
+        <input name="reason" class="form-control bg-black border-secondary" required>
+      </div>
+      <div class="col-12">
+        <button class="btn btn-warning">Apply Correction</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<div class="card border-0 mt-3" style="background:#151515; border:1px solid #333 !important;">
+  <div class="card-body">
+    <h2 class="h5 mb-2">Correction History</h2>
+    <div class="table-responsive">
+      <table class="table table-dark table-sm align-middle mb-0">
+        <thead><tr><th>When</th><th>Line</th><th>Type</th><th class="text-end">Qty</th><th>From</th><th>To</th><th>Reason</th><th>By</th></tr></thead>
+        <tbody>
+          {% for c in (delivery.corrections or []) %}
+          <tr>
+            <td>{{ c.created_at }}</td>
+            <td>#{{ c.delivery_line_id }}</td>
+            <td>{{ c.correction_type }}</td>
+            <td class="text-end">{{ c.quantity }}</td>
+            <td>{{ c.from_state }}</td>
+            <td>{{ c.to_state }}</td>
+            <td>{{ c.reason }}</td>
+            <td>{{ c.created_by_username or ('user #' ~ (c.created_by_user_id or '')) }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="text-center text-secondary py-3">No corrections recorded.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

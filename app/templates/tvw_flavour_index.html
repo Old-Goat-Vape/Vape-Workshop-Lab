@@ -1,0 +1,193 @@
+{% extends "base_public.html" %}
+{% block title %}Flavours | The Vape Workshop Calculator{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw.css') }}">
+
+<div class="tvw-page tvw-flavour-index">
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-1">Flavour catalogue</h1>
+      <p class="small text-secondary mb-0">
+        Browse the imported TVW flavour list — filter, sort, and add bottles to your stash.
+      </p>
+    </div>
+    <a class="btn btn-sm btn-outline-light align-self-stretch align-self-md-auto" href="{{ url_for('tvw_recipes.tvw_recipe_library') }}">Recipe library</a>
+  </div>
+
+  <form class="card card-body shadow-sm mb-3" method="get" action="{{ url_for('tvw_recipes.tvw_flavours') }}">
+    <div class="row g-2 align-items-end">
+      <div class="col-12 col-md-4 col-lg-4">
+        <label class="form-label small text-secondary mb-0">Search</label>
+        <input class="form-control form-control-sm" name="search" placeholder="Name or manufacturer" value="{{ search }}" autocomplete="off">
+      </div>
+      <div class="col-12 col-md-4 col-lg-3">
+        <label class="form-label small text-secondary mb-0">Manufacturer</label>
+        <select class="form-select form-select-sm" name="manufacturer">
+          <option value="">All manufacturers</option>
+          {% for m in manufacturers %}
+            <option value="{{ m }}" {% if manufacturer == m %}selected{% endif %}>{{ m }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2 col-lg-2">
+        <label class="form-label small text-secondary mb-0">Per page</label>
+        <select class="form-select form-select-sm" name="page_size">
+          {% for n in [10, 25, 50, 100] %}
+            <option value="{{ n }}" {% if page_size == n %}selected{% endif %}>{{ n }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <input type="hidden" name="sort_by" value="{{ sort_by }}">
+      <input type="hidden" name="sort_dir" value="{{ sort_dir }}">
+      <div class="col-6 col-md-2 col-lg-1 d-grid">
+        <button type="submit" class="btn btn-sm btn-outline-light">Apply</button>
+      </div>
+      <div class="col-12 col-lg-2 d-grid">
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('tvw_recipes.tvw_flavours') }}">Reset filters</a>
+      </div>
+    </div>
+  </form>
+
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 small text-secondary">
+    <div>
+      {% if total %}
+        Showing <strong>{{ row_start }}–{{ row_end }}</strong> of <strong>{{ total }}</strong> flavours
+        (merged / aliased rows are hidden).
+      {% else %}
+        No flavours match these filters.
+      {% endif %}
+    </div>
+    <div class="d-none d-md-block">Click column headers to sort.</div>
+  </div>
+
+  {% macro sort_url(key) -%}
+    {{ url_for(
+      'tvw_recipes.tvw_flavours',
+      search=search,
+      manufacturer=manufacturer,
+      sort_by=key,
+      sort_dir=('desc' if sort_by == key and sort_dir == 'asc' else 'asc') if sort_by == key else 'asc',
+      page=1,
+      page_size=page_size
+    ) }}
+  {%- endmacro %}
+
+  {% macro sort_chevron(key) -%}
+    {% if sort_by == key %}
+      <span class="text-warning ms-1" aria-hidden="true">{% if sort_dir == 'desc' %}▼{% else %}▲{% endif %}</span>
+    {% endif %}
+  {%- endmacro %}
+
+  <div class="table-responsive shadow-sm rounded border border-secondary">
+    <table class="table table-dark table-sm align-middle mb-0 tvw-flavour-table">
+      <thead class="sticky-top">
+        <tr>
+          <th scope="col" class="tvw-th-name bg-dark border-secondary">
+            <a class="text-light text-decoration-none d-inline-flex align-items-center" href="{{ sort_url('name') }}">Name{{ sort_chevron('name') }}</a>
+          </th>
+          <th scope="col" class="d-none d-sm-table-cell bg-dark border-secondary">
+            <a class="text-light text-decoration-none d-inline-flex align-items-center" href="{{ sort_url('manufacturer') }}">Manufacturer{{ sort_chevron('manufacturer') }}</a>
+          </th>
+          <th scope="col" class="text-end bg-dark border-secondary">
+            <a class="text-light text-decoration-none d-inline-flex align-items-center justify-content-end w-100" href="{{ sort_url('used_in') }}">Used in{{ sort_chevron('used_in') }}</a>
+          </th>
+          <th scope="col" class="text-end d-none d-md-table-cell bg-dark border-secondary">
+            <a class="text-light text-decoration-none d-inline-flex align-items-center justify-content-end w-100" href="{{ sort_url('rating') }}">Rating{{ sort_chevron('rating') }}</a>
+          </th>
+          <th scope="col" class="text-end d-none d-lg-table-cell bg-dark border-secondary">
+            <a class="text-light text-decoration-none d-inline-flex align-items-center justify-content-end w-100" href="{{ sort_url('avg_usage') }}">Avg usage %{{ sort_chevron('avg_usage') }}</a>
+          </th>
+          <th scope="col" class="text-end text-nowrap bg-dark border-secondary">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for flavour in flavours %}
+          <tr>
+            <td class="fw-semibold text-wrap" style="max-width: 14rem;">
+              <span class="d-sm-none text-secondary small">{{ flavour.brand or "Unknown" }} · </span>
+              <span title="{{ flavour.canonical_name }}">{{ flavour.canonical_name }}</span>
+            </td>
+            <td class="text-secondary d-none d-sm-table-cell">{{ flavour.brand or "—" }}</td>
+            <td class="text-end font-monospace small">{{ flavour.used_in_count }}</td>
+            <td class="text-end d-none d-md-table-cell font-monospace small">
+              {% if flavour.avg_rating is not none %}
+                {{ "%.2f"|format(flavour.avg_rating|float) }}
+              {% else %}
+                <span class="text-secondary">—</span>
+              {% endif %}
+            </td>
+            <td class="text-end d-none d-lg-table-cell font-monospace small">
+              {% if flavour.avg_usage_percent is not none %}
+                {{ "%.2f"|format(flavour.avg_usage_percent|float) }}
+              {% else %}
+                <span class="text-secondary">—</span>
+              {% endif %}
+            </td>
+            <td class="text-end p-2">
+              <div class="d-flex flex-wrap gap-1 justify-content-end">
+                <a class="btn btn-xs btn-outline-light px-2 py-1" href="{{ url_for('tvw_recipes.tvw_flavour_detail', flavour_id=flavour.id) }}">View</a>
+                <button type="button" class="btn btn-xs btn-outline-warning px-2 py-1 js-add-stash" data-flavour-id="{{ flavour.id }}">Stash</button>
+              </div>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="6" class="text-secondary py-4 text-center">No flavours in this view.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <p class="small text-secondary mt-3 mb-0">
+    <strong>Used in</strong> counts distinct community-visible recipes (same visibility rules as the recipe library).
+    <strong>Rating</strong> is from approved flavour reviews only.
+    <strong>Avg usage %</strong> comes from the catalogue import (<code>avg_usage</code> or <code>default_percent</code>).
+  </p>
+
+  {% if total_pages > 1 %}
+    <nav class="d-flex flex-wrap align-items-center gap-2 mt-3" aria-label="Flavour pagination">
+      {% if page > 1 %}
+        <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_flavours', search=search, manufacturer=manufacturer, sort_by=sort_by, sort_dir=sort_dir, page=page-1, page_size=page_size) }}">Previous</a>
+      {% endif %}
+      <span class="small text-secondary">Page {{ page }} / {{ total_pages }}</span>
+      {% if page < total_pages %}
+        <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_flavours', search=search, manufacturer=manufacturer, sort_by=sort_by, sort_dir=sort_dir, page=page+1, page_size=page_size) }}">Next</a>
+      {% endif %}
+    </nav>
+  {% endif %}
+</div>
+
+<style>
+  .tvw-flavour-table thead.sticky-top th { box-shadow: inset 0 -1px 0 var(--bs-secondary); z-index: 2; }
+  .btn-xs { font-size: 0.78rem; line-height: 1.2; }
+</style>
+
+<script>
+(() => {
+  const addButtons = document.querySelectorAll(".js-add-stash");
+  addButtons.forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const flavourId = Number(btn.dataset.flavourId || 0);
+      if (!flavourId) return;
+      const original = btn.textContent;
+      btn.disabled = true;
+      try {
+        const res = await fetch("/api/stash", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ flavour_id: flavourId, quantity_ml: 10, is_favorite: false }),
+        });
+        if (!res.ok) throw new Error("stash");
+        btn.textContent = "Added";
+      } catch (_err) {
+        btn.textContent = "Retry";
+      } finally {
+        setTimeout(() => {
+          btn.textContent = original;
+          btn.disabled = false;
+        }, 1000);
+      }
+    });
+  });
+})();
+</script>
+{% endblock %}

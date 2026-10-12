@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Client Detail - {{ client.name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h3 mb-1">{{ client.name }}</h1>
+    <div class="text-secondary small">{{ client.client_type }}{% if client.contact_person %} • {{ client.contact_person }}{% endif %}</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-light btn-sm" href="{{ url_for('master_admin.sales_clients') }}">Back to Clients</a>
+    <a class="btn btn-outline-warning btn-sm" href="{{ url_for('master_admin.sales_client_statement', client_id=client.id) }}">Statement View</a>
+    <a class="btn btn-outline-warning btn-sm" href="{{ url_for('master_admin.sales_client_statement_pdf', client_id=client.id) }}">Statement PDF</a>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-12 col-lg-4"><div class="card border-0 h-100" style="background:#151515; border:1px solid #333 !important;"><div class="card-body"><div class="text-secondary small">Outstanding</div><div class="h4 mb-0">R {{ "%.2f"|format(client.summary.total_owed or 0) }}</div></div></div></div>
+  <div class="col-12 col-lg-4"><div class="card border-0 h-100" style="background:#151515; border:1px solid #333 !important;"><div class="card-body"><div class="text-secondary small">Total Paid</div><div class="h4 mb-0">R {{ "%.2f"|format(client.summary.total_paid or 0) }}</div></div></div></div>
+  <div class="col-12 col-lg-4"><div class="card border-0 h-100" style="background:#151515; border:1px solid #333 !important;"><div class="card-body"><div class="text-secondary small">Stock At Client</div><div class="h4 mb-0">{{ client.summary.stock_currently_at_client or 0 }} bottles</div></div></div></div>
+</div>
+
+<div class="card border-0 mb-3" style="background:#151515; border:1px solid #333 !important;">
+  <div class="card-body">
+    <h2 class="h5 mb-2">Open + History Deliveries</h2>
+    <div class="table-responsive">
+      <table class="table table-dark table-sm align-middle mb-0">
+        <thead><tr><th>#</th><th>Date</th><th>Type</th><th>Status</th><th class="text-end">Due</th><th class="text-end">Actions</th></tr></thead>
+        <tbody>
+          {% for d in client.deliveries %}
+          <tr><td>{{ d.delivery_number }}</td><td>{{ d.delivery_date }}</td><td>{{ d.delivery_type }}</td><td>{{ d.status }}</td><td class="text-end">R {{ "%.2f"|format(d.due_value or 0) }}</td><td class="text-end"><a class="btn btn-sm btn-outline-warning" href="{{ url_for('master_admin.sales_delivery_detail', delivery_id=d.id) }}">Open</a></td></tr>
+          {% else %}<tr><td colspan="6" class="text-center text-secondary py-3">No deliveries yet.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0" style="background:#151515; border:1px solid #333 !important;">
+  <div class="card-body">
+    <h2 class="h5 mb-2">Payment History</h2>
+    <div class="table-responsive">
+      <table class="table table-dark table-sm align-middle mb-0">
+        <thead><tr><th>Date</th><th>Method</th><th>Reference</th><th class="text-end">Amount</th></tr></thead>
+        <tbody>
+          {% for p in client.payments %}
+          <tr><td>{{ p.payment_date }}</td><td>{{ p.payment_method or '-' }}</td><td>{{ p.reference or '-' }}</td><td class="text-end">R {{ "%.2f"|format(p.amount or 0) }}</td></tr>
+          {% else %}<tr><td colspan="4" class="text-center text-secondary py-3">No payments yet.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

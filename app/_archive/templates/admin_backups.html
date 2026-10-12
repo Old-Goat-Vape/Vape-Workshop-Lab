@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Disaster Recovery - Old Goat Lab{% endblock %}
+
+{% block content %}
+<div class="nav-header">
+    <div class="logo-small">🐐 Old Goat Lab</div>
+    <a href="{{ url_for('index') }}" class="btn-back">Dashboard</a>
+</div>
+
+<h1>Data Persistence & Backups</h1>
+
+<div class="section-card" style="border: 1px solid var(--primary-orange);">
+    <div class="section-title">Manual Actions</div>
+    <a href="{{ url_for('admin.manual_backup') }}" class="btn-primary">📸 Create Snapshot Now</a>
+</div>
+
+<div class="section-card">
+    <div class="section-title">Available Backups (FIFO - Max 30)</div>
+    <table>
+        <thead>
+            <tr>
+                <th>Backup File</th>
+                <th>Created At</th>
+                <th>Size</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for b in backups %}
+            <tr>
+                <td><code style="color:var(--primary-orange);">{{ b.name }}</code></td>
+                <td>{{ b.date }}</td>
+                <td>{{ b.size }}</td>
+                <td>
+                    <a href="{{ url_for('admin.run_restore', filename=b.name) }}" 
+                       class="btn-apply" 
+                       style="background: var(--danger); border: none;"
+                       onclick="return confirm('WARNING: This will overwrite ALL current data with this backup. Proceed?')">
+                       Restore
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

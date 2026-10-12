@@ -1,0 +1,302 @@
+/* =============================================================================
+   TVW / Old Goat Lab — responsive layout (phone, tablet, desktop)
+   Development UX: readable text, no horizontal scroll, touch-friendly controls.
+   ============================================================================= */
+
+html {
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+.app-shell,
+main.container-fluid {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+/* Prevent Bootstrap rows/cards from forcing sideways scroll */
+.row,
+.card,
+.card-body {
+  max-width: 100%;
+}
+
+/* ----- Touch targets (Apple HIG ~44px) ----- */
+@media (pointer: coarse), (max-width: 991.98px) {
+  .btn,
+  .btn-sm,
+  .form-select,
+  .form-control,
+  .nav-link.goat-nav,
+  .navbar .btn {
+    min-height: 2.75rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+
+  .btn-sm {
+    font-size: 0.9375rem;
+  }
+
+  .navbar .btn-sm {
+    min-height: 2.5rem;
+    padding: 0.4rem 0.65rem;
+  }
+
+  .form-control-sm,
+  .form-select-sm {
+    min-height: 2.75rem;
+    font-size: 1rem;
+  }
+
+  .form-control,
+  .form-select {
+    font-size: 1rem;
+  }
+
+  .navbar .container,
+  .navbar .container-fluid {
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+}
+
+/* Mobile menu trigger */
+@media (max-width: 991.98px) {
+  .navbar .btn-outline-secondary {
+    min-width: 4.5rem;
+    font-weight: 600;
+  }
+
+  .offcanvas .nav-link.goat-nav {
+    font-size: 1.0625rem;
+    padding: 0.65rem 0.75rem;
+  }
+}
+
+/* ----- Typography: no tiny body copy on small screens ----- */
+@media (max-width: 575.98px) {
+  main.container-fluid {
+    padding-left: 0.85rem !important;
+    padding-right: 0.85rem !important;
+  }
+
+  .small,
+  .text-secondary.small,
+  .form-label.small {
+    font-size: 0.875rem !important;
+  }
+
+  .display-6 {
+    font-size: clamp(1.75rem, 8vw, 2.25rem);
+  }
+
+  h1.h3,
+  .h3 {
+    font-size: clamp(1.25rem, 5vw, 1.5rem);
+  }
+
+  .card-body {
+    padding: 1rem;
+  }
+}
+
+/* ----- Tables: library, costing, logs ----- */
+.table-responsive {
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 0;
+}
+
+@media (max-width: 767.98px) {
+  .table {
+    font-size: 0.9375rem;
+  }
+
+  .table th,
+  .table td {
+    padding: 0.55rem 0.45rem;
+    vertical-align: middle;
+  }
+
+  .flavor-table th:nth-child(3),
+  .flavor-table td:nth-child(3),
+  .flavor-table th:nth-child(4),
+  .flavor-table td:nth-child(4) {
+    white-space: nowrap;
+  }
+}
+
+/* ----- Dashboard / recipe cards ----- */
+@media (max-width: 575.98px) {
+  .row.g-2 > [class*="col-"] .btn {
+    width: 100%;
+  }
+}
+
+/* ----- TVW public top nav (community) ----- */
+@media (max-width: 991.98px) {
+  .navbar .container.px-3 {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 0.5rem;
+  }
+
+  .navbar .navbar-brand {
+    text-align: center;
+    margin-right: 0 !important;
+  }
+
+  .navbar .ms-auto {
+    margin-left: 0 !important;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.35rem;
+  }
+
+  .navbar .ms-auto .btn {
+    flex: 1 1 calc(50% - 0.35rem);
+    min-width: 7rem;
+  }
+}
+
+/* ----- Guided mix / TVW pages ----- */
+.tvw-page {
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 575.98px) {
+  .tvw-page .btn-sm {
+    min-height: 2.75rem;
+    font-size: 0.9375rem;
+  }
+
+  .tvw-page .card-body .row.g-3 > [class*="col-"] {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+}
+
+/* ----- Mixing bench: arm's-length readability on phone/tablet ----- */
+@media (max-width: 899px) {
+  body.tvw-bench-mode .tvw-workstation {
+    padding-left: 0.65rem;
+    padding-right: 0.65rem;
+  }
+
+  body.tvw-bench-mode .tvw-ws-kicker,
+  body.tvw-bench-mode .tvw-ws-block-label,
+  body.tvw-bench-mode .tvw-ws-spec dt,
+  body.tvw-bench-mode .tvw-ws-bench-lane-title {
+    font-size: 0.72rem;
+  }
+
+  body.tvw-bench-mode .tvw-ws-spec dd {
+    font-size: 1.125rem;
+  }
+
+  body.tvw-bench-mode .tvw-ws-lcd-value input,
+  body.tvw-bench-mode .tvw-ws-lcd-value {
+    font-size: clamp(1.75rem, 9vw, 2.25rem) !important;
+  }
+
+  body.tvw-bench-mode .tvw-ws-commit,
+  body.tvw-bench-mode .tvw-ws-undo {
+    width: 100%;
+    min-height: 3rem;
+    font-size: 1.0625rem;
+  }
+
+  body.tvw-bench-mode .tvw-ws-primary-zone#focusActions,
+  body.tvw-bench-mode #focusActions.tvw-ws-primary-zone {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  body.tvw-bench-mode .tvw-ws-bench-note-body {
+    font-size: 1rem;
+    line-height: 1.45;
+  }
+
+  body.tvw-bench-mode .tvw-ws-bench-note-title {
+    font-size: 1.125rem;
+  }
+}
+
+@media (max-width: 480px) {
+  body.tvw-bench-mode .tvw-ws-spec-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body.tvw-bench-mode .tvw-ws-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* Recipe builder ingredient rows */
+@media (max-width: 767.98px) {
+  .ingredient-row .row > [class*="col-"] {
+    margin-bottom: 0.35rem;
+  }
+}
+
+/* Costing: stack tight 3- and 4-column assumption grids on phone */
+@media (max-width: 575.98px) {
+  .row.g-2 > .col-4,
+  .row.g-2 > .col-6,
+  .row.g-3 > .col-4,
+  .row.g-3 > .col-6 {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+
+  .og-nicotine-group {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+
+  #priceListTable {
+    font-size: 0.875rem;
+  }
+}
+
+/* TVW recipe library list rows — touch-friendly favorite */
+@media (max-width: 767.98px) {
+  .tvw-list-row .tvw-lib-favorite {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    padding: 0.35rem !important;
+  }
+
+  .tvw-list-row .d-flex.flex-column.align-items-md-end {
+    flex-direction: row !important;
+    flex-wrap: wrap;
+    align-items: center !important;
+    gap: 0.5rem;
+  }
+}
+
+/* Lab recipe cards: full-width mix controls on narrow screens */
+@media (max-width: 575.98px) {
+  .row.g-2 > .col-5,
+  .row.g-2 > .col-7 {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+}
+
+/* Flash toasts — stay on screen on narrow devices */
+.flash-messages {
+  max-width: min(420px, calc(100vw - 1.25rem));
+}

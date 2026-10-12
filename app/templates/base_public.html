@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}The Vape Workshop Calculator{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='industrial.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='responsive.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='tvw-dashboard.css') }}">
+</head>
+<body data-bs-theme="dark" class="{% block body_class %}{% endblock %}">
+    {% if session.get('user_id') %}
+    {% set ep = request.endpoint or '' %}
+    {% set nav_home_active = ep == 'tvw_community.community_feed' %}
+    {% set nav_recipes_active = ep in [
+      'tvw_recipes.tvw_recipe_library',
+      'tvw_recipes.tvw_recipe_detail',
+      'tvw_recipes.tvw_recipe_new',
+      'tvw_recipes.tvw_recipe_mix_logs'
+    ] %}
+    {% set nav_mix_active = ep in [
+      'tvw_recipes.tvw_my_mixes',
+      'tvw_recipes.tvw_guided_mix_session',
+      'tvw_recipes.tvw_guided_mix_start',
+      'tvw_recipes.tvw_guided_mix_index'
+    ] %}
+    {% set nav_flavours_active = ep in [
+      'tvw_recipes.tvw_flavours',
+      'tvw_recipes.tvw_flavour_detail',
+      'tvw_recipes.tvw_stash',
+      'tvw_recipes.tvw_what_can_i_make'
+    ] %}
+    <header class="tvw-app-header" id="tvwAppHeader">
+        <div class="tvw-shell tvw-header-inner">
+            <a class="tvw-brand" href="{{ url_for('tvw_community.community_feed') }}">The Vape Workshop</a>
+            <button type="button"
+                    class="tvw-nav-toggle"
+                    id="tvwNavToggle"
+                    aria-expanded="false"
+                    aria-controls="tvwHeaderNav tvwHeaderActions">
+                Menu
+            </button>
+            <nav class="tvw-header-nav" id="tvwHeaderNav" aria-label="Main navigation">
+                <a class="tvw-nav-link{% if nav_home_active %} is-active{% endif %}"
+                   href="{{ url_for('tvw_community.community_feed') }}"
+                   {% if nav_home_active %}aria-current="page"{% endif %}>Home</a>
+                <a class="tvw-nav-link{% if nav_recipes_active %} is-active{% endif %}"
+                   href="{{ url_for('tvw_recipes.tvw_recipe_library') }}"
+                   {% if nav_recipes_active %}aria-current="page"{% endif %}>Recipes</a>
+                <a class="tvw-nav-link{% if nav_mix_active %} is-active{% endif %}"
+                   href="{{ url_for('tvw_recipes.tvw_my_mixes') }}"
+                   {% if nav_mix_active %}aria-current="page"{% endif %}>Mix</a>
+                <a class="tvw-nav-link{% if nav_flavours_active %} is-active{% endif %}"
+                   href="{{ url_for('tvw_recipes.tvw_flavours') }}"
+                   {% if nav_flavours_active %}aria-current="page"{% endif %}>Flavours</a>
+            </nav>
+            <div class="tvw-header-actions" id="tvwHeaderActions">
+                {% if ep != 'tvw_recipes.tvw_recipe_library' %}
+                <form class="tvw-header-search" method="get" action="{{ url_for('tvw_recipes.tvw_recipe_library') }}" role="search">
+                    <label class="visually-hidden" for="tvwHeaderSearch">Search recipes</label>
+                    <input type="search" id="tvwHeaderSearch" name="search" placeholder="Search recipes" autocomplete="off">
+                    <button type="submit">Search</button>
+                </form>
+                {% endif %}
+                <details class="tvw-user-menu">
+                    <summary>{{ user.username if user else 'Account' }}</summary>
+                    <div class="tvw-user-menu-panel">
+                        <a class="tvw-user-menu-link" href="{{ url_for('tvw_recipes.tvw_recipe_library', mine=1) }}">My recipes</a>
+                        <a class="tvw-user-menu-link" href="{{ url_for('tvw_recipes.tvw_stash') }}">My stash</a>
+                        <a class="tvw-user-menu-link" href="{{ url_for('tvw_recipes.tvw_what_can_i_make') }}">What can I make</a>
+                        <a class="tvw-user-menu-link" href="{{ url_for('tvw_recipes.tvw_my_mixes') }}">My mixes</a>
+                        <a class="tvw-user-menu-link" href="{{ url_for('tvw_recipes.tvw_my_mixes') }}">Batch records</a>
+                        {% if can_access_tvw_admin %}
+                        <div class="tvw-user-menu-divider" role="presentation"></div>
+                        <a class="tvw-user-menu-link" href="{{ url_for('tvw_admin.dashboard') }}">Admin</a>
+                        {% endif %}
+                        {% if can_access_lab_bridge %}
+                        <a class="tvw-user-menu-link" href="{{ url_for('tvw_community.bridge_to_lab') }}">Lab access</a>
+                        {% endif %}
+                        <div class="tvw-user-menu-divider" role="presentation"></div>
+                        <a class="tvw-user-menu-link is-danger" href="{{ url_for('auth.logout') }}">Logout</a>
+                    </div>
+                </details>
+            </div>
+        </div>
+    </header>
+    {% endif %}
+    <main class="tvw-main min-vh-100 d-flex flex-column py-4">
+        <div class="tvw-shell">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                <div class="mb-3">
+                  {% for category, message in messages %}
+                    {% set c = (category or 'info')|lower %}
+                    {% if c in ['error', 'danger'] %}
+                      {% set cls = 'danger' %}
+                    {% elif c in ['warning'] %}
+                      {% set cls = 'warning' %}
+                    {% elif c in ['success'] %}
+                      {% set cls = 'success' %}
+                    {% else %}
+                      {% set cls = 'secondary' %}
+                    {% endif %}
+                    <div class="alert alert-{{ cls }} py-2 mb-2" style="font-size: 1rem;">{{ message }}</div>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            {% endwith %}
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      (function () {
+        var header = document.getElementById("tvwAppHeader");
+        var toggle = document.getElementById("tvwNavToggle");
+        if (!header || !toggle) return;
+        toggle.addEventListener("click", function () {
+          var open = header.classList.toggle("is-nav-open");
+          toggle.setAttribute("aria-expanded", open ? "true" : "false");
+        });
+      })();
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Stock Take - Old Goat Lab{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h3 mb-1">Stock Take Run #{{ run.id }}</h1>
+    <div class="small text-secondary">
+      Status: <span class="badge text-bg-{{ 'success' if run.status == 'completed' else 'warning' }}">{{ run.status }}</span>
+      | Started: {{ run.started_at }} | Completed: {{ run.completed_at or '—' }}
+    </div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="btn btn-outline-light btn-sm" href="{{ url_for('master_admin.console', tab='shopping') }}">Back to Shopping</a>
+    <form method="POST" action="{{ url_for('master_admin.start_stock_take') }}">
+      <button class="btn btn-outline-warning btn-sm" {% if run.status != 'completed' %}disabled{% endif %}>Start New Stock Take</button>
+    </form>
+  </div>
+</div>
+
+<div class="row g-2 mb-3">
+  <div class="col-6 col-lg-2"><div class="card border-0" style="background:#151515; border:1px solid #333 !important;"><div class="card-body py-2"><div class="small text-secondary">Total</div><div class="h5 mb-0">{{ report.summary.total_items }}</div></div></div></div>
+  <div class="col-6 col-lg-2"><div class="card border-0" style="background:#151515; border:1px solid #333 !important;"><div class="card-body py-2"><div class="small text-secondary">Adjusted</div><div class="h5 mb-0 text-warning">{{ report.summary.adjusted_items }}</div></div></div></div>
+  <div class="col-6 col-lg-2"><div class="card border-0" style="background:#151515; border:1px solid #333 !important;"><div class="card-body py-2"><div class="small text-secondary">Unchanged</div><div class="h5 mb-0 text-success">{{ report.summary.unchanged_items }}</div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card border-0" style="background:#151515; border:1px solid #333 !important;"><div class="card-body py-2"><div class="small text-secondary">Shortage Total</div><div class="h5 mb-0 text-danger">{{ "%.2f"|format(report.summary.shortage_total) }}</div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card border-0" style="background:#151515; border:1px solid #333 !important;"><div class="card-body py-2"><div class="small text-secondary">Excess Total</div><div class="h5 mb-0 text-info">{{ "%.2f"|format(report.summary.excess_total) }}</div></div></div></div>
+</div>
+
+<form method="GET" action="{{ url_for('master_admin.stock_take_run', run_id=run.id) }}" class="d-flex gap-2 flex-wrap mb-3">
+  <input class="form-control bg-black border-secondary" name="q" value="{{ q }}" placeholder="Search brand/name..." style="max-width: 260px;">
+  <input class="form-control bg-black border-secondary" name="cat" value="{{ cat }}" placeholder="Category..." style="max-width: 180px;">
+  <div class="form-check align-self-center">
+    <input class="form-check-input" type="checkbox" id="uncounted" name="uncounted" value="1" {% if uncounted %}checked{% endif %}>
+    <label class="form-check-label small" for="uncounted">Uncounted only</label>
+  </div>
+  <div class="form-check align-self-center">
+    <input class="form-check-input" type="checkbox" id="variance_only" name="variance_only" value="1" {% if variance_only %}checked{% endif %}>
+    <label class="form-check-label small" for="variance_only">Variances only</label>
+  </div>
+  <button class="btn btn-outline-light btn-sm">Filter</button>
+</form>
+
+<form method="POST" action="{{ url_for('master_admin.stock_take_save', run_id=run.id) }}" id="stockTakeForm">
+  <div class="d-flex gap-2 mb-2">
+    <button class="btn btn-outline-light btn-sm" {% if run.status != 'open' %}disabled{% endif %}>Save Progress</button>
+    <button class="btn btn-warning btn-sm" formaction="{{ url_for('master_admin.stock_take_finalize', run_id=run.id) }}" {% if run.status != 'open' %}disabled{% endif %} onclick="return confirm('Finalize and apply stock corrections?');">Finalize Stock Take</button>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-dark table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Brand</th>
+          <th>Name</th>
+          <th>Category</th>
+          <th class="text-end">Expected</th>
+          <th class="text-end">Actual</th>
+          <th class="text-end">Variance</th>
+          <th>Action</th>
+          <th>Quick</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in items %}
+        {% set var = (it.actual_stock if it.actual_stock is not none else it.expected_stock) - it.expected_stock %}
+        <tr>
+          <td class="text-secondary">{{ it.brand }}</td>
+          <td>{{ it.name }}</td>
+          <td><span class="badge text-bg-secondary">{{ it.profiles or it.category }}</span></td>
+          <td class="text-end">{{ "%.2f"|format(it.expected_stock or 0) }}</td>
+          <td class="text-end" style="min-width:120px;">
+            <input type="hidden" name="item_id" value="{{ it.id }}">
+            <input id="actual_{{ it.id }}" name="actual_{{ it.id }}" class="form-control form-control-sm bg-black border-secondary text-end" value="{{ '' if it.actual_stock is none else it.actual_stock }}" {% if run.status != 'open' %}readonly{% endif %}>
+          </td>
+          <td class="text-end {% if var < 0 %}text-danger{% elif var > 0 %}text-info{% else %}text-success{% endif %}">
+            {{ "%.2f"|format(var) }}
+          </td>
+          <td>
+            <select name="action_{{ it.id }}" class="form-select form-select-sm bg-black border-secondary" {% if run.status != 'open' %}disabled{% endif %}>
+              <option value="skipped" {% if it.action_taken == 'skipped' %}selected{% endif %}>Skipped</option>
+              <option value="unchanged" {% if it.action_taken == 'unchanged' %}selected{% endif %}>Unchanged</option>
+              <option value="adjusted" {% if it.action_taken == 'adjusted' %}selected{% endif %}>Adjusted</option>
+              <option value="marked_empty" {% if it.action_taken == 'marked_empty' %}selected{% endif %}>Marked Empty</option>
+            </select>
+          </td>
+          <td class="text-nowrap">
+            <button type="button" class="btn btn-sm btn-outline-light" onclick="setExpected({{ it.id }}, {{ it.expected_stock or 0 }})" {% if run.status != 'open' %}disabled{% endif %}>=Expected</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="setEmpty({{ it.id }})" {% if run.status != 'open' %}disabled{% endif %}>Empty</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setHalf({{ it.id }}, {{ it.expected_stock or 0 }})" {% if run.status != 'open' %}disabled{% endif %}>Half</button>
+          </td>
+          <td style="min-width:180px;">
+            <input name="notes_{{ it.id }}" class="form-control form-control-sm bg-black border-secondary" value="{{ it.notes or '' }}" {% if run.status != 'open' %}readonly{% endif %}>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="text-center text-secondary py-4">No stock take items for this filter.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</form>
+
+<script>
+function setExpected(id, expected) {
+  const input = document.getElementById(`actual_${id}`);
+  if (!input) return;
+  input.value = Number(expected || 0).toFixed(2);
+}
+function setEmpty(id) {
+  const input = document.getElementById(`actual_${id}`);
+  if (!input) return;
+  input.value = "0";
+}
+function setHalf(id, expected) {
+  const input = document.getElementById(`actual_${id}`);
+  if (!input) return;
+  input.value = (Number(expected || 0) / 2).toFixed(2);
+}
+</script>
+{% endblock %}

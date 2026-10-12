@@ -1,0 +1,439 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Lab Inventory' if view_type == 'inventory' else 'Master Reference' }} - Old Goat Lab{% endblock %}
+
+{% block content %}
+<style>
+    .nav-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    
+    /* Tab Styling */
+    .tabs { display: flex; gap: 5px; margin-bottom: 20px; border-bottom: 2px solid #222; overflow-x: auto; }
+    .tab-link {
+        text-decoration: none; color: #666; padding: 12px 20px; 
+        font-weight: bold; text-transform: uppercase; transition: 0.2s;
+        border-bottom: 3px solid transparent; white-space: nowrap;
+    }
+    .tab-link.active { color: var(--primary-orange); border-bottom-color: var(--primary-orange); background: rgba(255,165,0,0.05); }
+    
+    .card { background: #111; padding: 20px; border-radius: 12px; border: 1px solid #222; }
+    
+    .flavor-table th { color: #666; font-size: 0.75rem; text-transform: uppercase; }
+    
+    .action-cell { display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+    .size-input-sm { 
+        width: 70px; background: #000; border: 1px solid #444; color: #fff; 
+        padding: 5px; border-radius: 4px; font-size: 0.8rem; text-align: center;
+    }
+    
+    .btn-mini { background: #222; border: 1px solid #444; color: #eee; padding: 6px 12px; border-radius: 4px; cursor: pointer; text-decoration: none; font-size: 0.75rem; font-weight: bold; }
+    .btn-mini:hover { border-color: var(--primary-orange); color: var(--primary-orange); }
+    .btn-add { background: var(--primary-orange); color: #000; border: none; }
+    
+    /* Modal Styles */
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); }
+    .modal-content { background: #111; width: 400px; margin: 10% auto; padding: 25px; border-radius: 12px; border: 1px solid var(--primary-orange); }
+    .modal-content label { display: block; color: #888; font-size: 0.75rem; text-transform: uppercase; margin-bottom: 5px; margin-top: 15px; }
+    .modal-input { width: 100%; padding: 10px; background: #000; border: 1px solid #333; color: #fff; border-radius: 4px; }
+
+    .badge { background: #222; padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; color: #888; border: 1px solid #333; }
+    .badge-success { color: #28a745; border-color: #28a745; background: rgba(40, 167, 69, 0.1); }
+    
+    .loading-pulse { animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+    .search-alert {
+        padding: 12px; background: rgba(255,165,0,0.1); border-left: 4px solid var(--primary-orange);
+        border-radius: 4px; margin-bottom: 20px; color: #eee; font-size: 0.9rem;
+    }
+    .clickable-row { cursor: pointer; }
+    .clickable-row:hover { background: rgba(255,165,0,0.06); }
+    .pill-muted { color:#999; font-size:0.72rem; border:1px solid #333; border-radius:4px; padding:2px 6px; }
+    .badge-needs-review {
+        display: inline-block; margin-left: 6px; padding: 2px 7px; font-size: 0.65rem; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.04em; border-radius: 4px;
+        color: #1a1a1a; background: #e8a317; border: 1px solid #c78f12;
+    }
+    .flavor-class-block { margin-top: 8px; padding-top: 6px; border-top: 1px solid #222; max-width: 42rem; }
+    .flavor-class-line { display: block; font-size: 0.72rem; color: #9a9a9a; line-height: 1.45; }
+    .flavor-class-line + .flavor-class-line { margin-top: 3px; }
+    .flavor-class-k { color: #666; font-weight: 600; margin-right: 3px; }
+    .flavor-class-sep { color: #444; margin: 0 5px; }
+    .flavor-class-meta { color: #7a7a7a; }
+</style>
+
+<div class="nav-header">
+    <div style="display:flex; align-items:flex-start; gap:14px; flex:1; min-width:0;">
+        <div class="flex-shrink-0" style="margin-top:2px;">{% with logo_href = url_for('dashboard_index'), show_wordmark = false %}{% include "partials/og_brand.html" %}{% endwith %}</div>
+        <div>
+            <div class="og-page-eyebrow mb-1">{{ 'Inventory' if view_type == 'inventory' else 'Reference' }}</div>
+            <h2 style="color: var(--primary-orange); margin: 0; font-size:1.35rem;">
+                {{ 'Lab inventory' if view_type == 'inventory' else 'Master reference' }}
+            </h2>
+        </div>
+    </div>
+    
+    <div style="display: flex; gap: 10px;">
+        {% if session.get('role') in ['Foreman', 'Old Goat', 'Master'] %}
+            <button onclick="openManualModal()" class="btn-mini btn-add">+ MANUAL ADD</button>
+        {% endif %}
+
+        {% if view_type == 'inventory' %}
+            <a href="{{ url_for('library.index', view='reference', cat=current_cat) }}" class="btn-mini" style="background: #333;">MASTER LIST</a>
+        {% else %}
+            <a href="{{ url_for('library.index', view='inventory', cat=current_cat) }}" class="btn-mini" style="background: #333;">MY STOCK</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="tabs">
+    <a href="{{ url_for('library.index', view=view_type, cat='Flavor') }}" class="tab-link {{ 'active' if current_cat == 'Flavor' and not search }}">🍓 Flavors</a>
+    <a href="{{ url_for('library.index', view=view_type, cat='Base') }}" class="tab-link {{ 'active' if current_cat == 'Base' and not search }}">⚗️ Bases</a>
+    <a href="{{ url_for('library.index', view=view_type, cat='Nicotine') }}" class="tab-link {{ 'active' if current_cat == 'Nicotine' and not search }}">💀 Nicotine</a>
+    <a href="{{ url_for('library.index', view=view_type, cat='Hardware') }}" class="tab-link {{ 'active' if current_cat == 'Hardware' and not search }}">⚖️ Hardware</a>
+</div>
+
+<div class="card">
+    <form method="GET" action="{{ url_for('library.index') }}">
+        <input type="hidden" name="view" value="{{ view_type }}">
+        <input type="hidden" name="cat" value="{{ current_cat }}">
+        <input type="hidden" name="page" value="1">
+        <input type="hidden" name="page_size" value="{{ page_size or 50 }}">
+        <input type="text" name="search" id="universalSearch" class="form-control bg-black border-secondary" placeholder="Universal search (all tabs)..." value="{{ search }}">
+    </form>
+    <div style="margin-top:8px; color:#777; font-size:0.8rem;">
+        Showing page {{ page }} / {{ total_pages }} • {{ total_count }} results
+    </div>
+
+    {% if search %}
+    <div class="search-alert">
+        🔍 <strong>Universal Mode:</strong> Showing results for "<strong>{{ search }}</strong>" across all categories. 
+        <a href="{{ url_for('library.index', view=view_type, cat=current_cat) }}" style="color: var(--primary-orange); margin-left: 10px; text-decoration: none;">[Clear Search]</a>
+    </div>
+    {% endif %}
+    
+    <div class="table-responsive">
+    <table class="table table-dark table-hover align-middle flavor-table mb-0">
+        <thead>
+            <tr>
+                <th>Brand / Name</th>
+                <th>Profile</th>
+                <th>Price / ml</th>
+            <th>Active Avg Usage</th>
+                <th>Status</th>
+                {% if view_type != 'inventory' %}<th>Add Amount</th>{% endif %}
+                <th style="text-align: right;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr class="clickable-row" onclick="openFlavorDetail({{ item.id if view_type != 'inventory' else item.reference_id }})">
+                <td>
+                    <div>
+                        <strong style="color: #fff;">{{ item.brand }}</strong>
+                        {% if item.needs_review %}
+                        <span class="badge-needs-review" title="Classification flagged for review">Needs review</span>
+                        {% endif %}
+                    </div>
+                    <small style="color: #666;">{{ item.name }}</small>
+                    <div style="margin-top:4px; display:flex; gap:6px; flex-wrap:wrap;">
+                        {% if item.rating %}
+                            <span class="pill-muted">Rating {{ "%.1f"|format(item.rating) }}</span>
+                        {% endif %}
+                        {% if item.source %}
+                            <span class="pill-muted">{{ item.source }}</span>
+                        {% endif %}
+                        <span class="pill-muted">Used in {{ item.recipe_count|default(0) }} recipes</span>
+                    </div>
+                    {% if view_type != 'inventory' %}
+                        {% set has_bias_row = item.sweetness_bias or item.brightness_bias or item.harshness_bias or item.coil_risk or item.override_reason %}
+                        {% set has_cls_block = item.resolved_profile or item.keyword_primary or item.confidence or has_bias_row %}
+                        {% if has_cls_block %}
+                        <div class="flavor-class-block">
+                            <div class="flavor-class-line">
+                                <span><span class="flavor-class-k">Resolved</span> {{ item.resolved_profile or '—' }}</span><span class="flavor-class-sep">·</span>
+                                <span><span class="flavor-class-k">Primary</span> {{ item.keyword_primary or '—' }}</span><span class="flavor-class-sep">·</span>
+                                <span><span class="flavor-class-k">Confidence</span> {{ item.confidence or '—' }}</span>
+                            </div>
+                            {% if has_bias_row %}
+                            <div class="flavor-class-line flavor-class-meta">
+                                <span class="flavor-class-k">Bias</span> S{{ item.sweetness_bias or 0 }} B{{ item.brightness_bias or 0 }} H{{ item.harshness_bias or 0 }} C{{ item.coil_risk or 0 }}
+                                {% if item.override_reason %}<span class="flavor-class-sep">·</span>{{ item.override_reason }}{% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    {% endif %}
+                </td>
+                <td><span class="badge">{{ item.profiles or item.category }}</span></td>
+                <td style="color: var(--success);">R {{ "%.2f"|format(item.price_per_ml or 0) }}</td>
+                <td>{{ "%.2f"|format(item.active_avg_usage or 1.0) }}%</td>
+                
+                {% if view_type == 'inventory' %}
+                    <td>
+                        {% set is_low = item.current_stock <= (item.low_stock_threshold or 5) %}
+                        <span class="badge {{ 'badge-success' if not is_low else '' }}" style="{% if is_low %}color:#ff4444;border-color:#ff4444;background:rgba(255,68,68,0.1);{% endif %}">
+                            {{ 'LOW' if is_low else 'IN STOCK' }} · {{ item.current_stock }} {{ item.unit }}
+                        </span>
+                    </td>
+                {% else %}
+                    <td>
+                        <span class="badge {{ 'badge-success' if item.in_stock_id else '' }}">
+                            {{ 'IN LAB' if item.in_stock_id else 'REFERENCE ONLY' }}
+                        </span>
+                    </td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <input type="number" id="size-{{ item.id }}" class="size-input-sm" 
+                                   value="{{ item.ui_amount or 10 }}" min="1">
+                            <span style="font-size: 0.7rem; color: #555;">{{ 'unit' if item.category == 'Hardware' else 'ml' }}</span>
+                        </div>
+                    </td>
+                {% endif %}
+
+                <td class="action-cell">
+                    {% if view_type == 'inventory' %}
+                        {% if session.get('role') in ['Foreman', 'Old Goat', 'Master'] %}
+                            <a href="{{ url_for('library.edit_item', item_id=item.item_id or item.id) }}" class="btn-mini" onclick="event.stopPropagation()">EDIT</a>
+                        {% endif %}
+                        {% if item.url and item.url|trim %}
+                            <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="btn-mini" onclick="event.stopPropagation()">🛒 Shop</a>
+                        {% endif %}
+                        {% if item.vc_url and item.vc_url|trim %}
+                            <a href="{{ item.vc_url }}" target="_blank" rel="noopener noreferrer" class="btn-mini" onclick="event.stopPropagation()">📘 VC</a>
+                        {% endif %}
+                    {% else %}
+                        {% if item.in_stock_id %}
+                            <span class="badge badge-success">✓ IN LAB</span>
+                        {% endif %}
+                        <button onclick="event.stopPropagation(); quickAdd({{ item.id }})" class="btn-mini btn-add">+ ADD</button>
+                        {% if item.url and item.url|trim %}
+                            <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="btn-mini" onclick="event.stopPropagation()">🛒 Shop</a>
+                        {% endif %}
+                        {% if item.vc_url and item.vc_url|trim %}
+                            <a href="{{ item.vc_url }}" target="_blank" rel="noopener noreferrer" class="btn-mini" onclick="event.stopPropagation()">📘 VC</a>
+                        {% endif %}
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5" style="text-align: center; color: #444; padding: 40px;">No items found matching your criteria.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+
+<div class="card" style="margin-top:14px;">
+    <div style="display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap;">
+        <div style="display:flex; gap:8px; align-items:center;">
+            {% set prev_page = page - 1 %}
+            {% set next_page = page + 1 %}
+            <a class="btn-mini {% if page <= 1 %}disabled{% endif %}"
+               style="{% if page <= 1 %}opacity:0.5; pointer-events:none;{% endif %}"
+               href="{{ url_for('library.index', view=view_type, cat=current_cat, search=search, page=prev_page, page_size=page_size) }}">← Prev</a>
+            <span style="color:#aaa; font-size:0.82rem;">Page {{ page }} of {{ total_pages }}</span>
+            <a class="btn-mini {% if page >= total_pages %}disabled{% endif %}"
+               style="{% if page >= total_pages %}opacity:0.5; pointer-events:none;{% endif %}"
+               href="{{ url_for('library.index', view=view_type, cat=current_cat, search=search, page=next_page, page_size=page_size) }}">Next →</a>
+        </div>
+        <div>
+            <label style="color:#777; margin-right:6px; font-size:0.78rem;">Rows</label>
+            <select id="pageSizeSelect" class="size-input-sm" style="width:90px;">
+                <option value="50" {% if (page_size or 50) == 50 %}selected{% endif %}>50</option>
+                <option value="100" {% if (page_size or 50) == 100 %}selected{% endif %}>100</option>
+                <option value="150" {% if (page_size or 50) == 150 %}selected{% endif %}>150</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div id="flavorDetailModal" class="modal">
+    <div class="modal-content" style="width:min(720px,92vw); max-height:80vh; overflow:auto;">
+        <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start;">
+            <div>
+                <h3 id="fd-name" style="color:var(--primary-orange); margin:0;">Flavor</h3>
+                <div id="fd-brand" style="color:#9a9a9a; font-size:0.9rem;"></div>
+            </div>
+            <button type="button" class="btn-mini" onclick="closeFlavorDetail()">Close</button>
+        </div>
+        <div id="fd-grid" style="margin-top:14px; display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; font-size:0.86rem;"></div>
+        <div style="margin-top:12px;">
+            <div style="color:#777; text-transform:uppercase; font-size:0.72rem;">Description / Notes</div>
+            <div id="fd-description" style="color:#ddd; margin-top:6px; line-height:1.4;"></div>
+        </div>
+    </div>
+</div>
+
+<div id="manualModal" class="modal">
+    <div class="modal-content">
+        <h3 style="color: var(--primary-orange); margin-top: 0;">➕ Add New Item</h3>
+        <p style="color: #666; font-size: 0.8rem; margin-bottom: 20px;">The system will auto-categorize based on the name.</p>
+        
+        <form action="{{ url_for('library.manual_add') }}" method="POST">
+            <label>Brand (e.g., CAP, TFA, BLCK)</label>
+            <input type="text" name="brand" class="modal-input" placeholder="Brand Name" required autofocus>
+            
+            <label>Item Name</label>
+            <input type="text" name="name" class="modal-input" placeholder="e.g. Strawberry Ripe" required>
+            
+            <div style="display: flex; gap: 15px;">
+                <div style="flex: 1;">
+                    <label>Amount</label>
+                    <input type="number" name="amount" class="modal-input" value="10" step="0.1">
+                </div>
+                <div style="flex: 1;">
+                    <label>Unit</label>
+                    <select name="unit" class="modal-input" style="height: 38px;">
+                        <option value="ml">ml</option>
+                        <option value="g">grams</option>
+                        <option value="unit">unit</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="margin-top: 30px; display: flex; gap: 10px;">
+                <button type="submit" class="btn-mini btn-add" style="flex: 2; padding: 12px;">SAVE TO LAB</button>
+                <button type="button" onclick="closeManualModal()" class="btn-mini" style="flex: 1; padding: 12px;">CANCEL</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openManualModal() { document.getElementById('manualModal').style.display = 'block'; }
+function closeManualModal() { document.getElementById('manualModal').style.display = 'none'; }
+function closeFlavorDetail() { document.getElementById('flavorDetailModal').style.display = 'none'; }
+
+window.onclick = function(event) {
+    let modal = document.getElementById('manualModal');
+    if (event.target == modal) { closeManualModal(); }
+    let detail = document.getElementById('flavorDetailModal');
+    if (event.target == detail) { closeFlavorDetail(); }
+}
+
+function _fd(label, value) {
+    return `<div style="color:#777;">${label}</div><div style="color:#eee;">${value || '-'}</div>`;
+}
+
+function _esc(s) {
+    if (s === null || s === undefined) return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function _formatRecipeAnalytics(ra) {
+    if (!ra) {
+        return '<div style="grid-column:1/-1; color:#666; font-size:0.78rem; margin-top:10px; padding-top:10px; border-top:1px solid #333;">No recipe analytics in the database yet. Run <strong>Analyze all recipe usage</strong> from Master Admin → Flavor Intelligence → Recipe Intelligence.</div>';
+    }
+    const lines = [];
+    lines.push(`<div style="grid-column:1/-1; color:var(--primary-orange); font-size:0.75rem; text-transform:uppercase; margin-top:12px; padding-top:10px; border-top:1px solid #333;">Recipe analytics (${_esc(ra.analytics_version || '')})</div>`);
+    lines.push(_fd('Recipes (in set)', String(ra.recipe_count != null ? ra.recipe_count : '—')));
+    lines.push(_fd('Avg % in those recipes', ra.avg_pct != null ? `${Number(ra.avg_pct).toFixed(2)}%` : '—'));
+    lines.push(_fd('Min / Max %', (ra.min_pct != null && ra.max_pct != null) ? `${Number(ra.min_pct).toFixed(2)}% – ${Number(ra.max_pct).toFixed(2)}%` : '—'));
+    lines.push(_fd('Median %', ra.median_pct != null ? `${Number(ra.median_pct).toFixed(2)}%` : '—'));
+    lines.push(_fd('Likely recipe role', _esc(ra.likely_recipe_role || '—')));
+    lines.push(_fd('Updated', _esc(ra.updated_at || '—')));
+    let pairsHtml = '';
+    const pd = ra.pairings_detail || [];
+    if (pd.length) {
+        pairsHtml = '<ul style="margin:8px 0 0 16px; color:#bbb; font-size:0.8rem; line-height:1.35;">';
+        for (const p of pd.slice(0, 10)) {
+            const nm = `${_esc(p.partner_brand || '')} ${_esc(p.partner_name || '')}`.trim() || ('#' + p.partner_id);
+            pairsHtml += `<li><strong>${nm}</strong> — ${_esc(p.relationship_type || '')} · ${_esc(String(p.recipe_count || 0))} recipes · partner avg ${_esc(String(p.partner_avg_pct != null ? Number(p.partner_avg_pct).toFixed(2) : '—'))}%<br><span style="color:#888;">${_esc((p.pairing_reason || '').slice(0, 220))}</span></li>`;
+        }
+        pairsHtml += '</ul>';
+    }
+    const insights = ra.pairing_insights || [];
+    let insHtml = '';
+    if (insights.length) {
+        insHtml = '<ul style="margin:6px 0 0 16px; color:#999; font-size:0.78rem;">' +
+            insights.map((t) => `<li>${_esc(t)}</li>`).join('') + '</ul>';
+    }
+    lines.push(_fd('Pairing notes', insHtml || '—'));
+    lines.push(`<div style="grid-column:1/-1; color:#777; font-size:0.72rem; text-transform:uppercase; margin-top:6px;">Common pairings</div><div style="grid-column:1/-1;">${pairsHtml || '<span style="color:#666;">—</span>'}</div>`);
+    return lines.join('');
+}
+
+async function openFlavorDetail(referenceId) {
+    try {
+        const res = await fetch(`/library/flavor/${referenceId}/detail?view={{ view_type }}`);
+        const body = await res.json();
+        if (!res.ok || body.status !== 'success') {
+            alert(body.message || 'Failed to load flavor details.');
+            return;
+        }
+        const item = body.item || {};
+        document.getElementById('fd-name').textContent = item.name || 'Flavor';
+        document.getElementById('fd-brand').textContent = item.brand || '';
+        document.getElementById('fd-grid').innerHTML = [
+            _fd('Category / Profile', item.profiles || item.category),
+            _fd('Source', item.source),
+            _fd('Price per ml', `R ${(Number(item.price_per_ml || 0)).toFixed(2)}`),
+            _fd('Price 10ml', `R ${(Number(item.price_10ml || 0)).toFixed(2)}`),
+            _fd('Active Avg Usage', `${(Number(item.active_avg_usage || 1.0)).toFixed(2)}%`),
+            _fd(
+                'Recipe Avg Usage',
+                (item.recipe_avg_usage === null || item.recipe_avg_usage === undefined)
+                    ? '—'
+                    : `${(Number(item.recipe_avg_usage || 0)).toFixed(2)}%`
+            ),
+            _fd('Catalog Avg Usage (reference only)', `${(Number(item.avg_usage || 0)).toFixed(2)}%`),
+            _fd('Rating', (item.rating !== null && item.rating !== undefined) ? Number(item.rating).toFixed(1) : '-'),
+            _fd('Stock Status', item.in_stock ? 'In Lab' : 'Reference only'),
+            _fd('Current Stock', item.current_stock === null || item.current_stock === undefined ? '-' : `${item.current_stock} ${item.stock_unit || 'ml'}`),
+            _fd('Shop URL', item.url ? `<a href="${item.url}" target="_blank" rel="noopener noreferrer">🛒 Shop</a>` : '-'),
+            _fd('VC URL', item.vc_url ? `<a href="${item.vc_url}" target="_blank" rel="noopener noreferrer">📘 VC</a>` : '-'),
+            _fd('Active', item.active ? 'Yes' : 'No'),
+            _fd('Reference ID', item.id || '-')
+        ].join('') + _formatRecipeAnalytics(item.recipe_analytics);
+        const detailText = (item.description || item.usage_notes || '').trim();
+        document.getElementById('fd-description').textContent = detailText || 'No description/notes available.';
+        document.getElementById('flavorDetailModal').style.display = 'block';
+    } catch (err) {
+        alert('Failed to load flavor details.');
+    }
+}
+
+async function quickAdd(refId) {
+    const sizeInput = document.getElementById(`size-${refId}`);
+    const size = sizeInput ? sizeInput.value : 10;
+    const formData = new URLSearchParams();
+    formData.append('size', size);
+
+    try {
+        const response = await fetch(`/library/quick-add/${refId}`, { 
+            method: 'POST',
+            body: formData,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        });
+        const result = await response.json();
+        if (result.status === 'success') { location.reload(); }
+    } catch (err) { alert("Failed to add stock."); }
+}
+
+// Debounced server-side search to avoid full-page reloads per keystroke.
+let librarySearchTimer = null;
+const searchInput = document.getElementById('universalSearch');
+if (searchInput && searchInput.form) {
+    searchInput.addEventListener('input', function () {
+        clearTimeout(librarySearchTimer);
+        librarySearchTimer = setTimeout(() => searchInput.form.submit(), 350);
+    });
+}
+
+const pageSizeSelect = document.getElementById('pageSizeSelect');
+if (pageSizeSelect) {
+    pageSizeSelect.addEventListener('change', function () {
+        const url = new URL(window.location.href);
+        url.searchParams.set('page_size', this.value);
+        url.searchParams.set('page', '1');
+        window.location.href = url.toString();
+    });
+}
+</script>
+{% endblock %}

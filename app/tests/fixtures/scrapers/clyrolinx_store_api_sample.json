@@ -1,0 +1,80 @@
+[
+  {
+    "name": "Luxe. 500ml (refill)",
+    "permalink": "https://clyrolinx.co.za/shop/perfumes/men-refills-bulk/luxe-500ml-refill/",
+    "short_description": "<p><strong data-start=\"65\" data-end=\"127\">Disclaimer</strong></p>\n<p data-start=\"130\" data-end=\"443\"><em data-start=\"130\" data-end=\"443\">Our fragrances, made in the south of France and processed locally, are independent creations and are not associated with, endorsed by, or produced by any brand name manufacturer. Any references to brand names are for comparison purposes only to provide customers with an idea of the fragrance profile. All trademarks are the property of their respective owners.</em></p>",
+    "categories": [
+      {
+        "id": 101,
+        "name": "Men - Refills &amp; Bulk",
+        "slug": "men-refills-bulk",
+        "link": "https://clyrolinx.co.za/product-category/perfumes/men-refills-bulk/"
+      }
+    ],
+    "prices": {
+      "price": "80000",
+      "regular_price": "80000",
+      "sale_price": "80000",
+      "price_range": null,
+      "currency_code": "ZAR",
+      "currency_symbol": "R",
+      "currency_minor_unit": 2,
+      "currency_decimal_separator": ".",
+      "currency_thousand_separator": ",",
+      "currency_prefix": "R",
+      "currency_suffix": ""
+    }
+  },
+  {
+    "name": "Luxe. 100ml (refill)",
+    "permalink": "https://clyrolinx.co.za/shop/perfumes/men-refills-bulk/luxe-100ml-refill/",
+    "short_description": "<p><strong data-start=\"65\" data-end=\"127\">Disclaimer</strong></p>\n<p data-start=\"130\" data-end=\"443\"><em data-start=\"130\" data-end=\"443\">Our fragrances, made in the south of France and processed locally, are independent creations and are not associated with, endorsed by, or produced by any brand name manufacturer. Any references to brand names are for comparison purposes only to provide customers with an idea of the fragrance profile. All trademarks are the property of their respective owners.</em></p>",
+    "categories": [
+      {
+        "id": 101,
+        "name": "Men - Refills &amp; Bulk",
+        "slug": "men-refills-bulk",
+        "link": "https://clyrolinx.co.za/product-category/perfumes/men-refills-bulk/"
+      }
+    ],
+    "prices": {
+      "price": "20000",
+      "regular_price": "20000",
+      "sale_price": "20000",
+      "price_range": null,
+      "currency_code": "ZAR",
+      "currency_symbol": "R",
+      "currency_minor_unit": 2,
+      "currency_decimal_separator": ".",
+      "currency_thousand_separator": ",",
+      "currency_prefix": "R",
+      "currency_suffix": ""
+    }
+  },
+  {
+    "name": "Lactic acid 80% \u2013 500ml",
+    "permalink": "https://clyrolinx.co.za/shop/other-chemicals/other-chemicals-other-chemicals/lactic-acid-80-500ml/",
+    "short_description": "",
+    "categories": [
+      {
+        "id": 100,
+        "name": "Other Chemicals",
+        "slug": "other-chemicals-other-chemicals",
+        "link": "https://clyrolinx.co.za/product-category/other-chemicals/other-chemicals-other-chemicals/"
+      }
+    ],
+    "prices": {
+      "price": "10000",
+      "regular_price": "10000",
+      "sale_price": "10000",
+      "price_range": null,
+      "currency_code": "ZAR",
+      "currency_symbol": "R",
+      "currency_minor_unit": 2,
+      "currency_decimal_separator": ".",
+      "currency_thousand_separator": ",",
+      "currency_prefix": "R",
+      "currency_suffix": ""
+    }
+  }
+]

@@ -1,0 +1,886 @@
+{% extends "base_public.html" %}
+{% block title %}{{ recipe.name }} | The Vape Workshop Calculator{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw-recipe-detail.css') }}">
+
+{% macro stash_badge(sig) -%}
+  {% if sig == 'ready' %}<span class="badge text-bg-success">Can make now</span>
+  {% elif sig == 'low_stock' %}<span class="badge text-bg-warning text-dark">Low stock</span>
+  {% elif sig == 'short_batch' %}<span class="badge text-bg-danger">Not enough for batch</span>
+  {% elif sig == 'missing_1' %}<span class="badge text-bg-secondary">Missing 1</span>
+  {% elif sig == 'missing_2' %}<span class="badge text-bg-dark">Missing 2</span>
+  {% elif sig == 'missing_more' %}<span class="badge text-bg-dark">Missing 3+</span>
+  {% elif sig == 'no_items' %}<span class="badge text-bg-secondary">No ingredients</span>
+  {% else %}<span class="badge text-bg-secondary">—</span>
+  {% endif %}
+{%- endmacro %}
+
+{% set mf = mix_form or {} %}
+{% set mix_ml = mf.get('target_ml') or (detail.facts_batch_ml|int) %}
+{% set mix_nic = mf.get('target_nic_mg_ml') or '3' %}
+{% set mix_pg = mf.get('pg_ratio') or detail.facts_pg_pct %}
+{% set mix_vg = mf.get('vg_ratio') or detail.facts_vg_pct %}
+{% set mix_nic_base = mf.get('nic_base_mg_ml') or '100' %}
+{% set mix_carrier = (mf.get('nicotine_carrier') or 'PG')|upper %}
+{% set mix_version_id = mf.get('version_id') or active_version.id %}
+
+<div class="tvw-recipe-detail">
+  {% set st = detail.status_code %}
+  {% set ss = stash_panel.stash_summary %}
+
+  {% if st == 'HELP' %}
+    <div class="alert alert-warning tvw-rd-alert py-2">
+      <strong>Need help</strong> — the author is asking for input on this recipe.
+      {% if collab.latest_help_request and collab.latest_help_request.reason %}
+        <div class="mt-1 mb-0">{{ collab.latest_help_request.reason }}</div>
+      {% endif %}
+    </div>
+  {% elif st == 'WIP' and can_edit %}
+    <div class="alert alert-info tvw-rd-alert py-2">
+      <strong>Work in progress.</strong> Use <em>Leave feedback</em> in the menu when you have tasting notes.
+    </div>
+  {% endif %}
+  {% if is_owner and ((moderation_snapshot.status|lower) != 'active' or moderation_snapshot.hidden_from_public or moderation_snapshot.inactive) %}
+    <div class="alert alert-warning tvw-rd-alert py-2">
+      <strong>Owner moderation view.</strong>
+      Status: <strong>{{ moderation_snapshot.status|upper }}</strong>
+      {% if moderation_snapshot.hidden_from_public %} · Hidden from public{% endif %}
+      {% if moderation_snapshot.inactive %} · Inactive{% endif %}
+      {% if moderation_snapshot.reason %}
+        <div class="mt-1">Reason: {{ moderation_snapshot.reason }}</div>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <header class="tvw-rd-hero">
+    <div class="tvw-rd-hero-main">
+      <h1 class="tvw-rd-title">{{ recipe.name }}</h1>
+
+      <p class="tvw-rd-subtitle">
+        {% if detail.category %}
+          <span>{{ detail.category }} recipe</span>
+          ·
+        {% endif %}
+        {% if detail.is_imported %}
+          <span>Imported recipe</span>
+          {% if detail.imported_source_label %}
+            · Source: {{ detail.imported_source_label }}
+          {% endif %}
+        {% elif detail.owner_username %}
+          <span>By <a class="tvw-rd-author-link" href="{{ url_for('tvw_community.profile', username=detail.owner_username) }}">{{ detail.owner_username }}</a></span>
+        {% else %}
+          <span>Community recipe</span>
+        {% endif %}
+      </p>
+
+      <p class="tvw-rd-meta">
+        {{ detail.flavour_count }} flavour{{ '' if detail.flavour_count == 1 else 's' }}
+        · {{ "%.2f"|format(detail.total_flavour_pct|float) }}% total flavour
+        {% if detail.updated_label %}
+          · {{ detail.updated_label }}
+        {% endif %}
+      </p>
+
+      <div class="tvw-rd-badges">
+        {% set vp = detail.visibility_pill|lower %}
+        {% if vp == 'public' %}
+          <span class="tvw-rd-pill tvw-rd-pill-public">Public</span>
+        {% elif vp == 'private' %}
+          <span class="tvw-rd-pill tvw-rd-pill-private">Private</span>
+        {% elif vp == 'reference' %}
+          <span class="tvw-rd-pill tvw-rd-pill-reference">Reference</span>
+        {% else %}
+          <span class="tvw-rd-pill tvw-rd-pill-private">{{ detail.visibility_pill }}</span>
+        {% endif %}
+        <span class="tvw-rd-pill tvw-rd-pill-version">{{ detail.version_label }}{% if viewing_is_published_current %} · Current{% endif %}</span>
+        {% if st == 'HELP' %}
+          <span class="tvw-rd-pill tvw-rd-pill-status tvw-rd-pill-status-help">{{ detail.status_label }}</span>
+        {% elif st == 'READY' %}
+          <span class="tvw-rd-pill tvw-rd-pill-status tvw-rd-pill-status-ready">{{ detail.status_label }}</span>
+        {% elif st not in ('REFERENCE',) %}
+          <span class="tvw-rd-pill tvw-rd-pill-status">{{ detail.status_label }}</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="tvw-rd-hero-actions">
+      <div class="tvw-rd-hero-primary">
+        <button type="submit" form="guidedMixForm" class="btn btn-warning tvw-rd-btn-guided js-guided-mix-submit">Start guided mix</button>
+        <button type="button" class="btn btn-outline-warning tvw-rd-btn-quick js-quick-mix">Quick mix</button>
+      </div>
+      <div class="tvw-rd-hero-secondary-row">
+        {% if can_edit %}
+          <a class="btn btn-outline-light" href="{{ url_for('tvw_recipes.tvw_recipe_edit', slug=(recipe.slug or recipe.id)) }}">Edit recipe</a>
+        {% endif %}
+        {% if can_cost_recipe and cost_calculator_url %}
+          <a class="btn btn-outline-info" href="{{ cost_calculator_url }}">Cost this recipe</a>
+        {% endif %}
+        <button type="button" class="btn btn-outline-warning tvw-rd-btn-icon" id="btnRecipeFavorite" data-favorited="{{ 1 if recipe_engagement.is_favorited else 0 }}" title="{{ 'Remove from favourites' if recipe_engagement.is_favorited else 'Save to favourites' }}" aria-label="{{ 'Remove from favourites' if recipe_engagement.is_favorited else 'Save to favourites' }}">
+          {% if recipe_engagement.is_favorited %}★{% else %}☆{% endif %}
+        </button>
+        <div class="dropdown">
+          <button class="btn btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">More</button>
+          <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end">
+            <li><a class="dropdown-item" href="{{ url_for('tvw_recipes.tvw_recipe_library') }}">Back to library</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('tvw_recipes.tvw_recipe_mix_logs', slug=(recipe.slug or recipe.id)) }}">Batch history</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('tvw_recipes.tvw_my_mixes') }}">My mixes</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#feedbackModal">Leave feedback</button></li>
+            <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#reportModal">Report recipe</button></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="tvw-rd-facts" aria-label="Recipe mix facts">
+    <div class="tvw-rd-fact">
+      <span class="tvw-rd-fact-value">{{ detail.facts_batch_ml|int }} ml</span>
+      <span class="tvw-rd-fact-label">Batch size</span>
+    </div>
+    <div class="tvw-rd-fact">
+      <span class="tvw-rd-fact-value">3 mg/ml</span>
+      <span class="tvw-rd-fact-label">Nicotine</span>
+    </div>
+    <div class="tvw-rd-fact">
+      <span class="tvw-rd-fact-value">{{ detail.facts_pg_vg_label }}</span>
+      <span class="tvw-rd-fact-label">PG / VG</span>
+    </div>
+    <div class="tvw-rd-fact">
+      <span class="tvw-rd-fact-value">100 mg/ml · PG</span>
+      <span class="tvw-rd-fact-label">Nicotine base</span>
+    </div>
+  </div>
+
+  <form method="get" class="tvw-rd-version-bar" id="versionBarForm">
+    <label for="version_id">Version</label>
+    <select id="version_id" name="version_id" class="form-select form-select-sm" title="Recipe lines follow this version">
+      {% for version in versions %}
+        <option value="{{ version.id }}" {% if version.id == active_version.id %}selected{% endif %}>
+          v{{ version.version_number }}{% if published_version_id and version.id == published_version_id %} · current{% endif %}
+        </option>
+      {% endfor %}
+    </select>
+    <label for="batch_ml_sel">Batch for stash hint</label>
+    <select id="batch_ml_sel" name="batch_ml" class="form-select form-select-sm">
+      {% for n in [15, 30, 50, 60, 100] %}
+        <option value="{{ n }}" {% if (stash_panel.batch_ml|float) == (n|float) %}selected{% endif %}>{{ n }} ml</option>
+      {% endfor %}
+    </select>
+    <p class="tvw-rd-version-note mb-0">
+      {% if not viewing_is_published_current %}
+        Viewing <strong>v{{ active_version.version_number }}</strong>.
+        {% if published_version %}Published current is <strong>v{{ published_version.version_number }}</strong>.{% endif %}
+        Mix uses the selected version.
+      {% else %}
+        Viewing the published current version (v{{ active_version.version_number }}).
+      {% endif %}
+    </p>
+  </form>
+
+  <section class="tvw-rd-panel" id="ingredientsPanel">
+    <h2 class="tvw-rd-panel-title">Ingredients</h2>
+    <div class="table-responsive">
+      <table class="tvw-rd-ingredients-table">
+        <thead>
+          <tr>
+            <th scope="col">Flavour</th>
+            <th scope="col">Brand</th>
+            <th scope="col" class="text-end">%</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in ingredients %}
+            {% set rid = item.get('ingredient_id') if item.get('ingredient_id') is not none else item.get('matched_flavor_id') %}
+            {% set stash_line = detail.ingredient_stash.get(rid|int) if rid is not none else none %}
+            {% set flav_href = None %}
+            {% if rid and stash_panel.ref_to_flavour.get(rid) %}
+              {% set flav_href = url_for('tvw_recipes.tvw_flavour_detail', flavour_id=stash_panel.ref_to_flavour[rid]) %}
+            {% endif %}
+            {% set row_class = '' %}
+            {% if stash_line and stash_line.get('line_status') == 'short' %}
+              {% set row_class = 'is-missing' %}
+            {% elif stash_line and stash_line.get('line_tight') %}
+              {% set row_class = 'is-low' %}
+            {% elif item.get('is_imported_identity_row') and not item.get('is_matched_identity') %}
+              {% set row_class = 'is-missing' %}
+            {% endif %}
+            <tr class="{{ row_class }}">
+              <td>
+                {% if flav_href %}
+                  <a class="text-info text-decoration-none" href="{{ flav_href }}">{{ item.name }}</a>
+                {% else %}
+                  {{ item.name }}
+                {% endif %}
+                {% if stash_line and stash_line.get('line_status') == 'short' %}
+                  <span class="badge text-bg-danger ms-1">Short</span>
+                {% elif stash_line and stash_line.get('line_tight') %}
+                  <span class="badge text-bg-warning text-dark ms-1">Low</span>
+                {% elif item.get('is_imported_identity_row') and not item.get('is_matched_identity') %}
+                  <span class="badge text-bg-secondary ms-1">Unresolved</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if item.brand %}
+                  <span class="tvw-rd-brand-badge">{{ item.brand }}</span>
+                {% else %}
+                  <span class="text-secondary">—</span>
+                {% endif %}
+              </td>
+              <td class="text-end">{{ "%.2f"|format(item.amount_percent|float) }}%</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="3" class="text-secondary py-3">No ingredients in this version.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if ingredients %}
+      <div class="tvw-rd-ing-total">
+        <span>Total flavour</span>
+        <span>{{ "%.2f"|format(detail.total_flavour_pct|float) }}%</span>
+      </div>
+    {% endif %}
+    {% if ss and (ss.stash_signal or (ss.wcm_qty and ss.wcm_qty.reason)) %}
+      <div class="tvw-rd-stash-hint">
+        {{ stash_badge(ss.stash_signal if ss else '') }}
+        {% if ss.wcm_qty and ss.wcm_qty.reason %}
+          <span class="ms-1">{{ ss.wcm_qty.reason }}</span>
+        {% elif stash_panel.stash_source == 'lab_shared_holdings' %}
+          <span class="ms-1">Stash hint uses Lab-linked holdings at {{ detail.facts_batch_ml|int }} ml.</span>
+        {% else %}
+          <span class="ms-1">Stash hint uses your catalogue at {{ detail.facts_batch_ml|int }} ml.</span>
+        {% endif %}
+      </div>
+    {% endif %}
+  </section>
+
+  <div class="tvw-rd-main-grid">
+    <section class="tvw-rd-panel" id="mix-card">
+      <form id="guidedMixForm" method="post" action="{{ guided_mix_start_url }}" novalidate>
+        <input type="hidden" name="version_id" id="guided_mix_version_id" value="{{ mix_version_id }}">
+
+        <p class="tvw-rd-panel-kicker">Mixing</p>
+        <h2 class="tvw-rd-panel-title">Mix this recipe</h2>
+        <p class="small text-secondary mb-3">Targets for <strong>v{{ active_version.version_number }}</strong> — adjust below, then start a guided pour or run a quick calculation.</p>
+
+        {% if mix_errors %}
+          <div class="alert alert-danger py-2 mb-3" id="mixErrorSummary" tabindex="-1" role="alert">
+            {% if mix_errors.get('mix_summary') %}
+              {{ mix_errors.mix_summary }}
+            {% else %}
+              Fix the highlighted mix settings below.
+            {% endif %}
+          </div>
+        {% endif %}
+
+        <div class="tvw-rd-mix-fields">
+          <div class="tvw-rd-mix-field">
+            <label for="target_ml">Batch size</label>
+            <input id="target_ml" name="target_ml" type="number" min="5" step="1" class="form-control{% if mix_errors.get('target_ml') %} is-invalid{% endif %}" value="{{ mix_ml }}">
+            {% if mix_errors.get('target_ml') %}<div class="invalid-feedback d-block">{{ mix_errors.target_ml }}</div>{% endif %}
+          </div>
+          <div class="tvw-rd-mix-field">
+            <label for="target_nic">Nicotine strength</label>
+            <input id="target_nic" name="target_nic_mg_ml" type="number" min="0" step="0.1" class="form-control{% if mix_errors.get('target_nic_mg_ml') %} is-invalid{% endif %}" value="{{ mix_nic }}">
+            {% if mix_errors.get('target_nic_mg_ml') %}<div class="invalid-feedback d-block">{{ mix_errors.target_nic_mg_ml }}</div>{% endif %}
+          </div>
+          <div class="tvw-rd-mix-field">
+            <label for="mix_pg">PG ratio</label>
+            <input id="mix_pg" name="pg_ratio" type="number" min="0" step="1" class="form-control{% if mix_errors.get('pg_ratio') %} is-invalid{% endif %}" value="{{ mix_pg }}">
+            {% if mix_errors.get('pg_ratio') %}<div class="invalid-feedback d-block">{{ mix_errors.pg_ratio }}</div>{% endif %}
+          </div>
+          <div class="tvw-rd-mix-field">
+            <label for="mix_vg">VG ratio</label>
+            <input id="mix_vg" name="vg_ratio" type="number" min="0" step="1" class="form-control{% if mix_errors.get('vg_ratio') %} is-invalid{% endif %}" value="{{ mix_vg }}">
+            {% if mix_errors.get('vg_ratio') %}<div class="invalid-feedback d-block">{{ mix_errors.vg_ratio }}</div>{% endif %}
+          </div>
+          <div class="tvw-rd-mix-field">
+            <label for="mix_nic_base">Nicotine base</label>
+            <input id="mix_nic_base" name="nic_base_mg_ml" type="number" min="1" step="1" class="form-control{% if mix_errors.get('nic_base_mg_ml') %} is-invalid{% endif %}" value="{{ mix_nic_base }}">
+            {% if mix_errors.get('nic_base_mg_ml') %}<div class="invalid-feedback d-block">{{ mix_errors.nic_base_mg_ml }}</div>{% endif %}
+          </div>
+          <div class="tvw-rd-mix-field">
+            <label for="mix_nic_carrier">Nicotine carrier</label>
+            <select id="mix_nic_carrier" name="nicotine_carrier" class="form-select{% if mix_errors.get('nicotine_carrier') %} is-invalid{% endif %}">
+              <option value="PG" {% if mix_carrier == 'PG' %}selected{% endif %}>PG</option>
+              <option value="VG" {% if mix_carrier == 'VG' %}selected{% endif %}>VG</option>
+            </select>
+            {% if mix_errors.get('nicotine_carrier') %}<div class="invalid-feedback d-block">{{ mix_errors.nicotine_carrier }}</div>{% endif %}
+          </div>
+        </div>
+
+        <div class="tvw-rd-mix-actions">
+          <button class="btn btn-warning js-guided-mix-submit" type="submit" id="btnGuidedMix">Start guided mix</button>
+          <button class="btn btn-outline-warning js-quick-mix" type="button" id="btnQuickMix">Quick mix</button>
+        </div>
+        <p class="small text-secondary mt-2 mb-0" id="guidedMixSubmitStatus" hidden aria-live="polite">
+          Starting mix…
+        </p>
+      </form>
+      <p class="small text-secondary mt-2 mb-0" id="mixHandoffHint" hidden>
+        Want pours instead? <a class="link-info" href="#" id="mixHandoffLink">Start guided mix with these settings</a>.
+      </p>
+      <pre id="mixOutput" class="tvw-output tvw-rd-output-hidden mb-0 small"></pre>
+    </section>
+
+    <aside class="tvw-rd-panel">
+      <p class="tvw-rd-panel-kicker">Details</p>
+      <h2 class="tvw-rd-panel-title">Recipe details</h2>
+      <ul class="tvw-rd-details-list">
+        <li><strong>{{ detail.version_label }}</strong>{% if viewing_is_published_current %} · Current{% endif %}</li>
+        {% if detail.updated_label %}
+          <li>{{ detail.updated_label }}</li>
+        {% endif %}
+        <li>{{ detail.flavour_count }} flavours · {{ "%.2f"|format(detail.total_flavour_pct|float) }}% total</li>
+      </ul>
+
+      {% if detail.creator_notes_is_source_only and detail.imported_source_label %}
+        <div class="mt-3">
+          <p class="small text-secondary mb-1">Creator notes</p>
+          <p class="mb-1">Imported from {{ detail.imported_source_label }}</p>
+          {% if detail.imported_source_url %}
+            <a class="tvw-rd-source-link link-info" href="{{ detail.imported_source_url }}" target="_blank" rel="noopener noreferrer">View source</a>
+          {% endif %}
+        </div>
+      {% elif detail.creator_notes_body %}
+        <div class="mt-3">
+          <p class="small text-secondary mb-1">Creator notes</p>
+          <div class="small" style="white-space: pre-wrap;">{{ detail.creator_notes_body }}</div>
+        </div>
+      {% endif %}
+
+      <p class="small text-secondary mt-3 mb-0">
+        <a class="link-info" href="#versionHistoryPanel">View version history</a>
+      </p>
+    </aside>
+  </div>
+
+  <div class="tvw-rd-secondary-grid">
+    <section class="tvw-rd-panel" id="recipeEngagementPanel">
+      <p class="tvw-rd-panel-kicker">Community</p>
+      <h2 class="tvw-rd-panel-title">Rating &amp; favourites</h2>
+      <div class="tvw-rd-community-row">
+        <div class="tvw-rd-rating-block" id="recipeAvgRatingLabel">
+          {% if recipe_engagement.rating_count and recipe_engagement.avg_rating is not none %}
+            Community ★ {{ "%.1f"|format(recipe_engagement.avg_rating|float) }}
+            · {{ recipe_engagement.rating_count }} rating{{ '' if recipe_engagement.rating_count == 1 else 's' }}
+          {% else %}
+            No ratings yet
+          {% endif %}
+        </div>
+        <div class="tvw-rd-rating-controls">
+          <label class="small text-secondary mb-0 visually-hidden" for="recipeMyRating">Your rating</label>
+          <select id="recipeMyRating" class="form-select form-select-sm">
+            <option value="" {% if recipe_engagement.my_rating is none %}selected{% endif %}>Rate…</option>
+            {% for n in range(1, 6) %}
+              <option value="{{ n }}" {% if recipe_engagement.my_rating == n %}selected{% endif %}>{{ n }} ★</option>
+            {% endfor %}
+          </select>
+          <button type="button" class="btn btn-sm btn-outline-light" id="btnSaveRecipeRating">Save</button>
+        </div>
+      </div>
+      <div class="small text-secondary mt-2 mb-0" id="recipeEngagementHint"></div>
+
+      <div class="mt-3">
+        <p class="tvw-rd-panel-kicker mb-1">Mixer notes</p>
+        {% if mixer_notes_preview %}
+          {% for note in mixer_notes_preview %}
+            <div class="tvw-rd-mixer-note-compact">
+              <div class="meta">
+                {% if note.mixer_username %}{{ note.mixer_username }} · {% endif %}
+                {{ note.batch_size_ml|int }} ml · {{ note.target_pgvg }}
+                {% if note.updated_label %} · {{ note.updated_label }}{% endif %}
+              </div>
+              <div style="white-space: pre-wrap;">{{ note.note_text }}</div>
+            </div>
+          {% endfor %}
+          {% if mixer_notes_total > mixer_notes_preview|length %}
+            <p class="tvw-rd-empty mt-2">{{ mixer_notes_total - mixer_notes_preview|length }} more in batch history.</p>
+          {% endif %}
+        {% else %}
+          <p class="tvw-rd-empty">No mixer notes yet — complete a guided mix to leave practical batch feedback.</p>
+        {% endif %}
+      </div>
+    </section>
+
+    {% if can_edit %}
+      <section class="tvw-rd-panel" id="ownerControlsPanel">
+        <p class="tvw-rd-panel-kicker">Owner</p>
+        <h2 class="tvw-rd-panel-title">Owner controls</h2>
+        <p class="small text-secondary mb-2">Workflow status for this recipe. Others see the badge near the title.</p>
+        <div class="d-flex flex-wrap gap-2 mb-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-status="wip">Work in progress</button>
+          <button type="button" class="btn btn-sm btn-outline-info" data-status="help">Need help</button>
+          <button type="button" class="btn btn-sm btn-outline-success" data-status="ready">Ready</button>
+        </div>
+        <input id="statusReason" class="form-control form-control-sm mb-2" placeholder="Optional reason">
+        <div id="statusHistory" class="vstack gap-1 small"></div>
+      </section>
+    {% endif %}
+  </div>
+
+  <details class="tvw-rd-version-history" id="versionHistoryPanel">
+    <summary>
+      {{ detail.version_label }}{% if viewing_is_published_current %} · Current{% endif %}
+      {% if detail.updated_label %} · {{ detail.updated_label }}{% endif %}
+      — View version history
+    </summary>
+    <div class="tvw-rd-version-history-body">
+      {% for version in versions %}
+        <div class="tvw-rd-version-row d-flex flex-wrap justify-content-between gap-2 align-items-start">
+          <div>
+            <span class="fw-semibold">v{{ version.version_number }}</span>
+            {% if published_version_id and version.id == published_version_id %}
+              <span class="badge text-bg-success ms-1">Current</span>
+            {% endif %}
+            {% if version.id == active_version.id %}
+              <span class="badge text-bg-primary ms-1">Viewing</span>
+            {% endif %}
+            {% if version.total_flavor_percent is not none %}
+              <span class="text-secondary ms-1">· {{ version.total_flavor_percent }}%</span>
+            {% endif %}
+          </div>
+          {% if version.id != active_version.id %}
+            <a class="btn btn-sm btn-outline-light py-0 px-2" href="{{ url_for('tvw_recipes.tvw_recipe_detail', slug=(recipe.slug or recipe.id)) }}?version_id={{ version.id }}&batch_ml={{ stash_panel.batch_ml }}">View</a>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  </details>
+</div>
+
+<div class="modal fade" id="feedbackModal" tabindex="-1" aria-labelledby="feedbackModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content bg-dark text-light border-secondary">
+      <div class="modal-header border-secondary">
+        <h2 class="modal-title h5" id="feedbackModalLabel">Leave feedback</h2>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-secondary">Structured tasting notes for <strong>v{{ active_version.version_number }}</strong>. Visible items follow community moderation rules.</p>
+        <div class="row g-2 mb-2">
+          <div class="col-12">
+            <label class="form-label small text-secondary mb-0" for="feedback_body">Main message</label>
+            <input id="feedback_body" class="form-control form-control-sm" placeholder="Tasting notes, balance, off-notes…">
+          </div>
+          <div class="col-6 col-md-4">
+            <label class="form-label small text-secondary mb-0" for="feedback_score">Score (0–10)</label>
+            <input id="feedback_score" type="number" min="0" max="10" step="0.5" class="form-control form-control-sm" value="7">
+          </div>
+          <div class="col-6 col-md-4">
+            <label class="form-label small text-secondary mb-0" for="feedback_steep">Steep days</label>
+            <input id="feedback_steep" type="number" min="0" step="1" class="form-control form-control-sm" placeholder="e.g. 7">
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label small text-secondary mb-0" for="feedback_device">Device</label>
+            <input id="feedback_device" class="form-control form-control-sm" placeholder="RDA, pod, etc.">
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label small text-secondary mb-0" for="feedback_issue">Issue type</label>
+            <input id="feedback_issue" class="form-control form-control-sm" placeholder="harsh, mute, separation…">
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label small text-secondary mb-0" for="feedback_suggested">Suggested changes</label>
+            <input id="feedback_suggested" class="form-control form-control-sm" placeholder="+/- %, substitute…">
+          </div>
+        </div>
+        <button class="btn btn-sm btn-outline-light mb-3" type="button" id="btnSubmitFeedback">Submit feedback</button>
+        <div id="feedbackList" class="vstack gap-2 small"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="reportModal" tabindex="-1" aria-labelledby="reportModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content bg-dark text-light border-secondary">
+      <div class="modal-header border-secondary">
+        <h2 class="modal-title h5" id="reportModalLabel">Report this recipe</h2>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-secondary mb-3">Flag spam, abuse, or other issues for moderators.</p>
+        <div class="mb-2">
+          <label class="form-label small text-secondary mb-0" for="reportRecipeReason">Reason</label>
+          <select id="reportRecipeReason" class="form-select form-select-sm">
+            <option value="spam">spam</option>
+            <option value="abusive">abusive</option>
+            <option value="duplicate">duplicate</option>
+            <option value="wrong_category">wrong category</option>
+            <option value="misleading">misleading</option>
+            <option value="not_flavour">not a real flavour (recipe issue)</option>
+            <option value="other">other</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small text-secondary mb-0" for="reportRecipeDetail">Detail (optional)</label>
+          <input id="reportRecipeDetail" class="form-control form-control-sm" placeholder="Optional detail">
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-danger" id="btnReportRecipe">Submit report</button>
+        <div class="small text-secondary mt-2 mb-0" id="reportHint"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const recipeId = {{ recipe.id }};
+  const activeVersionId = {{ active_version.id }};
+  const currentVersionId = () => {
+    const raw = document.getElementById("guided_mix_version_id")?.value
+      || document.getElementById("version_id")?.value
+      || String(activeVersionId);
+    return Number(raw);
+  };
+  const mixOutput = document.getElementById("mixOutput");
+  const feedbackList = document.getElementById("feedbackList");
+  const statusHistory = document.getElementById("statusHistory");
+  const engagementHint = document.getElementById("recipeEngagementHint");
+  const reportHint = document.getElementById("reportHint");
+  const btnFavorite = document.getElementById("btnRecipeFavorite");
+  const avgRatingLabel = document.getElementById("recipeAvgRatingLabel");
+  const selMyRating = document.getElementById("recipeMyRating");
+
+  const showMixOutput = (text) => {
+    if (!mixOutput) return;
+    mixOutput.textContent = text;
+    mixOutput.classList.remove("tvw-rd-output-hidden");
+    mixOutput.classList.add("tvw-rd-output-visible");
+  };
+
+  document.getElementById("version_id")?.addEventListener("change", () => {
+    const guidedVersion = document.getElementById("guided_mix_version_id");
+    if (guidedVersion) guidedVersion.value = document.getElementById("version_id").value;
+    document.getElementById("versionBarForm")?.submit();
+  });
+  document.getElementById("batch_ml_sel")?.addEventListener("change", () => {
+    document.getElementById("versionBarForm")?.submit();
+  });
+
+  const guidedMixForm = document.getElementById("guidedMixForm");
+  const syncGuidedMixVersion = () => {
+    const versionSelect = document.getElementById("version_id");
+    const guidedVersion = document.getElementById("guided_mix_version_id");
+    if (versionSelect && guidedVersion) {
+      guidedVersion.value = versionSelect.value;
+    }
+  };
+  guidedMixForm?.addEventListener("submit", () => {
+    syncGuidedMixVersion();
+    const status = document.getElementById("guidedMixSubmitStatus");
+    if (status) status.hidden = false;
+    document.querySelectorAll(".js-guided-mix-submit").forEach((btn) => {
+      btn.disabled = true;
+      if (btn.dataset.loadingLabel !== "1") {
+        btn.dataset.originalLabel = btn.textContent || "";
+        btn.dataset.loadingLabel = "1";
+        btn.textContent = "Starting mix…";
+      }
+    });
+  });
+  syncGuidedMixVersion();
+
+  const mixErrorSummary = document.getElementById("mixErrorSummary");
+  if (mixErrorSummary) {
+    document.querySelectorAll(".js-guided-mix-submit").forEach((btn) => {
+      btn.disabled = false;
+      if (btn.dataset.originalLabel) btn.textContent = btn.dataset.originalLabel;
+      btn.dataset.loadingLabel = "0";
+    });
+    const status = document.getElementById("guidedMixSubmitStatus");
+    if (status) status.hidden = true;
+    mixErrorSummary.focus({ preventScroll: true });
+    document.getElementById("mix-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  } else if (window.location.hash === "#mix-card") {
+    document.getElementById("mix-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  const applyEngagement = (body) => {
+    if (!body || body.status !== "success") return;
+    const fav = !!body.is_favorited;
+    if (btnFavorite) {
+      btnFavorite.dataset.favorited = fav ? "1" : "0";
+      btnFavorite.textContent = fav ? "★" : "☆";
+      btnFavorite.title = fav ? "Remove from favourites" : "Save to favourites";
+    }
+    if (avgRatingLabel) {
+      const n = Number(body.rating_count || 0);
+      const avg = body.avg_rating;
+      if (n > 0 && avg != null) {
+        avgRatingLabel.textContent = `Community ★ ${Number(avg).toFixed(1)} · ${n} rating${n === 1 ? "" : "s"}`;
+      } else {
+        avgRatingLabel.textContent = "No ratings yet";
+      }
+    }
+    if (selMyRating) {
+      const mine = body.my_rating != null ? String(body.my_rating) : "";
+      selMyRating.value = mine === "" ? "" : mine;
+    }
+  };
+
+  btnFavorite?.addEventListener("click", async () => {
+    const next = btnFavorite.dataset.favorited !== "1";
+    try {
+      const body = await apiJson(`/api/recipes/${recipeId}/favorite`, {
+        method: "POST",
+        body: JSON.stringify({ favorited: next }),
+      });
+      applyEngagement(body);
+      if (engagementHint) engagementHint.textContent = next ? "Saved to your favourites." : "Removed from favourites.";
+    } catch (err) {
+      if (engagementHint) engagementHint.textContent = err.message;
+    }
+  });
+
+  document.getElementById("btnSaveRecipeRating")?.addEventListener("click", async () => {
+    const raw = selMyRating?.value ?? "";
+    if (raw === "") {
+      if (engagementHint) engagementHint.textContent = "Pick a rating from 1–5.";
+      return;
+    }
+    try {
+      const body = await apiJson(`/api/recipes/${recipeId}/rating`, {
+        method: "POST",
+        body: JSON.stringify({ rating: Number(raw) }),
+      });
+      applyEngagement(body);
+      if (engagementHint) engagementHint.textContent = "Rating saved.";
+    } catch (err) {
+      if (engagementHint) engagementHint.textContent = err.message;
+    }
+  });
+
+  const apiJson = async (url, options = {}) => {
+    const response = await fetch(url, {
+      headers: { "Content-Type": "application/json" },
+      ...options,
+    });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.message || "Request failed");
+    return body;
+  };
+
+  const postReport = async (targetType, targetId, reason, detail) => {
+    await apiJson("/api/reports", {
+      method: "POST",
+      body: JSON.stringify({ target_type: targetType, target_id: targetId, reason, detail: detail || "" }),
+    });
+  };
+
+  const addReasonSelect = () => {
+    const s = document.createElement("select");
+    s.className = "form-select form-select-sm flex-grow-0";
+    s.style.maxWidth = "11rem";
+    for (const r of ["spam","abusive","duplicate","wrong_category","misleading","not_flavour","other"]) {
+      const o = document.createElement("option");
+      o.value = r;
+      o.textContent = r;
+      s.appendChild(o);
+    }
+    return s;
+  };
+
+  const formatMetricsLine = (metrics) => {
+    if (!metrics || typeof metrics !== "object") return "";
+    const parts = [];
+    if (metrics.steep_days != null && metrics.steep_days !== "") {
+      parts.push(`Steep ${metrics.steep_days}d`);
+    }
+    const keys = Object.keys(metrics).filter((k) => k !== "steep_days" && metrics[k] != null);
+    for (const k of keys.slice(0, 4)) {
+      parts.push(`${k}: ${metrics[k]}`);
+    }
+    return parts.length ? parts.join(" · ") : "";
+  };
+
+  const renderFeedback = async () => {
+    const body = await apiJson(`/api/recipes/${recipeId}/feedback?recipe_version_id=${activeVersionId}`);
+    feedbackList.innerHTML = "";
+    for (const item of body.items) {
+      const row = document.createElement("div");
+      row.className = "tvw-list-row d-flex flex-wrap align-items-start gap-2";
+      const txt = document.createElement("div");
+      txt.className = "flex-grow-1 small";
+      const mline = formatMetricsLine(item.metrics);
+      const who = item.author_username || `user ${item.author_user_id ?? "-"}`;
+      const when = item.created_at ? ` · ${item.created_at}` : "";
+      txt.innerHTML = "";
+      const line1 = document.createElement("div");
+      const verStrong = document.createElement("strong");
+      verStrong.textContent = `v${item.recipe_version_id ?? "-"}`;
+      line1.appendChild(verStrong);
+      line1.appendChild(document.createTextNode(` · score ${item.score_overall ?? "-"}`));
+      line1.appendChild(document.createTextNode(when));
+      line1.appendChild(document.createTextNode(" · "));
+      line1.appendChild(document.createTextNode(who));
+      const line2 = document.createElement("div");
+      line2.className = "mt-1";
+      line2.style.whiteSpace = "pre-wrap";
+      line2.textContent = item.body || "";
+      txt.appendChild(line1);
+      if (item.owner_moderation_visible && (!item.public_visible || String(item.moderation_status || "").toLowerCase() !== "active")) {
+        const modLine = document.createElement("div");
+        modLine.className = "small text-warning mt-1";
+        const hiddenTxt = Number(item.is_hidden || 0) === 1 ? " · hidden from public view" : "";
+        const reasonTxt = item.moderation_reason ? ` · reason: ${item.moderation_reason}` : "";
+        modLine.textContent = `Owner moderation view · ${String(item.moderation_status || "active").toUpperCase()}${hiddenTxt}${reasonTxt}`;
+        txt.appendChild(modLine);
+      }
+      if (mline) {
+        const lineM = document.createElement("div");
+        lineM.className = "text-secondary mt-1";
+        lineM.textContent = mline;
+        txt.appendChild(lineM);
+      }
+      txt.appendChild(line2);
+      row.appendChild(txt);
+      const sel = addReasonSelect();
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn-sm btn-outline-danger align-self-start";
+      btn.textContent = "Report";
+      btn.addEventListener("click", async () => {
+        try {
+          await postReport("feedback", item.id, sel.value, "");
+        } catch (err) {
+          if (engagementHint) engagementHint.textContent = err.message;
+        }
+      });
+      row.appendChild(sel);
+      row.appendChild(btn);
+      feedbackList.appendChild(row);
+    }
+    if (!body.items.length) feedbackList.innerHTML = '<div class="text-secondary">No feedback yet for this version.</div>';
+  };
+
+  const renderStatusHistory = async () => {
+    if (!statusHistory) return;
+    const body = await apiJson(`/api/recipes/${recipeId}/status`);
+    statusHistory.innerHTML = "";
+    for (const item of body.items) {
+      const row = document.createElement("div");
+      row.className = "tvw-list-row";
+      row.textContent = `${item.to_status} (v${item.recipe_version_id || "-"}) ${item.reason ? "- " + item.reason : ""}`;
+      statusHistory.appendChild(row);
+    }
+    if (!body.items.length) statusHistory.innerHTML = '<div class="text-secondary">No status changes yet.</div>';
+  };
+
+  document.getElementById("btnReportRecipe")?.addEventListener("click", async () => {
+    try {
+      await postReport(
+        "recipe",
+        recipeId,
+        document.getElementById("reportRecipeReason").value,
+        document.getElementById("reportRecipeDetail").value
+      );
+      if (reportHint) reportHint.textContent = "Report submitted. Thank you.";
+    } catch (err) {
+      if (reportHint) reportHint.textContent = err.message;
+    }
+  });
+
+  const mixTargets = () => ({
+    target_ml: Number(document.getElementById("target_ml").value || 60),
+    target_nic_mg_ml: Number(document.getElementById("target_nic").value || 0),
+    nic_base_mg_ml: Number(document.getElementById("mix_nic_base").value || 100),
+    pg_ratio: Number(document.getElementById("mix_pg").value || 30),
+    vg_ratio: Number(document.getElementById("mix_vg").value || 70),
+    nicotine_carrier: (document.getElementById("mix_nic_carrier").value || "PG").toUpperCase(),
+  });
+
+  const runQuickMix = async () => {
+    try {
+      const t = mixTargets();
+      const body = await apiJson("/api/mix/quick", {
+        method: "POST",
+        body: JSON.stringify({
+          recipe_id: recipeId,
+          version_id: currentVersionId(),
+          target_ml: t.target_ml,
+          target_nic_mg_ml: t.target_nic_mg_ml,
+          nic_base_mg_ml: t.nic_base_mg_ml,
+          pg_ratio: t.pg_ratio,
+          vg_ratio: t.vg_ratio,
+          nicotine_carrier: t.nicotine_carrier,
+        }),
+      });
+      showMixOutput(JSON.stringify(body, null, 2));
+      const mixHandoffHint = document.getElementById("mixHandoffHint");
+      if (mixHandoffHint) mixHandoffHint.hidden = false;
+      document.getElementById("mix-card")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    } catch (err) {
+      showMixOutput(err.message);
+      const mixHandoffHint = document.getElementById("mixHandoffHint");
+      if (mixHandoffHint) mixHandoffHint.hidden = true;
+    }
+  };
+
+  document.querySelectorAll(".js-quick-mix").forEach((btn) => {
+    btn.addEventListener("click", runQuickMix);
+  });
+
+  document.getElementById("mixHandoffLink")?.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    syncGuidedMixVersion();
+    guidedMixForm?.requestSubmit();
+  });
+
+  document.getElementById("btnSubmitFeedback")?.addEventListener("click", async () => {
+    try {
+      const steepRaw = document.getElementById("feedback_steep").value;
+      const metrics = {};
+      if (steepRaw !== "" && !Number.isNaN(Number(steepRaw))) {
+        metrics.steep_days = Number(steepRaw);
+      }
+      await apiJson(`/api/recipes/${recipeId}/feedback`, {
+        method: "POST",
+        body: JSON.stringify({
+          recipe_version_id: activeVersionId,
+          feedback_type: "structured",
+          body: document.getElementById("feedback_body").value || "",
+          score_overall: Number(document.getElementById("feedback_score").value || 0),
+          device: document.getElementById("feedback_device").value || "",
+          issue_type: document.getElementById("feedback_issue").value || "",
+          suggested_changes: document.getElementById("feedback_suggested").value || "",
+          metrics,
+        }),
+      });
+      document.getElementById("feedback_body").value = "";
+      document.getElementById("feedback_device").value = "";
+      document.getElementById("feedback_issue").value = "";
+      document.getElementById("feedback_suggested").value = "";
+      document.getElementById("feedback_steep").value = "";
+      await renderFeedback();
+    } catch (err) {
+      if (engagementHint) engagementHint.textContent = err.message;
+    }
+  });
+
+  document.querySelectorAll("[data-status]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      try {
+        await apiJson(`/api/recipes/${recipeId}/status`, {
+          method: "POST",
+          body: JSON.stringify({
+            status: btn.dataset.status,
+            recipe_version_id: activeVersionId,
+            reason: document.getElementById("statusReason").value || "",
+          }),
+        });
+        await renderStatusHistory();
+      } catch (err) {
+        if (engagementHint) engagementHint.textContent = err.message;
+      }
+    });
+  });
+
+  renderFeedback();
+  renderStatusHistory();
+})();
+</script>
+{% endblock %}

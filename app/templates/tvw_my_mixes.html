@@ -1,0 +1,176 @@
+{% extends "base_public.html" %}
+{% block title %}My mixes | The Vape Workshop Calculator{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw.css') }}">
+
+<div class="tvw-page">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-1">My mixes</h1>
+      <p class="small text-secondary mb-0">
+        Your personal history: <strong>Quick mix</strong> runs (one-tap calculator) and <strong>guided</strong> checklists (resumable).
+        Nothing here is public.
+      </p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_recipe_library') }}">Recipe library</a>
+    </div>
+  </div>
+
+  {% macro filter_link(label, key) -%}
+    <a class="btn btn-sm {% if filter_active == key %}btn-warning{% else %}btn-outline-light{% endif %}"
+       href="{% if key == 'all' %}{{ url_for('tvw_recipes.tvw_my_mixes') }}{% else %}{{ url_for('tvw_recipes.tvw_my_mixes', filter=key) }}{% endif %}">{{ label }}</a>
+  {%- endmacro %}
+
+  <div class="d-flex flex-wrap gap-2 mb-3">
+    {{ filter_link('All', 'all') }}
+    {{ filter_link('In progress', 'in_progress') }}
+    {{ filter_link('Completed', 'completed') }}
+    {{ filter_link('Guided only', 'guided') }}
+    {{ filter_link('Quick only', 'quick') }}
+  </div>
+  <div class="small text-secondary mb-2">{{ total }} mix session(s)</div>
+
+  <section class="card shadow-sm">
+    <div class="card-body p-0">
+      {% if sessions %}
+        <div class="table-responsive d-none d-md-block">
+          <table class="table table-dark table-sm align-middle mb-0">
+            <thead>
+              <tr class="text-secondary small">
+                <th>Type</th>
+                <th>Recipe</th>
+                <th>Ver</th>
+                <th class="text-end">Batch</th>
+                <th class="text-end">Nic</th>
+                <th>PG/VG</th>
+                <th>Started</th>
+                <th>Completed</th>
+                <th>Status</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in sessions %}
+                {% set rslug = row.recipe_slug or row.recipe_id %}
+                {% set pgvg = (row.target_pgvg or '30/70').split('/') %}
+                {% set mix_pg = pgvg[0] if pgvg and pgvg[0] else '30' %}
+                {% set mix_vg = pgvg[1] if pgvg and pgvg|length > 1 and pgvg[1] else '70' %}
+                {% set again_qs = 'version_id=' ~ row.recipe_version_id ~ '&target_ml=' ~ row.target_ml ~ '&target_nic_mg_ml=' ~ row.target_nic ~ '&pg_ratio=' ~ mix_pg ~ '&vg_ratio=' ~ mix_vg ~ '&nic_base_mg_ml=' ~ (row.nic_base_mg_ml|int) ~ '&nicotine_carrier=' ~ row.nicotine_carrier %}
+                {% set mix_again_guided = url_for('tvw_recipes.tvw_guided_mix_start', slug=rslug) ~ '?' ~ again_qs %}
+                {% set recipe_href = url_for('tvw_recipes.tvw_recipe_detail', slug=rslug) ~ '?version_id=' ~ row.recipe_version_id ~ '&batch_ml=' ~ (row.target_ml|int) %}
+                <tr>
+                  <td>
+                    {% if row.mode == 'quick' %}
+                      <span class="badge text-bg-info text-dark">Quick</span>
+                    {% else %}
+                      <span class="badge text-bg-primary">Guided</span>
+                    {% endif %}
+                  </td>
+                  <td class="fw-semibold">{{ row.recipe_name or ('#' ~ row.recipe_id) }}</td>
+                  <td>v{{ row.version_number }}</td>
+                  <td class="text-end">{{ row.target_ml|int }} ml</td>
+                  <td class="text-end">{{ row.target_nic }} mg/ml</td>
+                  <td class="small">{{ row.target_pgvg or '—' }}</td>
+                  <td class="small text-secondary">{{ row.created_at }}</td>
+                  <td class="small text-secondary">{{ row.completed_at or "—" }}</td>
+                  <td>
+                    {% if row.mode == 'quick' %}
+                      <span class="badge text-bg-secondary">Quick logged</span>
+                    {% elif row.in_progress %}
+                      <span class="badge text-bg-warning text-dark">Guided in progress · {{ row.open_steps }} left</span>
+                    {% else %}
+                      <span class="badge text-bg-success">Guided completed</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-end text-nowrap">
+                    <a class="btn btn-sm btn-outline-light py-0" href="{{ recipe_href }}">Recipe</a>
+                    {% if row.mode == 'guided' %}
+                      {% if row.in_progress %}
+                        <a class="btn btn-sm btn-warning py-0" href="{{ url_for('tvw_recipes.tvw_guided_mix_session', session_id=row.id) }}">Resume</a>
+                      {% else %}
+                        <a class="btn btn-sm btn-outline-light py-0" href="{{ url_for('tvw_recipes.tvw_guided_mix_session', session_id=row.id) }}">Review</a>
+                      {% endif %}
+                      <a class="btn btn-sm btn-outline-secondary py-0" href="{{ mix_again_guided }}">Mix again</a>
+                    {% else %}
+                      <a class="btn btn-sm btn-outline-secondary py-0" href="{{ recipe_href }}">Mix again</a>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="d-md-none vstack gap-2 p-3">
+          {% for row in sessions %}
+            {% set rslug = row.recipe_slug or row.recipe_id %}
+            {% set pgvg = (row.target_pgvg or '30/70').split('/') %}
+            {% set mix_pg = pgvg[0] if pgvg and pgvg[0] else '30' %}
+            {% set mix_vg = pgvg[1] if pgvg and pgvg|length > 1 and pgvg[1] else '70' %}
+            {% set again_qs = 'version_id=' ~ row.recipe_version_id ~ '&target_ml=' ~ row.target_ml ~ '&target_nic_mg_ml=' ~ row.target_nic ~ '&pg_ratio=' ~ mix_pg ~ '&vg_ratio=' ~ mix_vg ~ '&nic_base_mg_ml=' ~ (row.nic_base_mg_ml|int) ~ '&nicotine_carrier=' ~ row.nicotine_carrier %}
+            {% set mix_again_guided = url_for('tvw_recipes.tvw_guided_mix_start', slug=rslug) ~ '?' ~ again_qs %}
+            {% set recipe_href = url_for('tvw_recipes.tvw_recipe_detail', slug=rslug) ~ '?version_id=' ~ row.recipe_version_id ~ '&batch_ml=' ~ (row.target_ml|int) %}
+            <div class="card bg-body-secondary border-secondary">
+              <div class="card-body py-3 small">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                  <div class="fw-semibold">{{ row.recipe_name or ('#' ~ row.recipe_id) }}</div>
+                  {% if row.mode == 'quick' %}
+                    <span class="badge text-bg-info text-dark">Quick</span>
+                  {% else %}
+                    <span class="badge text-bg-primary">Guided</span>
+                  {% endif %}
+                </div>
+                <div class="text-secondary mt-1">v{{ row.version_number }} · {{ row.target_ml|int }} ml · {{ row.target_nic }} mg/ml · {{ row.target_pgvg or 'PG/VG' }}</div>
+                <div class="text-secondary mt-1">Started: {{ row.created_at }}</div>
+                <div class="text-secondary mt-1">Completed: {{ row.completed_at or "—" }}</div>
+                <div class="mt-2">
+                  {% if row.mode == 'quick' %}
+                    <span class="badge text-bg-secondary">Quick logged</span>
+                  {% elif row.in_progress %}
+                    <span class="badge text-bg-warning text-dark">Guided in progress · {{ row.open_steps }} left</span>
+                  {% else %}
+                    <span class="badge text-bg-success">Guided completed</span>
+                  {% endif %}
+                </div>
+                <div class="d-grid gap-2 mt-3">
+                  <div class="btn-group">
+                    <a class="btn btn-sm btn-outline-light" href="{{ recipe_href }}">Open recipe</a>
+                    {% if row.mode == 'guided' %}
+                      {% if row.in_progress %}
+                        <a class="btn btn-sm btn-warning" href="{{ url_for('tvw_recipes.tvw_guided_mix_session', session_id=row.id) }}">Resume</a>
+                      {% else %}
+                        <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_guided_mix_session', session_id=row.id) }}">Review</a>
+                      {% endif %}
+                      <a class="btn btn-sm btn-outline-secondary" href="{{ mix_again_guided }}">Mix again</a>
+                    {% else %}
+                      <a class="btn btn-sm btn-outline-secondary" href="{{ recipe_href }}">Mix again</a>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="p-3">
+          <p class="text-secondary small mb-2">No mixes in this view yet.</p>
+          <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_recipe_library') }}">Browse recipes</a>
+          <span class="text-secondary small ms-2">Run <strong>Quick mix</strong> on a recipe page or start a <strong>guided</strong> session.</span>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+  {% if total_pages > 1 %}
+    <div class="d-flex flex-wrap gap-2 mt-3 align-items-center">
+      {% if page > 1 %}
+        <a class="btn btn-sm btn-outline-light" href="{% if filter_active == 'all' %}{{ url_for('tvw_recipes.tvw_my_mixes', page=page-1) }}{% else %}{{ url_for('tvw_recipes.tvw_my_mixes', filter=filter_active, page=page-1) }}{% endif %}">Previous</a>
+      {% endif %}
+      <span class="small text-secondary">Page {{ page }} of {{ total_pages }}</span>
+      {% if page < total_pages %}
+        <a class="btn btn-sm btn-outline-light" href="{% if filter_active == 'all' %}{{ url_for('tvw_recipes.tvw_my_mixes', page=page+1) }}{% else %}{{ url_for('tvw_recipes.tvw_my_mixes', filter=filter_active, page=page+1) }}{% endif %}">Next</a>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

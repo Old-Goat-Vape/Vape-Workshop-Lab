@@ -1,0 +1,109 @@
+{% extends "base_public.html" %}
+{% block title %}Users | TVW Admin{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw.css') }}">
+<div class="tvw-page">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h1 class="h4 mb-0">User moderation</h1>
+    <div class="d-flex gap-2 flex-wrap">
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.dashboard') }}">Dashboard</a>
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.community_moderation') }}">Community UGC</a>
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.recipe_moderation') }}">Recipes</a>
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.flavour_moderation') }}">Flavours</a>
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.audit_log') }}">Audit</a>
+    </div>
+  </div>
+
+  <form class="card card-body shadow-sm mb-3" method="get">
+    <div class="row g-2">
+      <div class="col-12 col-md-4">
+        <input class="form-control form-control-sm" name="search" value="{{ search }}" placeholder="Username or email">
+      </div>
+      <div class="col-6 col-md-2">
+        <select class="form-select form-select-sm" name="role">
+          <option value="">Any role</option>
+          {% for r in role_options %}
+            <option value="{{ r|lower }}" {% if role_filter == r|lower %}selected{% endif %}>{{ r }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <input class="form-control form-control-sm" name="moderation_status" value="{{ moderation_status }}" placeholder="Mod status">
+      </div>
+      <div class="col-4 col-md-1">
+        <select class="form-select form-select-sm" name="suspended" title="Suspended">
+          <option value="">Sus?</option>
+          <option value="yes" {% if suspended == 'yes' %}selected{% endif %}>Yes</option>
+          <option value="no" {% if suspended == 'no' %}selected{% endif %}>No</option>
+        </select>
+      </div>
+      <div class="col-4 col-md-1">
+        <select class="form-select form-select-sm" name="banned" title="Banned">
+          <option value="">Ban?</option>
+          <option value="yes" {% if banned == 'yes' %}selected{% endif %}>Yes</option>
+          <option value="no" {% if banned == 'no' %}selected{% endif %}>No</option>
+        </select>
+      </div>
+      <div class="col-4 col-md-1">
+        <select class="form-select form-select-sm" name="muted" title="Muted">
+          <option value="">Mute?</option>
+          <option value="yes" {% if muted == 'yes' %}selected{% endif %}>Yes</option>
+          <option value="no" {% if muted == 'no' %}selected{% endif %}>No</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-1 d-grid"><button class="btn btn-sm btn-outline-light">Filter</button></div>
+    </div>
+  </form>
+
+  <div class="small text-secondary mb-2">{{ total }} user(s)</div>
+
+  <div class="table-responsive">
+    <table class="table table-dark table-sm align-middle">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Username</th>
+          <th>Role</th>
+          <th>Mod status</th>
+          <th>Sus</th>
+          <th>Ban</th>
+          <th>Mute</th>
+          <th>Created</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr>
+            <td>{{ row.id }}</td>
+            <td>{{ row.username }}</td>
+            <td>{{ row.role }}</td>
+            <td><span class="badge text-bg-secondary">{{ row.moderation_status }}</span></td>
+            <td>{% if row.is_suspended %}<span class="text-warning">Y</span>{% else %}—{% endif %}</td>
+            <td>{% if row.is_banned %}<span class="text-danger">Y</span>{% else %}—{% endif %}</td>
+            <td>{% if row.is_muted %}<span class="text-info">Y</span>{% else %}—{% endif %}</td>
+            <td class="small text-secondary">{{ row.created_at or "—" }}</td>
+            <td>
+              <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.user_moderation_detail', user_id=row.id) }}">Open</a>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="9" class="text-secondary">No users for this filter.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if total_pages > 1 %}
+    <div class="d-flex gap-2 mt-3">
+      {% if page > 1 %}
+        <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.user_moderation', search=search, role=role_filter, moderation_status=moderation_status, suspended=suspended, banned=banned, muted=muted, page=page-1) }}">Prev</a>
+      {% endif %}
+      <span class="small text-secondary align-self-center">Page {{ page }} / {{ total_pages }}</span>
+      {% if page < total_pages %}
+        <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.user_moderation', search=search, role=role_filter, moderation_status=moderation_status, suspended=suspended, banned=banned, muted=muted, page=page+1) }}">Next</a>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

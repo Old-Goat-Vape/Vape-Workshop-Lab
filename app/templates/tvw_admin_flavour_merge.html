@@ -1,0 +1,65 @@
+{% extends "base_public.html" %}
+{% block title %}Merge flavours | TVW Admin{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw.css') }}">
+<div class="tvw-page">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h1 class="h4 mb-0">Merge comparison</h1>
+    <div class="d-flex gap-2 flex-wrap">
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.flavour_identity_cleanup') }}">Cleanup</a>
+      <a class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener" href="{{ url_for('tvw_recipes.tvw_flavour_detail', flavour_id=source.id) }}">Public source</a>
+      <a class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener" href="{{ url_for('tvw_recipes.tvw_flavour_detail', flavour_id=target.id) }}">Public target</a>
+    </div>
+  </div>
+
+  <p class="small text-secondary mb-3">
+    <strong>Source</strong> (#{{ source.id }}) will point at <strong>target</strong> (#{{ target.id }}).
+    Full merge repoints recipe ingredients (<code>recipe_items</code>), consolidates stash rows, and moves notes/reviews. The source row is hidden and marked merged — it is <strong>not</strong> deleted.
+  </p>
+
+  <div class="row g-3 mb-4">
+    <div class="col-12 col-md-6">
+      <div class="card shadow-sm h-100 border-warning">
+        <div class="card-header small text-warning">Source (duplicate)</div>
+        <div class="card-body">
+          <h2 class="h6">{{ source.brand }} — {{ source.canonical_name }}</h2>
+          <p class="small mb-1">Ref id: <code>{{ source.source_flavor_ref_id or "—" }}</code></p>
+          <p class="small mb-1">Moderation: {{ source.moderation_status }}{% if source.merged_into_flavour_id %} · already merged → #{{ source.merged_into_flavour_id }}{% endif %}</p>
+          <hr>
+          <p class="small mb-0">Recipe line items (via ref): <strong>{{ source.recipe_item_count }}</strong></p>
+          <p class="small mb-0">Stash rows: <strong>{{ source.stash_count }}</strong></p>
+          <p class="small mb-0">Notes / reviews: <strong>{{ source.note_count }}</strong> / <strong>{{ source.review_count }}</strong></p>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-md-6">
+      <div class="card shadow-sm h-100 border-success">
+        <div class="card-header small text-success">Target (canonical)</div>
+        <div class="card-body">
+          <h2 class="h6">{{ target.brand }} — {{ target.canonical_name }}</h2>
+          <p class="small mb-1">Ref id: <code>{{ target.source_flavor_ref_id or "—" }}</code></p>
+          <p class="small mb-1">Moderation: {{ target.moderation_status }}{% if target.merged_into_flavour_id %} · merged → #{{ target.merged_into_flavour_id }}{% endif %}</p>
+          <hr>
+          <p class="small mb-0">Recipe line items (via ref): <strong>{{ target.recipe_item_count }}</strong></p>
+          <p class="small mb-0">Stash rows: <strong>{{ target.stash_count }}</strong></p>
+          <p class="small mb-0">Notes / reviews: <strong>{{ target.note_count }}</strong> / <strong>{{ target.review_count }}</strong></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if not can_merge %}
+    <div class="alert alert-secondary small">You need Master or Old Goat to execute merges. Ask a higher role to apply after review.</div>
+  {% else %}
+    <div class="card shadow-sm card-body">
+      <h2 class="h6 mb-3">Actions</h2>
+      <form method="post">
+        <textarea class="form-control form-control-sm mb-3" name="reason" placeholder="Reason / ticket (audit)"></textarea>
+        <button type="submit" name="action" value="execute_merge" class="btn btn-danger btn-sm me-2 mb-2" onclick="return confirm('Run FULL merge: repoint recipes, stash, UGC, and mark source merged?');">Full merge into target</button>
+        <button type="submit" name="action" value="merge_pointer_only" class="btn btn-outline-warning btn-sm mb-2" onclick="return confirm('Pointer-only: only if source has zero recipe lines and zero stash. Moves notes/reviews. Continue?');">Pointer-only (UGC + alias)</button>
+      </form>
+      <p class="small text-secondary mb-0 mt-2">Pointer-only is rejected automatically if the source still has recipe or stash usage — use full merge instead.</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

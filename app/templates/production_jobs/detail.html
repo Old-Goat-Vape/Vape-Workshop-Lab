@@ -1,0 +1,460 @@
+{% extends "base.html" %}
+{% block title %}{{ job.name }} · Production Job{% endblock %}
+{% block content %}
+<style>
+  .pj-tab { color:#aaa; border-bottom:2px solid transparent; }
+  .pj-tab.active { color:#5ec8d8; border-bottom-color:#5ec8d8; }
+  .pj-board { background:#121212; border:1px solid #2a2a2a; border-radius:10px; }
+  .pj-stat { font-size:1.6rem; font-weight:700; line-height:1.1; }
+  .pj-stat-label { font-size:.75rem; letter-spacing:.04em; text-transform:uppercase; color:#888; }
+  .pj-recipe-card { border:1px solid #333; border-radius:10px; background:#151515; }
+  .stock-not_purchased { color:#e74c3c; }
+  .stock-short { color:#f39c12; }
+  .stock-enough { color:#2ecc71; }
+  .stock-excess { color:#5ec8d8; }
+</style>
+
+<div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-3">
+  <div>
+    <a href="{{ url_for('production_jobs.index') }}" class="small text-secondary text-decoration-none">← Production Jobs</a>
+    <h1 class="h3 mb-1 mt-1">{{ job.name }}</h1>
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      <span class="badge {% if job.status == 'complete' %}text-bg-success{% elif job.status == 'in_production' %}text-bg-info{% elif job.status == 'cancelled' %}text-bg-secondary{% else %}text-bg-warning text-dark{% endif %}">{{ job.status }}</span>
+      <span class="small text-secondary">{{ job.job_type }}{% if job.reference_label %} · {{ job.reference_label }}{% endif %}</span>
+    </div>
+  </div>
+  {% if can_manage %}
+  <form method="post" action="{{ url_for('production_jobs.set_status', job_id=job.id) }}" class="d-flex gap-2 align-items-end">
+    <div>
+      <label class="form-label small text-secondary mb-1" for="status">Status</label>
+      <select class="form-select form-select-sm bg-black border-secondary" name="status" id="status">
+        {% for s in job_statuses %}
+        <option value="{{ s }}" {% if s == job.status %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button class="btn btn-sm btn-outline-warning" type="submit">Update</button>
+  </form>
+  {% endif %}
+</div>
+
+<ul class="nav gap-3 mb-4 border-bottom border-secondary pb-2 flex-wrap">
+  {% for t, label in [('overview','Overview'),('recipes','Recipes'),('production','Production'),('ingredients','Ingredients'),('costs','Costs'),('pay','Production Pay')] %}
+  <li class="nav-item">
+    <a class="nav-link px-0 pj-tab {% if tab == t %}active{% endif %}" href="{{ url_for('production_jobs.detail', job_id=job.id, tab=t) }}">{{ label }}</a>
+  </li>
+  {% endfor %}
+</ul>
+
+{% if tab == 'overview' %}
+<section class="pj-board p-3 p-md-4 mb-4">
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-md-3"><div class="pj-stat-label">Required</div><div class="pj-stat">{{ '%.0f'|format(overview.target_bottles) }}</div><div class="small text-secondary">bottles</div></div>
+    <div class="col-6 col-md-3"><div class="pj-stat-label">Complete</div><div class="pj-stat text-success">{{ '%.0f'|format(overview.completed_bottles) }}</div></div>
+    <div class="col-6 col-md-3"><div class="pj-stat-label">In progress</div><div class="pj-stat" style="color:#5ec8d8;">{{ '%.0f'|format(overview.in_progress_ml) }}</div><div class="small text-secondary">ml open</div></div>
+    <div class="col-6 col-md-3"><div class="pj-stat-label">Remaining</div><div class="pj-stat text-warning">{{ '%.0f'|format(overview.remaining_bottles) }}</div></div>
+  </div>
+  <div class="d-flex justify-content-between small mb-1">
+    <span>{{ '%.0f'|format(overview.progress_pct) }}% complete</span>
+    <span class="text-secondary">{{ '%.0f'|format(overview.completed_ml) }} / {{ '%.0f'|format(overview.target_total_ml) }} ml</span>
+  </div>
+  <div class="progress mb-2" style="height:12px; background:#222;">
+    <div class="progress-bar bg-success" style="width: {{ overview.progress_bar_pct }}%;"></div>
+  </div>
+  {% if overview.over_ml > 0 %}
+  <div class="small text-info">Overproduction: {{ '%.0f'|format(overview.over_ml) }} ml / {{ '%.1f'|format(overview.over_bottles) }} bottles</div>
+  {% endif %}
+</section>
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-2"><div class="pj-board p-3 h-100"><div class="pj-stat-label">Progress</div><div class="fw-semibold">{{ '%.0f'|format(overview.progress_pct) }}%</div></div></div>
+  <div class="col-6 col-lg-2"><div class="pj-board p-3 h-100"><div class="pj-stat-label">Ingredients</div><div class="fw-semibold {% if overview.ingredient_readiness == 'ready' %}text-success{% elif overview.ingredient_readiness == 'short' %}text-warning{% else %}text-secondary{% endif %}">{{ overview.ingredient_readiness }}</div></div></div>
+  <div class="col-6 col-lg-2"><div class="pj-board p-3 h-100"><div class="pj-stat-label">Pay owed</div><div class="fw-semibold text-warning">R{{ '%.0f'|format(overview.production_pay_owed) }}</div></div></div>
+  <div class="col-6 col-lg-2"><div class="pj-board p-3 h-100"><div class="pj-stat-label">Purchase spend</div><div class="fw-semibold">R{{ '%.0f'|format(overview.purchase_spend) }}</div></div></div>
+  <div class="col-6 col-lg-2"><div class="pj-board p-3 h-100"><div class="pj-stat-label">Revenue</div><div class="fw-semibold" style="color:#5ec8d8;">R{{ '%.0f'|format(overview.revenue) }}</div></div></div>
+  <div class="col-6 col-lg-2"><div class="pj-board p-3 h-100"><div class="pj-stat-label">Est. profit</div><div class="fw-semibold text-success">R{{ '%.0f'|format(overview.estimated_profit) }}</div></div></div>
+</div>
+{% endif %}
+
+{% if tab == 'recipes' %}
+<div class="vstack gap-3 mb-4">
+  {% for r in recipes %}
+  <div class="pj-recipe-card p-3">
+    <div class="d-flex flex-column flex-md-row justify-content-between gap-3">
+      <div>
+        <div class="fw-semibold" style="color:#ff9f43;">{{ r.recipe_name }}</div>
+        <div class="small text-secondary">Version {{ r.version_number }} · locked</div>
+        <div class="mt-2 small">
+          Required: <strong>{{ r.target_bottle_count }} × {{ '%.0f'|format(r.target_bottle_size_ml) }} ml</strong>
+          ({{ '%.0f'|format(r.target_total_ml) }} ml)<br>
+          Complete: <strong class="text-success">{{ '%.0f'|format(r.completed_bottles) }}</strong>
+          · In progress: <strong style="color:#5ec8d8;">{{ '%.0f'|format(r.in_progress_ml) }} ml</strong>
+          · Remaining: <strong class="text-warning">{{ '%.0f'|format(r.remaining_bottles) }}</strong>
+          {% if r.over_ml > 0 %}<br><span class="text-info">Over: {{ '%.0f'|format(r.over_ml) }} ml</span>{% endif %}
+          {% if r.operators %}
+          <div class="mt-2 text-secondary">Produced by:
+            {% for o in r.operators %}
+              <span class="text-light">{{ o.username or ('#' ~ o.user_id) }}: {{ '%.0f'|format(o.bottles) }}</span>{% if not loop.last %}; {% endif %}
+            {% endfor %}
+          </div>
+          {% if r.production_pay_amount and r.production_pay_amount > 0 %}
+          <div class="text-success">Production pay: R{{ '%.2f'|format(r.production_pay_amount) }}</div>
+          {% endif %}
+          {% endif %}
+        </div>
+      </div>
+      {% if can_produce %}
+      <div class="align-self-md-center">
+        <a class="btn btn-warning fw-semibold" href="{{ url_for('production_jobs.mix_for_job', job_id=job.id, job_recipe_id=r.id) }}">Mix for this job</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div class="text-secondary">No recipes on this job yet.</div>
+  {% endfor %}
+</div>
+
+{% if can_manage %}
+<section class="pj-board p-3 p-md-4">
+  <h2 class="h6 text-warning mb-3">Add recipe</h2>
+  <form method="post" action="{{ url_for('production_jobs.add_recipe', job_id=job.id) }}" class="row g-3" id="addRecipeForm">
+    <div class="col-lg-6">
+      <label class="form-label small text-secondary" for="recipe_id">Recipe</label>
+      <select class="form-select bg-black border-secondary" name="recipe_id" id="recipe_id" required>
+        <option value="">Select recipe…</option>
+        {% for p in recipe_picker %}
+        <option value="{{ p.id }}"
+          data-versions='{{ p.versions|tojson }}'
+          data-current="{{ p.current_version_id or '' }}">
+          {{ p.name }}{% if p.badges %} · {{ p.badges|join(', ') }}{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-lg-6">
+      <label class="form-label small text-secondary" for="recipe_version_id">Exact version (locked)</label>
+      <select class="form-select bg-black border-secondary" name="recipe_version_id" id="recipe_version_id" required>
+        <option value="">Select version…</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small text-secondary" for="target_bottle_size_ml">Bottle size (ml)</label>
+      <input class="form-control bg-black border-secondary" type="number" step="any" min="1" name="target_bottle_size_ml" id="target_bottle_size_ml" value="120" required>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small text-secondary" for="target_bottle_count">Bottle count</label>
+      <input class="form-control bg-black border-secondary" type="number" min="1" name="target_bottle_count" id="target_bottle_count" value="30" required>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small text-secondary" for="mix_target_nic_mg_ml">Target nic</label>
+      <input class="form-control bg-black border-secondary" type="number" step="any" min="0" name="mix_target_nic_mg_ml" id="mix_target_nic_mg_ml" value="3">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small text-secondary" for="mix_pg_ratio">PG %</label>
+      <input class="form-control bg-black border-secondary" type="number" step="any" name="mix_pg_ratio" value="30">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small text-secondary" for="mix_vg_ratio">VG %</label>
+      <input class="form-control bg-black border-secondary" type="number" step="any" name="mix_vg_ratio" value="70">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small text-secondary" for="mix_nic_base_mg_ml">Nic base mg/ml</label>
+      <input class="form-control bg-black border-secondary" type="number" step="any" name="mix_nic_base_mg_ml" value="100">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small text-secondary" for="mix_nicotine_carrier">Nic carrier</label>
+      <select class="form-select bg-black border-secondary" name="mix_nicotine_carrier" id="mix_nicotine_carrier">
+        <option value="PG">PG</option>
+        <option value="VG">VG</option>
+      </select>
+    </div>
+    <div class="col-12">
+      <button type="submit" class="btn btn-outline-warning">Add to job</button>
+      <span class="small text-secondary ms-2">Target total = size × count. Version stays locked.</span>
+    </div>
+  </form>
+</section>
+<script>
+(function () {
+  const recipeSel = document.getElementById("recipe_id");
+  const versionSel = document.getElementById("recipe_version_id");
+  if (!recipeSel || !versionSel) return;
+  recipeSel.addEventListener("change", function () {
+    const opt = recipeSel.options[recipeSel.selectedIndex];
+    let versions = [];
+    try { versions = JSON.parse(opt.getAttribute("data-versions") || "[]"); } catch (e) { versions = []; }
+    const current = opt.getAttribute("data-current") || "";
+    versionSel.innerHTML = '<option value="">Select version…</option>';
+    versions.forEach(function (v) {
+      const o = document.createElement("option");
+      o.value = v.id;
+      o.textContent = "v" + (v.version_number || v.id);
+      if (String(v.id) === String(current)) o.selected = true;
+      versionSel.appendChild(o);
+    });
+  });
+})();
+</script>
+{% endif %}
+{% endif %}
+
+{% if tab == 'production' %}
+<div class="table-responsive pj-board p-2">
+  <table class="table table-dark table-sm align-middle mb-0" style="--bs-table-bg:transparent;">
+    <thead class="small text-secondary">
+      <tr>
+        <th>Batch</th>
+        <th>Recipe</th>
+        <th>Operator</th>
+        <th>Target</th>
+        <th>Actual</th>
+        <th>Bottles</th>
+        <th>Status</th>
+        <th>Started</th>
+        <th>Completed</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for b in batches %}
+      <tr>
+        <td>#{{ b.id }}</td>
+        <td>{{ b.recipe_name }} <span class="text-secondary">v{{ b.version_number }}</span></td>
+        <td>{{ b.operator_username or ('#' ~ b.operator_user_id) }}</td>
+        <td>{{ '%.0f'|format(b.target_ml) }} ml</td>
+        <td>{% if b.actual_ml is not none %}{{ '%.0f'|format(b.actual_ml) }} ml{% else %}—{% endif %}</td>
+        <td>{% if b.status == 'completed' %}{{ '%.1f'|format(b.completed_bottles) }}{% else %}{{ '%.1f'|format(b.target_bottles) }}{% endif %}</td>
+        <td>
+          <span class="badge {% if b.status == 'completed' %}text-bg-success{% elif b.status == 'in_progress' %}text-bg-info{% elif b.status == 'cancelled' %}text-bg-secondary{% else %}text-bg-dark border{% endif %}">{{ b.status }}</span>
+        </td>
+        <td class="small text-secondary">{{ b.started_at or '—' }}</td>
+        <td class="small text-secondary">{{ b.completed_at or '—' }}</td>
+        <td>
+          {% if b.status == 'in_progress' and can_produce %}
+          <form method="post" action="{{ url_for('production_jobs.cancel_batch', job_id=job.id, batch_id=b.id) }}" onsubmit="return confirm('Cancel this batch? It will not count toward the job.');">
+            <button class="btn btn-sm btn-outline-danger" type="submit">Cancel</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="10" class="text-secondary">No production batches yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if tab == 'ingredients' %}
+<div class="table-responsive pj-board p-2 mb-4">
+  <table class="table table-dark table-sm align-middle mb-0" style="--bs-table-bg:transparent;">
+    <thead class="small text-secondary">
+      <tr>
+        <th>Ingredient</th>
+        <th>Required</th>
+        <th>Planned buy</th>
+        <th>Purchased</th>
+        <th>Used</th>
+        <th>Remaining</th>
+        <th>Still to buy</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for i in inventory %}
+      <tr>
+        <td>{{ i.display_name }} <span class="small text-secondary">({{ i.ingredient_type }})</span></td>
+        <td>{{ '%.2f'|format(i.required_ml) }}</td>
+        <td>{{ '%.2f'|format(i.planned_purchase_ml or 0) }}</td>
+        <td>{{ '%.2f'|format(i.purchased_ml) }}</td>
+        <td>{{ '%.2f'|format(i.used_ml) }}</td>
+        <td>{{ '%.2f'|format(i.remaining_ml) }}</td>
+        <td>{{ '%.2f'|format(i.still_to_buy_ml) }}</td>
+        <td class="stock-{{ i.stock_status }} fw-semibold text-uppercase small">{{ i.stock_status.replace('_', ' ') }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="text-secondary">Add recipes to generate ingredient requirements.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if purchases %}
+<h2 class="h6 text-warning">Purchase transactions</h2>
+<div class="table-responsive pj-board p-2 mb-4">
+  <table class="table table-dark table-sm" style="--bs-table-bg:transparent;">
+    <thead class="small text-secondary"><tr><th>When</th><th>Ingredient</th><th>Qty ml</th><th>Packs</th><th>Pack price</th><th>Total paid</th><th>Source</th></tr></thead>
+    <tbody>
+      {% for p in purchases %}
+      <tr>
+        <td class="small">{{ p.purchased_at or p.created_at }}</td>
+        <td>{{ p.display_name }}</td>
+        <td>{{ '%.0f'|format(p.quantity_ml) }}</td>
+        <td>{{ p.pack_count or '—' }}</td>
+        <td>{% if p.pack_price %}R{{ '%.2f'|format(p.pack_price) }}{% else %}—{% endif %}</td>
+        <td>R{{ '%.2f'|format(p.total_paid or 0) }}</td>
+        <td>{{ p.source or p.pack_info or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if can_manage and inventory %}
+<section class="pj-board p-3" style="max-width:640px;">
+  <h2 class="h6 text-warning mb-3">Record purchase</h2>
+  <form method="post" action="{{ url_for('production_jobs.record_purchase', job_id=job.id) }}" class="row g-2">
+    <div class="col-12">
+      <label class="form-label small text-secondary" for="inventory_id">Ingredient</label>
+      <select class="form-select bg-black border-secondary" name="inventory_id" id="inventory_id" required>
+        {% for i in inventory %}
+        <option value="{{ i.id }}">{{ i.display_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small text-secondary" for="quantity_ml">Quantity (ml)</label>
+      <input class="form-control bg-black border-secondary" type="number" step="any" min="0.01" name="quantity_ml" id="quantity_ml" required>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small text-secondary" for="pack_count">Pack count</label>
+      <input class="form-control bg-black border-secondary" type="number" step="any" name="pack_count" id="pack_count">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small text-secondary" for="pack_size_ml">Pack size (ml)</label>
+      <input class="form-control bg-black border-secondary" type="number" step="any" name="pack_size_ml" id="pack_size_ml">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small text-secondary" for="pack_price">Pack price (R)</label>
+      <input class="form-control bg-black border-secondary" type="number" step="any" name="pack_price" id="pack_price">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small text-secondary" for="total_paid">Total paid (R)</label>
+      <input class="form-control bg-black border-secondary" type="number" step="any" name="total_paid" id="total_paid">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small text-secondary" for="source">Source</label>
+      <input class="form-control bg-black border-secondary" name="source" id="source" placeholder="BLCK / other">
+    </div>
+    <div class="col-12">
+      <label class="form-label small text-secondary" for="note">Note</label>
+      <input class="form-control bg-black border-secondary" name="note" id="note">
+    </div>
+    <div class="col-12">
+      <button type="submit" class="btn btn-outline-warning">Record purchase</button>
+      <span class="small text-secondary ms-2">Job inventory only — not personal stash.</span>
+    </div>
+  </form>
+</section>
+{% endif %}
+{% endif %}
+
+{% if tab == 'costs' and financials %}
+<section class="pj-board p-3 p-md-4 mb-4" style="max-width:720px;">
+  <h2 class="h5 text-warning mb-3">{{ job.name }} Financial Summary</h2>
+  <div class="d-flex justify-content-between py-1"><span>Revenue</span><strong style="color:#5ec8d8;">R{{ '%.2f'|format(financials.revenue) }}</strong></div>
+  <hr class="border-secondary">
+  <div class="d-flex justify-content-between py-1 small"><span>Ingredients consumed</span><span>R{{ '%.2f'|format(financials.ingredients_consumed) }}</span></div>
+  <div class="d-flex justify-content-between py-1 small"><span>Bottles</span><span>R{{ '%.2f'|format(financials.bottles_cost) }}</span></div>
+  <div class="d-flex justify-content-between py-1 small"><span>Labels</span><span>R{{ '%.2f'|format(financials.labels_cost) }}</span></div>
+  <div class="d-flex justify-content-between py-1 small"><span>Production pay (helpers)</span><span>R{{ '%.2f'|format(financials.production_pay) }}</span></div>
+  <div class="d-flex justify-content-between py-1 small"><span>Referral{% if financials.referral.label %} ({{ financials.referral.label }}){% endif %}</span><span>R{{ '%.2f'|format(financials.referral.amount) }}</span></div>
+  <div class="d-flex justify-content-between py-1 small"><span>Shipping / packing</span><span>R{{ '%.2f'|format(financials.shipping_packing) }}</span></div>
+  <div class="d-flex justify-content-between py-1 small"><span>Other costs</span><span>R{{ '%.2f'|format(financials.other_costs) }}</span></div>
+  <hr class="border-secondary">
+  <div class="d-flex justify-content-between py-1"><span>Total fulfilment cost</span><strong>R{{ '%.2f'|format(financials.total_fulfilment_cost) }}</strong></div>
+  <div class="d-flex justify-content-between py-1 mt-2"><span>Old Goat profit</span><strong class="text-success fs-5">R{{ '%.2f'|format(financials.old_goat_profit) }}</strong></div>
+  <div class="mt-3 small text-secondary">
+    Cash spent on inventory: R{{ '%.2f'|format(financials.cash_spent_on_inventory) }} ·
+    Remaining job stock value: R{{ '%.2f'|format(financials.remaining_job_stock_value) }}
+    {% if financials.owner_labour %}<br>Owner labour tracked (not owed): R{{ '%.2f'|format(financials.owner_labour) }}{% endif %}
+  </div>
+</section>
+
+{% if can_manage %}
+<div class="row g-3">
+  <div class="col-lg-4">
+    <form method="post" action="{{ url_for('production_jobs.set_revenue', job_id=job.id) }}" class="pj-board p-3 vstack gap-2">
+      <h3 class="h6 text-warning">Revenue</h3>
+      <select class="form-select bg-black border-secondary" name="revenue_mode">
+        {% for m in ['none','estimated','actual','customer_order'] %}
+        <option value="{{ m }}" {% if job.revenue_mode == m %}selected{% endif %}>{{ m }}</option>
+        {% endfor %}
+      </select>
+      <input class="form-control bg-black border-secondary" type="number" step="any" name="revenue_amount" value="{{ job.revenue_amount or 0 }}" placeholder="Amount R">
+      <input class="form-control bg-black border-secondary" name="revenue_note" value="{{ job.revenue_note or '' }}" placeholder="Note">
+      <button class="btn btn-sm btn-outline-warning" type="submit">Save revenue</button>
+    </form>
+  </div>
+  <div class="col-lg-4">
+    <form method="post" action="{{ url_for('production_jobs.set_packaging', job_id=job.id) }}" class="pj-board p-3 vstack gap-2">
+      <h3 class="h6 text-warning">Packaging overrides</h3>
+      <input class="form-control bg-black border-secondary" type="number" step="any" name="bottle_cost_override" value="{{ job.bottle_cost_override if job.bottle_cost_override is not none else '' }}" placeholder="Bottle R (default from costing)">
+      <input class="form-control bg-black border-secondary" type="number" step="any" name="label_cost_override" value="{{ job.label_cost_override if job.label_cost_override is not none else '' }}" placeholder="Label R">
+      <button class="btn btn-sm btn-outline-warning" type="submit">Save packaging</button>
+    </form>
+  </div>
+  <div class="col-lg-4">
+    <form method="post" action="{{ url_for('production_jobs.set_referral', job_id=job.id) }}" class="pj-board p-3 vstack gap-2">
+      <h3 class="h6 text-warning">Referral</h3>
+      <input class="form-control bg-black border-secondary" name="referral_label" value="{{ job.referral_label or '' }}" placeholder="e.g. Jaco">
+      <select class="form-select bg-black border-secondary" name="referral_mode">
+        {% for m in ['none','fixed','percent'] %}
+        <option value="{{ m }}" {% if job.referral_mode == m %}selected{% endif %}>{{ m }}</option>
+        {% endfor %}
+      </select>
+      <input class="form-control bg-black border-secondary" type="number" step="any" name="referral_value" value="{{ job.referral_value or 0 }}">
+      <button class="btn btn-sm btn-outline-warning" type="submit">Save referral</button>
+    </form>
+  </div>
+  <div class="col-lg-6">
+    <form method="post" action="{{ url_for('production_jobs.add_expense', job_id=job.id) }}" class="pj-board p-3 vstack gap-2">
+      <h3 class="h6 text-warning">Add expense</h3>
+      <select class="form-select bg-black border-secondary" name="category">
+        {% for c in ['shipping','packing','courier','cartons','printing','travel','other'] %}
+        <option value="{{ c }}">{{ c }}</option>
+        {% endfor %}
+      </select>
+      <input class="form-control bg-black border-secondary" name="description" placeholder="Description" required>
+      <input class="form-control bg-black border-secondary" type="number" step="any" name="amount" placeholder="Amount R" required>
+      <input class="form-control bg-black border-secondary" name="note" placeholder="Note">
+      <button class="btn btn-sm btn-outline-warning" type="submit">Add expense</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endif %}
+
+{% if tab == 'pay' and pay_summary %}
+<section class="pj-board p-3 mb-4">
+  <div class="row g-3">
+    <div class="col-md-4"><div class="pj-stat-label">Helper earned</div><div class="pj-stat text-success">R{{ '%.2f'|format(pay_summary.helper_earned) }}</div></div>
+    <div class="col-md-4"><div class="pj-stat-label">Paid on this job</div><div class="pj-stat" style="color:#5ec8d8;">R{{ '%.2f'|format(pay_summary.helper_paid_on_job) }}</div></div>
+    <div class="col-md-4"><div class="pj-stat-label">Owed on this job</div><div class="pj-stat text-warning">R{{ '%.2f'|format(pay_summary.helper_owed_on_job) }}</div></div>
+  </div>
+  {% if pay_summary.owner_labour %}
+  <div class="small text-secondary mt-2">Owner labour tracked: R{{ '%.2f'|format(pay_summary.owner_labour) }} (not owed)</div>
+  {% endif %}
+  <div class="mt-3"><a href="{{ url_for('production_jobs.earnings') }}" class="btn btn-sm btn-outline-info">Open earnings ledger</a></div>
+</section>
+<div class="table-responsive pj-board p-2">
+  <table class="table table-dark table-sm" style="--bs-table-bg:transparent;">
+    <thead class="small text-secondary"><tr><th>Operator</th><th>Kind</th><th>Bottles</th><th>Earned</th></tr></thead>
+    <tbody>
+      {% for o in pay_summary.operators %}
+      <tr>
+        <td>{{ o.username }}</td>
+        <td>{{ o.labour_kind }}</td>
+        <td>{{ '%.1f'|format(o.bottles) }}</td>
+        <td>R{{ '%.2f'|format(o.earned) }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="text-secondary">No production credits yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% endblock %}

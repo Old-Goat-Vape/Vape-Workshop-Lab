@@ -1,0 +1,57 @@
+{% extends "base_public.html" %}
+
+{% block title %}Login | Old Goat Mixing Lab{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-sm-10 col-md-7 col-lg-5 col-xl-4">
+        <div class="og-auth-card card border-0 shadow-lg">
+            <div class="card-body p-4 p-sm-5">
+                <div class="text-center mb-4">
+                    <div class="d-flex justify-content-center mb-3">
+                        {% with logo_href = url_for('auth.login') %}{% include "partials/og_brand.html" %}{% endwith %}
+                    </div>
+                    <div class="text-secondary small text-uppercase og-auth-sub">Authentication Required</div>
+                </div>
+
+                <form action="{{ url_for('auth.login') }}" method="POST" class="vstack gap-3">
+                    <div>
+                        <label for="username" class="form-label small text-uppercase text-secondary" style="letter-spacing: 1px;">Operator Identity</label>
+                        <input type="text" id="username" name="username" class="form-control form-control-lg bg-black border-secondary" placeholder="Username" autofocus required autocomplete="username">
+                    </div>
+
+                    <div>
+                        <label for="password" class="form-label small text-uppercase text-secondary" style="letter-spacing: 1px;">Security Key</label>
+                        <input type="password" id="password" name="password" class="form-control form-control-lg bg-black border-secondary" placeholder="••••••••" required autocomplete="current-password">
+                    </div>
+
+                    <button type="submit" class="btn btn-warning btn-lg fw-bold text-uppercase og-btn-primary">Initialize Access</button>
+                </form>
+
+                <p class="text-center mt-4 mb-0 small text-secondary">
+                    New here?
+                    <a href="{{ url_for('auth.signup') }}" class="link-warning text-decoration-none fw-semibold">Create an account</a>
+                </p>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="mt-4">
+                            {% for category, message in messages %}
+                                {% set bs = 'secondary' %}
+                                {% if category in ['danger','error'] %}{% set bs = 'danger' %}{% endif %}
+                                {% if category in ['warning'] %}{% set bs = 'warning' %}{% endif %}
+                                {% if category in ['success'] %}{% set bs = 'success' %}{% endif %}
+                                <div class="alert alert-{{ bs }} mb-2 py-2" role="alert">{{ message }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+
+        <div class="text-center mt-3 text-secondary small text-uppercase og-version-footer">
+            Secured Lab Environment v2.0.26
+        </div>
+    </div>
+</div>
+{% endblock %}

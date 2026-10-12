@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Mix – {{ recipe.name }}{% endblock %}
+
+{% block content %}
+<h1>🧪 Mixing: {{ recipe.name }}</h1>
+
+<p>
+<a href="/recipes">← Cancel & Return</a>
+</p>
+
+<h3>Ingredients</h3>
+<ul>
+{% for i in ingredients %}
+    <li>
+        {{ i.name }} — {{ i.percent }}%
+        (Available: {{ "%.1f"|format(i.stock_ml) }} ml)
+    </li>
+{% endfor %}
+</ul>
+
+<hr>
+
+<form method="post">
+    <label>
+        Batch size (ml)<br>
+        <input type="number" name="size" step="1" min="1" required>
+    </label><br><br>
+
+    <button type="submit">START MIX</button>
+</form>
+
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <ul>
+      {% for m in messages %}
+        <li>{{ m }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+{% endblock %}

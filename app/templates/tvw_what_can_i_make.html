@@ -1,0 +1,194 @@
+{% extends "base_public.html" %}
+{% block title %}What Can I Make | The Vape Workshop Calculator{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw.css') }}">
+
+<div class="tvw-page">
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-1">What Can I Make</h1>
+      <p class="small text-secondary mb-0">
+        {% if wcm.stash_source == 'lab_shared_holdings' %}
+          Stash source: <strong>Lab holdings (linked)</strong> — quantities match your Lab library.
+        {% else %}
+          Stash source: <strong>Your stash</strong> — from flavours you have saved.
+        {% endif %}
+        <span class="d-block d-md-inline mt-1 mt-md-0">{{ wcm.stash_reference_count }} flavour reference(s) in stock · scanned {{ wcm.recipe_scan_count }} recipe(s) visible to your account.</span>
+      </p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_recipe_library') }}">Recipe library</a>
+      <a class="btn btn-sm btn-outline-warning" href="{{ url_for('tvw_recipes.tvw_stash') }}">Stash</a>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-3">
+    <div class="card-body py-3">
+      <form class="row g-2 align-items-end" method="get" action="{{ url_for('tvw_recipes.tvw_what_can_i_make') }}">
+        <div class="col-12 col-sm-6 col-md-4">
+          <label class="form-label small text-secondary mb-0">Target batch size (ml)</label>
+          <select class="form-select form-select-sm" name="batch_ml">
+            {% set bm = wcm.target_batch_ml|float %}
+            {% set presets = [15, 30, 50, 60, 100, 120] %}
+            {% for n in presets %}
+              <option value="{{ n }}" {% if bm == n %}selected{% endif %}>{{ n }} ml</option>
+            {% endfor %}
+            {% if bm not in presets %}
+              <option value="{{ wcm.target_batch_ml }}" selected>{{ "%.1f"|format(bm) }} ml</option>
+            {% endif %}
+          </select>
+        </div>
+        <div class="col-6 col-md-2 d-grid">
+          <button type="submit" class="btn btn-sm btn-outline-light">Apply</button>
+        </div>
+      </form>
+      <ul class="small text-secondary mb-0 mt-2 ps-3">
+        {% for line in wcm.assumptions %}
+          <li>{{ line }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  {% if (wcm.recipe_scan_count|int) <= 0 %}
+    <div class="alert alert-secondary small py-2 mb-3">
+      No recipes are currently visible for matching. This can happen when there are no public recipes (or only private recipes you do not own).
+      Try <a href="{{ url_for('tvw_recipes.tvw_recipe_library') }}">Recipe Library</a> or create a new recipe.
+    </div>
+  {% endif %}
+
+  {% macro recipe_qty_block(r) -%}
+    {% if r.wcm_qty and r.wcm_qty.lines %}
+      <div class="mt-2 small">
+        <div class="text-secondary mb-1">Flavours for this batch (~{{ "%.0f"|format(wcm.target_batch_ml|float) }} ml)</div>
+        <div class="table-responsive">
+          <table class="table table-dark table-sm mb-0 align-middle">
+            <thead>
+              <tr class="small text-secondary">
+                <th>Flavour</th>
+                <th class="text-end">%</th>
+                <th class="text-end">Need ml</th>
+                <th class="text-end">Have ml</th>
+                <th class="text-end d-none d-sm-table-cell">After</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ln in r.wcm_qty.lines %}
+                {% if ln.line_status != 'negligible' %}
+                  <tr class="{% if ln.line_status == 'short' %}table-danger{% elif ln.line_tight %}table-warning{% endif %}">
+                    <td>
+                      {% if ln.flavour_id %}
+                        <a class="text-light text-decoration-none" href="{{ url_for('tvw_recipes.tvw_flavour_detail', flavour_id=ln.flavour_id) }}">{{ ln.brand }} — {{ ln.name }}</a>
+                      {% else %}
+                        {{ ln.brand }} — {{ ln.name }}
+                      {% endif %}
+                    </td>
+                    <td class="text-end font-monospace">{{ "%.2f"|format(ln.amount_percent|float) }}</td>
+                    <td class="text-end font-monospace">{{ "%.2f"|format(ln.required_ml|float) }}</td>
+                    <td class="text-end font-monospace">{{ "%.2f"|format(ln.have_ml|float) }}</td>
+                    <td class="text-end font-monospace d-none d-sm-table-cell">{{ "%.2f"|format(ln.remaining_after_ml|float) }}</td>
+                  </tr>
+                {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% if r.wcm_qty.status == 'short' %}
+          <div class="text-danger mt-1">{{ r.wcm_qty.reason }}</div>
+        {% elif r.wcm_qty.status == 'tight' %}
+          <div class="text-warning mt-1">{{ r.wcm_qty.reason }}</div>
+        {% endif %}
+      </div>
+    {% endif %}
+  {%- endmacro %}
+
+  {% macro recipe_section(title, badge_class, recipes, show_missing) -%}
+    <section class="card shadow-sm mb-3">
+      <div class="card-body">
+        <h2 class="h6 mb-3 d-flex align-items-center gap-2 flex-wrap">
+          {{ title }}
+          <span class="badge {{ badge_class }}">{{ recipes|length }}</span>
+        </h2>
+        {% if recipes|length == 0 %}
+          <p class="small text-secondary mb-0">Nothing in this group yet.</p>
+        {% else %}
+          <div class="vstack gap-2">
+            {% for r in recipes %}
+              <div class="border border-secondary rounded p-2 p-md-3">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                  <a class="fw-semibold text-light text-decoration-none" href="{{ url_for('tvw_recipes.tvw_recipe_detail', slug=(r.slug or r.id)) }}">{{ r.name }}</a>
+                  <span class="small text-secondary text-nowrap">v{{ r.current_version_number or "—" }}</span>
+                </div>
+                {% if r.current_total_flavour_pct is not none %}
+                  <div class="small text-secondary">{{ "%.1f"|format(r.current_total_flavour_pct|float) }}% flavour total (recipe)</div>
+                {% endif %}
+                {% if not show_missing and r.wcm_qty %}
+                  {{ recipe_qty_block(r) }}
+                {% endif %}
+                {% if show_missing and r.missing and r.missing|length > 0 %}
+                  <div class="mt-2 small">
+                    <div class="text-warning mb-1">Missing (not in stash or below {{ "%.2f"|format(0.05) }} ml):</div>
+                    <ul class="mb-0 ps-3">
+                      {% for m in r.missing %}
+                        <li>
+                          {% if m.flavour_id %}
+                            <a class="text-decoration-none" href="{{ url_for('tvw_recipes.tvw_flavour_detail', flavour_id=m.flavour_id) }}">{{ m.brand }} — {{ m.name }}</a>
+                            <button type="button" class="btn btn-xs btn-outline-warning ms-1 js-wcm-add-stash" data-flavour-id="{{ m.flavour_id }}">Add</button>
+                          {% else %}
+                            {{ m.brand }} — {{ m.name }} <span class="text-secondary">(no TVW flavour page)</span>
+                          {% endif %}
+                        </li>
+                      {% endfor %}
+                    </ul>
+                  </div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </section>
+  {%- endmacro %}
+
+  {{ recipe_section("Can make now", "text-bg-success", wcm.ready, false) }}
+  {{ recipe_section("Can make but low stock", "text-bg-info text-dark", wcm.low_stock, false) }}
+  {{ recipe_section("Missing 1 flavour", "text-bg-warning text-dark", wcm.missing_1, true) }}
+  {{ recipe_section("Missing 2 flavours", "text-bg-secondary", wcm.missing_2, true) }}
+  {{ recipe_section("Missing more", "text-bg-dark", wcm.missing_more, true) }}
+
+  <p class="small text-secondary mb-0">
+    Large libraries are capped per request (default scan limit). Constants: headroom ≥ {{ wcm.qty_constants.headroom_ratio }}× required or leave ≥ {{ wcm.qty_constants.remaining_after_ml }} ml after mix marks <strong>low stock</strong> when still feasible.
+  </p>
+</div>
+<style>
+  .btn-xs { font-size: 0.78rem; line-height: 1.2; }
+</style>
+<script>
+(() => {
+  document.querySelectorAll(".js-wcm-add-stash").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const fid = Number(btn.dataset.flavourId || 0);
+      if (!fid) return;
+      const original = btn.textContent;
+      btn.disabled = true;
+      try {
+        const res = await fetch("/api/stash", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ flavour_id: fid, quantity_ml: 10, is_favorite: false }),
+        });
+        if (!res.ok) throw new Error("stash");
+        btn.textContent = "Added";
+      } catch (_err) {
+        btn.textContent = "Retry";
+      } finally {
+        setTimeout(() => {
+          btn.textContent = original;
+          btn.disabled = false;
+        }, 900);
+      }
+    });
+  });
+})();
+</script>
+{% endblock %}

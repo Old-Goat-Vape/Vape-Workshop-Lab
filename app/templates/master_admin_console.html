@@ -1,0 +1,1291 @@
+{% extends "base.html" %}
+
+{% block title %}Master Admin Console - Old Goat Lab{% endblock %}
+
+{% block content %}
+{% set summary = summary if summary is defined else {'total_users': 0, 'active_users': 0, 'recent_scraper_runs': 0, 'low_stock_items': 0} %}
+<div class="d-flex flex-column flex-xl-row align-items-xl-start justify-content-between gap-3 mb-3">
+  <div class="d-flex gap-3 align-items-start">
+    <div class="flex-shrink-0 mt-1">
+      {% with logo_href = url_for('master_admin.console'), show_wordmark = false %}{% include "partials/og_brand.html" %}{% endwith %}
+    </div>
+    <div>
+      <h1 class="h3 mb-1">Master Admin Console</h1>
+      <div class="text-secondary small">Scrapers, flavor intelligence, users, audit, shopping — use tabs below.</div>
+    </div>
+  </div>
+
+  <div class="d-flex flex-wrap gap-2 align-items-center">
+    <a class="btn btn-outline-primary btn-sm" href="{{ url_for('master_admin.production_home') }}">Production &amp; Decanting</a>
+    <form method="POST" action="{{ url_for('master_admin.start_stock_take') }}" class="d-inline">
+      <button type="submit" class="btn btn-outline-warning btn-sm">Start Stock Take</button>
+    </form>
+    {% if open_stock_take %}
+      <a class="btn btn-outline-warning btn-sm" href="{{ url_for('master_admin.stock_take_run', run_id=open_stock_take.id) }}">Resume Stock Take</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-2 mb-3">
+  <div class="col-6 col-lg-3"><div class="card border-0" style="background:#151515; border:1px solid #333 !important;"><div class="card-body py-2"><div class="small text-secondary">Total Users</div><div class="h5 mb-0">{{ summary.total_users }}</div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card border-0" style="background:#151515; border:1px solid #333 !important;"><div class="card-body py-2"><div class="small text-secondary">Active Users</div><div class="h5 mb-0 text-success">{{ summary.active_users }}</div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card border-0" style="background:#151515; border:1px solid #333 !important;"><div class="card-body py-2"><div class="small text-secondary">Scraper Runs (24h)</div><div class="h5 mb-0 text-warning">{{ summary.recent_scraper_runs }}</div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card border-0" style="background:#151515; border:1px solid #333 !important;"><div class="card-body py-2"><div class="small text-secondary">Low Stock Items</div><div class="h5 mb-0 text-danger">{{ summary.low_stock_items }}</div></div></div></div>
+</div>
+
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'scrapers' %}active{% endif %}" href="{{ url_for('master_admin.console', tab='scrapers') }}">Scrapers</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'flavor_intel' %}active{% endif %}" href="{{ url_for('master_admin.console', tab='flavor_intel') }}">Flavor Intelligence</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'users' %}active{% endif %}" href="{{ url_for('master_admin.console', tab='users') }}">Users</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'audit' %}active{% endif %}" href="{{ url_for('master_admin.console', tab='audit') }}">Audit Logs</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'shopping' %}active{% endif %}" href="{{ url_for('master_admin.console', tab='shopping') }}">Shopping List</a>
+  </li>
+</ul>
+
+{% if tab == 'scrapers' %}
+<div class="row g-3">
+  <div class="col-12">
+    {% set sched = scheduler_status or {} %}
+    <div class="card border-0" style="background:#151515; border:1px solid #333 !important;">
+      <div class="card-body">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2">
+          <div>
+            <h2 class="h5 mb-1">Scheduler Status</h2>
+            <div class="text-secondary small">Monthly automation health and diagnostics.</div>
+          </div>
+          <button class="btn btn-outline-info btn-sm" onclick="checkSchedulerHealth()">Check Scheduler Health</button>
+        </div>
+        <div class="row g-2 mt-1 small">
+          <div class="col-12 col-md-4">enabled: <strong>{{ 'yes' if sched.get('monthly_job_enabled') else 'no' }}</strong></div>
+          <div class="col-12 col-md-4">job registered: <strong>{{ 'yes' if sched.get('monthly_job_registered') else 'no' }}</strong></div>
+          <div class="col-12 col-md-4">process active: <strong>{{ 'yes' if sched.get('scheduler_process_active') else 'no' }}</strong></div>
+          <div class="col-12 col-md-6">last monthly run: <span class="text-secondary">{{ sched.get('monthly_last_run') or 'Never' }}</span></div>
+          <div class="col-12 col-md-6">next monthly run: <span class="text-secondary">{{ sched.get('monthly_next_run') or 'n/a' }}</span></div>
+          <div class="col-12 col-md-6">last result: <span class="text-secondary">{{ sched.get('monthly_last_result') or 'n/a' }}</span></div>
+          <div class="col-12 col-md-6">last error: <span class="{% if sched.get('monthly_last_error') %}text-warning{% else %}text-secondary{% endif %}">{{ sched.get('monthly_last_error') or 'none' }}</span></div>
+          <div class="col-12 col-md-6">VC monthly inclusion: <strong>{{ 'yes' if sched.get('vc_monthly_inclusion') else 'no' }}</strong></div>
+          <div class="col-12 col-md-6">VC monthly trigger: <span class="text-secondary">{{ sched.get('vc_monthly_trigger') or 'none' }}</span></div>
+        </div>
+        <div class="mt-2">
+          <button class="btn btn-outline-light btn-sm" onclick="previewMonthlyPlan()">Preview Monthly Scraper Plan</button>
+        </div>
+        <div id="schedulerHealthResult" class="small mt-2 text-secondary"></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-7">
+    <div class="card border-0" style="background:#151515; border:1px solid #333 !important;">
+      <div class="card-body">
+        <h2 class="h5 mb-1">Scraper Operations</h2>
+        <div class="text-secondary small mb-3">Primary actions first. Advanced workflows are grouped below.</div>
+
+        <div class="mb-3">
+          <div class="d-grid gap-2">
+            <button class="btn btn-success fw-semibold btn-lg" onclick="runAllScrapers()">Run All Scrapers</button>
+            <button class="btn btn-outline-primary fw-semibold" onclick="triggerScraper('vc_dtl_public_resume')">Resume Recovery Jobs</button>
+            <button class="btn btn-outline-info fw-semibold" onclick="checkSchedulerHealth()">Check Scheduler Health</button>
+          </div>
+        </div>
+
+        <div class="accordion" id="scraperOpsAccordion">
+          <div class="accordion-item bg-dark text-light border-secondary">
+            <h2 class="accordion-header" id="headingVcImports">
+              <button class="accordion-button collapsed bg-dark text-light" type="button" data-bs-toggle="collapse" data-bs-target="#collapseVcImports" aria-expanded="false" aria-controls="collapseVcImports">
+                VC Imports
+              </button>
+            </h2>
+            <div id="collapseVcImports" class="accordion-collapse collapse" aria-labelledby="headingVcImports" data-bs-parent="#scraperOpsAccordion">
+              <div class="accordion-body">
+                <div class="d-grid gap-2 mb-3">
+                  <button class="btn btn-outline-primary fw-semibold" onclick="triggerScraper('vc_dtl_public_all')">Run VC Public Backfill</button>
+                  <button class="btn btn-outline-primary fw-semibold" onclick="triggerScraper('vc_dtl_public_resume')">Resume VC Public Backfill</button>
+                </div>
+                <div class="border rounded p-2 border-secondary-subtle">
+                  <div class="small text-secondary mb-2">VC User Imports</div>
+                  <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <select id="vcUserSelect" class="form-select form-select-sm bg-black border-secondary" style="max-width:170px;">
+                      <option value="2078">User 2078</option>
+                      <option value="11">User 11</option>
+                      <option value="385">User 385</option>
+                    </select>
+                    <button class="btn btn-sm btn-outline-primary" onclick="runSelectedVcUser('run')">Run</button>
+                    <button class="btn btn-sm btn-outline-info" onclick="runSelectedVcUser('resume')">Resume</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="runSelectedVcUser('reset')">Reset Cursor</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion-item bg-dark text-light border-secondary">
+            <h2 class="accordion-header" id="headingIdentityRepair">
+              <button class="accordion-button collapsed bg-dark text-light" type="button" data-bs-toggle="collapse" data-bs-target="#collapseIdentityRepair" aria-expanded="false" aria-controls="collapseIdentityRepair">
+                Identity & Repair
+              </button>
+            </h2>
+            <div id="collapseIdentityRepair" class="accordion-collapse collapse" aria-labelledby="headingIdentityRepair" data-bs-parent="#scraperOpsAccordion">
+              <div class="accordion-body d-grid gap-2">
+                <button class="btn btn-outline-info fw-semibold" onclick="triggerScraper('vc_flavour_identity_backfill')">Backfill Imported Flavour Matches</button>
+                <button class="btn btn-outline-info fw-semibold" onclick="triggerScraper('vc_flavour_identity_unresolved')">Re-run Unresolved Only</button>
+                <button class="btn btn-outline-danger fw-semibold" onclick="triggerScraper('vc_flavour_identity_force')">Force Rematch All Imported Flavours</button>
+                <button class="btn btn-outline-light fw-semibold" onclick="triggerScraper('vc_imported_display_resync')">Resync Imported Recipe Display Names</button>
+                <div class="small text-secondary mt-1 mb-1">
+                  <strong>Canonical library repair:</strong> canonical brand + cleaned flavor name, safe duplicate merge (same identity key; never mixes Flavor vs Hardware/Base/Nicotine buckets), category correction, <code>is_nicotine</code> sync, then FK repoint on merged ids.
+                  After <em>Apply</em>, run <strong>Fix Recipe Flavor Links</strong>, then recompute recipe analytics. Bulk flavor <em>trait classification</em> stays under Flavor Intelligence → Reclassify All Flavors.
+                </div>
+                <button class="btn btn-outline-secondary fw-semibold" onclick="triggerScraper('canonical_library_repair_preview')">Preview Canonical Library Repair</button>
+                <button class="btn btn-outline-success fw-semibold" onclick="triggerScraper('canonical_library_repair_apply')">Apply Canonical Library Repair</button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="triggerScraper('canonicalize_flavor_brands_preview')">Legacy: preview (same repair)</button>
+                <button class="btn btn-outline-success btn-sm" onclick="triggerScraper('canonicalize_flavor_brands_apply')">Legacy: apply (same repair)</button>
+                <button class="btn btn-outline-warning fw-semibold" onclick="triggerScraper('fix_recipe_flavor_links')">Fix Recipe Flavor Links</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion-item bg-dark text-light border-danger">
+            <h2 class="accordion-header" id="headingDangerZone">
+              <button class="accordion-button collapsed bg-dark text-warning" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDangerZone" aria-expanded="false" aria-controls="collapseDangerZone">
+                Advanced / Danger Zone
+              </button>
+            </h2>
+            <div id="collapseDangerZone" class="accordion-collapse collapse" aria-labelledby="headingDangerZone" data-bs-parent="#scraperOpsAccordion">
+              <div class="accordion-body d-grid gap-2">
+                <div class="small text-secondary">Individual scraper tools</div>
+                <button class="btn btn-outline-warning fw-semibold" onclick="triggerScraper('blck')">Run BLCK</button>
+                <button class="btn btn-outline-warning fw-semibold" onclick="triggerScraper('clyrolinx')">Run Clyrolinx</button>
+                <button class="btn btn-outline-info fw-semibold" onclick="triggerScraper('vc_flavours')">Run VC Flavours</button>
+                <button class="btn btn-outline-primary fw-semibold" onclick="triggerScraper('vc_dtl')">Run VC Recipes DTL</button>
+                <hr class="my-2">
+                <button class="btn btn-outline-secondary fw-semibold" onclick="triggerScraper('vc_dtl_public_reset')">Reset VC Public Cursor</button>
+                <button class="btn btn-outline-secondary fw-semibold" onclick="triggerScraper('vc_dtl_user_reset_2078')">Reset VC User 2078 Cursor</button>
+                <button class="btn btn-outline-secondary fw-semibold" onclick="triggerScraper('vc_dtl_user_reset_11')">Reset VC User 11 Cursor</button>
+                <button class="btn btn-outline-secondary fw-semibold" onclick="triggerScraper('vc_dtl_user_reset_385')">Reset VC User 385 Cursor</button>
+                <div class="small text-warning">Maintenance tools: use only when recovery workflows are blocked.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="scraperResult" class="mt-3 small"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-5">
+    <div class="card border-0" style="background:#151515; border:1px solid #333 !important;">
+      <div class="card-body">
+        <h2 class="h5 mb-1">Run Status</h2>
+        <div class="text-secondary small">
+          - Actions are logged to <span class="font-monospace">audit_logs</span>.<br>
+          - Clyrolinx respects <span class="font-monospace">robots.txt</span> crawl-delay (10s).<br>
+          - “Non-blocking” here means the browser won’t freeze; the request still runs server-side.
+        </div>
+        <hr>
+        <h3 class="h6 mb-2">Latest Runs</h3>
+        <div class="small text-secondary mb-2">
+          Same source of truth as Scraper Health (<span class="font-monospace">scraper_runs.id</span>).
+          Historical failures are labeled separately and do not override a successful latest run.
+        </div>
+        <div class="small text-secondary">
+          {% set runs = scraper_last_runs or {} %}
+          {% for label, key in [('BLCK','blck'),('Clyrolinx','clyrolinx'),('VC Flavours','vc_flavours'),('VC Recipes DTL','vc_dtl'),('Run All','all')] %}
+            {% set r = runs.get(key, {}) %}
+            <div>
+              {{ label }}:
+              {% if r.get('run_id') %}
+                run #{{ r.get('run_id') }} —
+                <span class="{% if r.get('status')=='success' or r.get('status')=='partial' %}text-success{% elif r.get('status')=='started' %}text-warning{% elif r.get('status') in ['error','failed'] %}text-danger{% else %}text-secondary{% endif %}">
+                  {{ r.get('status') or 'n/a' }}
+                </span>
+                {% if r.get('completed_at') %} @ {{ r.get('completed_at') }}{% elif r.get('started_at') %} since {{ r.get('started_at') }}{% endif %}
+                {% if r.get('updated') or r.get('added') %}
+                  (added {{ r.get('added') or 0 }}, updated {{ r.get('updated') or 0 }})
+                {% endif %}
+              {% else %}
+                Never
+              {% endif %}
+            </div>
+          {% endfor %}
+          {% if runs.get('all', {}).get('run_type') %}
+            <div>Latest monthly type: {{ runs.get('all', {}).get('run_type') }}</div>
+          {% endif %}
+        </div>
+        {% set health = scraper_health or {} %}
+        {% if health.get('sources') %}
+        <hr>
+        <h3 class="h6 mb-2">Scraper Health</h3>
+        <div class="table-responsive">
+          <table class="table table-dark table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Latest</th>
+                <th>Last success</th>
+                <th>Last failure <span class="text-secondary fw-normal">(historical)</span></th>
+                <th class="text-end">Freshness</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for name, row in health.get('sources', {}).items() %}
+              {% set vs = row.get('visual_state') or 'never' %}
+              {% set latest = row.get('latest_run') or {} %}
+              {% set ok = row.get('last_success') or {} %}
+              {% set fail = row.get('last_failure') or {} %}
+              <tr>
+                <td>
+                  <div class="fw-semibold">
+                    {% if vs == 'success' %}<span class="text-success">●</span>
+                    {% elif vs == 'failed' %}<span class="text-danger">●</span>
+                    {% elif vs == 'running' or vs == 'stale' %}<span class="text-warning">●</span>
+                    {% else %}<span class="text-secondary">●</span>{% endif %}
+                    {{ name }}
+                  </div>
+                  <div class="text-secondary" style="font-size:0.75rem;">{{ row.get('notes') or '' }}</div>
+                </td>
+                <td style="white-space:normal; max-width:14rem;">
+                  {% if latest %}
+                    <div>run #{{ latest.get('run_id') }} · <strong>{{ latest.get('status') }}</strong></div>
+                    <div class="text-secondary" style="font-size:0.75rem;">
+                      {% if latest.get('completed_at') %}{{ latest.get('completed_at') }}{% else %}started {{ latest.get('started_at') }}{% endif %}
+                      {% if latest.get('duration_s') is not none %} · {{ latest.get('duration_s') }}s{% endif %}
+                    </div>
+                    <div style="font-size:0.75rem;">
+                      parsed {{ latest.get('parsed') or 0 }} ·
+                      added {{ latest.get('added') or 0 }} ·
+                      updated {{ latest.get('updated') or 0 }}
+                    </div>
+                    {% if latest.get('error_message') %}
+                      <div class="text-danger" style="font-size:0.75rem;">{{ latest.get('error_message') }}</div>
+                    {% endif %}
+                  {% else %}
+                    <span class="text-secondary">Never run</span>
+                  {% endif %}
+                </td>
+                <td style="white-space:normal;">
+                  {% if ok %}
+                    run #{{ ok.get('run_id') }}<br>
+                    <span class="text-secondary" style="font-size:0.75rem;">{{ ok.get('completed_at') }}</span>
+                  {% else %}
+                    Never
+                  {% endif %}
+                </td>
+                <td style="white-space:normal; max-width:14rem;">
+                  {% if fail %}
+                    {% if fail.get('is_current') %}
+                      <div class="text-danger">Current · run #{{ fail.get('run_id') }}</div>
+                    {% else %}
+                      <div class="text-secondary">Earlier · run #{{ fail.get('run_id') }}</div>
+                    {% endif %}
+                    <div style="font-size:0.75rem;" class="{% if fail.get('is_current') %}text-danger{% else %}text-secondary{% endif %}">
+                      {{ fail.get('error_message') or fail.get('status') }}
+                    </div>
+                    <div class="text-secondary" style="font-size:0.7rem;">{{ fail.get('completed_at') }}</div>
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+                <td class="text-end" style="white-space:normal;">
+                  <div>{{ row.get('priced_in_db') or 0 }}/{{ row.get('products_in_db') or 0 }} priced</div>
+                  <div class="text-secondary" style="font-size:0.75rem;">newest {{ row.get('newest_last_scraped') or '—' }}</div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-items-center mt-2">
+          <div class="text-secondary small">Priced catalogue rows: {{ health.get('priced_flavor_rows') or 0 }}</div>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="verifyLatestScraper('blck')">Verify BLCK</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="verifyLatestScraper('clyrolinx')">Verify Clyrolinx</button>
+        </div>
+        <div id="scraperVerifyResult" class="mt-2 small font-monospace"></div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% elif tab == 'flavor_intel' %}
+<div class="row g-3">
+  <div class="col-12 col-lg-7">
+    <div class="card border-0" style="background:#151515; border:1px solid #333 !important;">
+      <div class="card-body">
+        <h2 class="h5 mb-1">Flavor Intelligence</h2>
+        <div class="text-secondary small mb-3">Classification tools: preview dry runs, apply bulk or single flavor updates. Manual overrides are never overwritten.</div>
+        <div class="d-grid gap-2">
+          <button class="btn btn-outline-light fw-semibold" onclick="runFlavorClassifyDryRun()">Preview Classification (Dry Run)</button>
+          <button class="btn btn-outline-primary fw-semibold" onclick="runFlavorClassifyApply()">Reclassify All Flavors</button>
+          <div class="d-flex flex-wrap gap-2 align-items-center mt-1">
+            <input id="singleFlavorId" class="form-control form-control-sm bg-black border-secondary" placeholder="Flavor reference ID…" style="max-width:160px;">
+            <button class="btn btn-sm btn-outline-light" onclick="previewSingleFlavorClassification()">Preview Single Flavor</button>
+            <button class="btn btn-sm btn-outline-primary" onclick="applySingleFlavorClassification()">Reclassify Single Flavor</button>
+          </div>
+        </div>
+        <div id="classificationResult" class="mt-3 small font-monospace"></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-5">
+    <div class="card border-0" style="background:#151515; border:1px solid #333 !important;">
+      <div class="card-body">
+        <h3 class="h6 mb-2">Notes</h3>
+        <ul class="small text-secondary mb-0 ps-3">
+          <li>Dry run reports counts only; no database writes.</li>
+          <li>Apply updates resolved fields, keywords, biases, and audit columns on non-manual rows.</li>
+          <li>Brand aliases and brand trait defaults live in <span class="font-monospace">config/flavor_classification_brands.py</span>.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="col-12">
+    <div class="card border-0" style="background:#151515; border:1px solid #333 !important;">
+      <div class="card-body">
+        <h2 class="h5 mb-1">Recipe Intelligence</h2>
+        <div class="text-secondary small mb-3">
+          Recipe-derived usage and pairings (additive tables only). Source: active recipes excluding Archived/Development, latest version per recipe, Flavor + non-nicotine lines.
+        </div>
+        <div class="d-flex flex-wrap gap-2 mb-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm fw-semibold" onclick="recipeAnalyticsDryRun()">Preview analytics (dry run)</button>
+          <button type="button" class="btn btn-outline-info btn-sm fw-semibold" onclick="recipeAnalyticsApplyAll()">Analyze all recipe usage</button>
+          <button type="button" class="btn btn-outline-warning btn-sm fw-semibold" onclick="recipeAnalyticsPairingsOnly()">Recompute pairings only</button>
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+          <input id="recipeAnalyticsFlavorId" class="form-control form-control-sm bg-black border-secondary" placeholder="Flavor reference ID…" style="max-width:160px;">
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="recipeAnalyticsPreviewSingle()">Preview single flavor</button>
+          <button type="button" class="btn btn-sm btn-outline-info" onclick="recipeAnalyticsApplySingle()">Analyze single flavor</button>
+        </div>
+        <div id="recipeAnalyticsResult" class="mt-3 small font-monospace"></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12">
+    <div class="card border-0" style="background:#151515; border:1px solid #333 !important;">
+      <div class="card-body">
+        <h3 class="h6 mb-2">VC DTL Benchmark Stats</h3>
+        <div class="text-secondary small mb-2">
+          Derived from <span class="font-monospace">recipe_references</span> rows where
+          source_type=<span class="font-monospace">vc_dtl</span> and benchmark_eligible=1.
+        </div>
+        <div class="table-responsive">
+          <table class="table table-dark table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Profile</th>
+                <th class="text-end">Recipes</th>
+                <th class="text-end">Avg Total %</th>
+                <th class="text-end">Median Total %</th>
+                <th class="text-end">Avg Flavor Count</th>
+                <th class="text-end">Avg %/Flavor</th>
+                <th class="text-end">Sweetener Rate</th>
+                <th class="text-end">Cooling Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in (vc_dtl_benchmark_stats or []) %}
+              <tr>
+                <td>{{ s.profile_normalized }}</td>
+                <td class="text-end">{{ s.recipe_count }}</td>
+                <td class="text-end">{{ "%.2f"|format(s.avg_total_flavour_pct or 0) }}</td>
+                <td class="text-end">{{ "%.2f"|format(s.median_total_flavour_pct or 0) }}</td>
+                <td class="text-end">{{ "%.2f"|format(s.avg_flavour_count or 0) }}</td>
+                <td class="text-end">{{ "%.2f"|format(s.avg_pct_per_flavour or 0) }}</td>
+                <td class="text-end">{{ "%.1f"|format((s.sweetener_usage_rate or 0) * 100) }}%</td>
+                <td class="text-end">{{ "%.1f"|format((s.cooling_usage_rate or 0) * 100) }}%</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="8" class="text-center text-secondary py-3">No VC DTL benchmark stats yet. Run VC Recipes DTL scraper first.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12">
+    <div class="card border-0" style="background:#151515; border:1px solid #333 !important;">
+      <div class="card-body">
+        <h3 class="h6 mb-2">Unresolved Imported Flavours</h3>
+        <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+          <input id="uqBrand" class="form-control form-control-sm bg-black border-secondary" placeholder="Brand filter" style="max-width:180px;">
+          <input id="uqSearch" class="form-control form-control-sm bg-black border-secondary" placeholder="Search raw/normalized..." style="max-width:260px;">
+          <input id="uqMinOcc" class="form-control form-control-sm bg-black border-secondary" type="number" min="1" value="2" style="max-width:90px;">
+          <button type="button" class="btn btn-sm btn-outline-light" onclick="loadUnresolvedQueue()">Load Queue</button>
+          <button type="button" class="btn btn-sm btn-outline-info" onclick="triggerScraper('vc_flavour_identity_unresolved')">Re-run Unresolved Only</button>
+          <button type="button" class="btn btn-sm btn-outline-danger" onclick="triggerScraper('vc_flavour_identity_force')">Force Rematch All</button>
+        </div>
+        <div id="unresolvedMetrics" class="small text-secondary mb-2">Load queue to view metrics.</div>
+        <div id="unresolvedQueueBox" class="small text-secondary">No data loaded.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% elif tab == 'users' %}
+<div class="card border-0" style="background:#151515; border:1px solid #333 !important;">
+  <div class="card-body">
+    <div class="d-flex flex-column flex-lg-row justify-content-between gap-2 mb-3">
+      <div>
+        <h2 class="h5 mb-1">Users</h2>
+        <div class="text-secondary small">Manage user role, status, performance, and password resets.</div>
+      </div>
+      <form class="d-flex gap-2" method="GET" action="{{ url_for('master_admin.console') }}">
+        <input type="hidden" name="tab" value="users">
+        <select class="form-select bg-black border-secondary" name="role" style="max-width: 220px;">
+          <option value="">All roles</option>
+          {% for r in roles %}
+            <option value="{{ r }}" {% if role_filter == r %}selected{% endif %}>{{ r }}</option>
+          {% endfor %}
+        </select>
+        <input class="form-control bg-black border-secondary" name="search" placeholder="Search username/email..." value="{{ search }}">
+        <button class="btn btn-outline-light">Filter</button>
+      </form>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-dark table-hover align-middle mb-0" id="usersTable">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>User</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th class="text-end">Mixes</th>
+            <th class="text-end">Mistakes</th>
+            <th>Last login</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td class="font-monospace">{{ u.id }}</td>
+            <td>{{ u.username }}</td>
+            <td class="text-secondary">{{ u.email }}</td>
+            <td>
+              {% set badge = 'secondary' %}
+              {% if u.role == 'Master' %}{% set badge = 'warning' %}{% endif %}
+              {% if u.role == 'Old Goat' %}{% set badge = 'danger' %}{% endif %}
+              {% if u.role == 'Foreman' %}{% set badge = 'info' %}{% endif %}
+              <span class="badge text-bg-{{ badge }}">{{ u.role }}</span>
+              {% if u.status != 'Active' %}
+                <span class="badge text-bg-secondary">Disabled</span>
+              {% endif %}
+            </td>
+            <td class="text-end">{{ u.mixes_completed }}</td>
+            <td class="text-end {% if (u.mistakes or 0) > 0 %}text-warning{% else %}text-secondary{% endif %}">{{ u.mistakes }}</td>
+            <td class="text-secondary small">{{ u.last_login }}</td>
+            <td class="text-end">
+              <div class="d-flex justify-content-end gap-2 flex-wrap">
+                <select class="form-select form-select-sm bg-black border-secondary" data-user-role="{{ u.role }}" id="role-{{ u.id }}" style="width: 160px;">
+                  {% for r in roles %}
+                    <option value="{{ r }}" {% if u.role == r %}selected{% endif %}>{{ r }}</option>
+                  {% endfor %}
+                </select>
+                <select class="form-select form-select-sm bg-black border-secondary" id="status-{{ u.id }}" style="width: 140px;">
+                  <option value="Active" {% if u.status == 'Active' %}selected{% endif %}>Active</option>
+                  <option value="Disabled" {% if u.status != 'Active' %}selected{% endif %}>Disabled</option>
+                </select>
+                <button class="btn btn-sm btn-outline-light" onclick="saveUser({{ u.id }})">Save</button>
+                <button class="btn btn-sm btn-outline-warning" onclick="openResetPasswordModal({{ u.id }}, '{{ u.username }}')">Reset Password</button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content bg-dark text-light border border-secondary">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title">Reset Password</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="small text-secondary mb-2">Set a new password for <span id="rpUsername" class="text-light"></span></div>
+        <input type="hidden" id="rpUserId">
+        <label class="form-label">New Password</label>
+        <input id="rpPassword" type="password" class="form-control bg-black text-light border-secondary mb-2">
+        <label class="form-label">Confirm Password</label>
+        <input id="rpConfirm" type="password" class="form-control bg-black text-light border-secondary">
+      </div>
+      <div class="modal-footer border-secondary">
+        <button type="button" class="btn btn-outline-light btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-warning btn-sm" onclick="submitResetPassword()">Reset Password</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% elif tab == 'audit' %}
+<div class="card border-0" style="background:#151515; border:1px solid #333 !important;">
+  <div class="card-body">
+    <div class="d-flex flex-column flex-lg-row justify-content-between gap-2 mb-3">
+      <div>
+        <h2 class="h5 mb-1">Audit Logs</h2>
+        <div class="text-secondary small">Filter by user/action/date. Export individual entries as PDF.</div>
+      </div>
+      <form class="d-flex flex-wrap gap-2" method="GET" action="{{ url_for('master_admin.console') }}">
+        <input type="hidden" name="tab" value="audit">
+        <input class="form-control bg-black border-secondary" name="audit_user" placeholder="User ID" value="{{ audit_user }}" style="max-width: 120px;">
+        <input class="form-control bg-black border-secondary" name="audit_action" placeholder="Action contains..." value="{{ audit_action }}" style="min-width: 220px;">
+        <input class="form-control bg-black border-secondary" name="audit_start" placeholder="Start (YYYY-MM-DD)" value="{{ audit_start }}" style="max-width: 170px;">
+        <input class="form-control bg-black border-secondary" name="audit_end" placeholder="End (YYYY-MM-DD)" value="{{ audit_end }}" style="max-width: 170px;">
+        <button class="btn btn-outline-light">Apply</button>
+      </form>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-dark table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Timestamp</th>
+            <th>User</th>
+            <th>Action</th>
+            <th>Target</th>
+            <th>Details</th>
+            <th class="text-end">Export</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in audit_logs %}
+          <tr>
+            <td class="font-monospace">{{ l.id }}</td>
+            <td class="text-secondary small">{{ l.timestamp }}</td>
+            <td>{{ l.username }}</td>
+            <td class="font-monospace">{{ l.action }}</td>
+            <td class="text-secondary">{{ l.target_table }}:{{ l.target_id }}</td>
+            <td class="text-secondary small">{{ l.details }}</td>
+            <td class="text-end">
+              <a class="btn btn-sm btn-outline-secondary" target="_blank" href="{{ url_for('master_admin.audit_pdf', log_id=l.id) }}">Open PDF</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% elif tab == 'shopping' %}
+<div class="row g-3">
+  <div class="col-12 col-lg-4">
+    <div class="card border-0" style="background:#151515; border:1px solid #333 !important;">
+      <div class="card-body">
+        <h2 class="h5 mb-2">Shopping List</h2>
+        <div class="text-secondary small mb-2">Per-category thresholds (ml) used to detect low-stock items.</div>
+        <div class="text-info-emphasis small mb-2">These items are automatically included in the shopping list when below threshold.</div>
+        <div class="small text-warning mb-2">
+          Debug: shopping_items={{ shopping_items|length if shopping_items is defined else 'undefined' }}
+          | empty={{ 'yes' if (shopping_items is not defined or shopping_items|length == 0) else 'no' }}
+        </div>
+
+        <div class="vstack gap-2">
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="text-secondary small">Flavor</span>
+            <input id="t_flavor" type="number" class="form-control bg-black border-secondary" style="max-width: 140px;" value="{{ thresholds['Flavor'] }}">
+          </div>
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="text-secondary small">Base</span>
+            <input id="t_base" type="number" class="form-control bg-black border-secondary" style="max-width: 140px;" value="{{ thresholds['Base'] }}">
+          </div>
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="text-secondary small">Nicotine</span>
+            <input id="t_nic" type="number" class="form-control bg-black border-secondary" style="max-width: 140px;" value="{{ thresholds['Nicotine'] }}">
+          </div>
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="text-secondary small">Hardware</span>
+            <input id="t_hw" type="number" class="form-control bg-black border-secondary" style="max-width: 140px;" value="{{ thresholds['Hardware'] }}">
+          </div>
+        </div>
+
+        <div class="d-grid gap-2 mt-3">
+          <button class="btn btn-success fw-semibold" onclick="regenerateShopping()">Regenerate Shopping List</button>
+          <button class="btn btn-outline-light" onclick="openAllUrls()">Add All to Cart (open tabs)</button>
+        </div>
+
+        <div id="shoppingResult" class="mt-3 small"></div>
+      </div>
+    </div>
+
+    <div class="card border-0 mt-3" style="background:#151515; border:1px solid #333 !important;">
+      <div class="card-body">
+        <h2 class="h6 mb-2">History</h2>
+        <div class="text-secondary small mb-2">Previous generated shopping lists.</div>
+        <div class="vstack gap-2">
+          {% for r in shopping_runs %}
+            <div class="d-flex justify-content-between">
+              <span class="text-secondary small">#{{ r.id }} • {{ r.created_at }}</span>
+              <span class="badge text-bg-secondary">{{ r.item_count }} items</span>
+            </div>
+          {% else %}
+            <div class="text-secondary small">No saved runs yet.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-8">
+    <div class="card border-0" style="background:#151515; border:1px solid #333 !important;">
+      <div class="card-body">
+        <div class="d-flex flex-column flex-lg-row justify-content-between gap-2 mb-3">
+          <div>
+            <h2 class="h5 mb-1">Current Shopping List</h2>
+            <div class="text-secondary small">Click “🛒 Add to Cart” to open supplier pages in new tabs.</div>
+          </div>
+          <input id="shopFilter" class="form-control bg-black border-secondary" placeholder="Filter by supplier/category/name..." oninput="filterShopping()" />
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-dark table-hover align-middle mb-0" id="shoppingTable">
+            <thead>
+              <tr>
+                <th>Flavor</th>
+                <th>Brand</th>
+                <th>Category</th>
+                <th class="text-end">Current</th>
+                <th class="text-end">Threshold</th>
+                <th class="text-end">Target</th>
+                <th class="text-end">Price/ml</th>
+                <th class="text-end">Cart</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for it in shopping_items %}
+              <tr data-url="{{ it.product_url or '' }}">
+                <td>
+                  {{ it.name }}
+                  {% if it.needs_review %}
+                  <span class="badge text-bg-warning ms-1" title="Classification flagged for review">Needs review</span>
+                  {% endif %}
+                </td>
+                <td class="text-secondary">{{ it.brand }}</td>
+                <td><span class="badge text-bg-secondary">{{ it.category }}</span></td>
+                <td class="text-end">{{ it.quantity_ml }}</td>
+                <td class="text-end">{{ it.threshold_used_ml or it.target_quantity_ml }}</td>
+                <td class="text-end">{{ it.target_quantity_ml }}</td>
+                <td class="text-end">R {{ "%.2f"|format(it.price_per_ml or 0) }}</td>
+                <td class="text-end">
+                  {% if it.product_url %}
+                    <a class="btn btn-sm btn-outline-warning" target="_blank" rel="noopener noreferrer" href="{{ it.product_url }}">Add to Cart</a>
+                  {% elif it.vc_url %}
+                    <a class="btn btn-sm btn-outline-info" target="_blank" rel="noopener noreferrer" href="{{ it.vc_url }}">VC</a>
+                  {% else %}
+                    <span class="text-secondary small">No URL</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="8" class="text-center text-secondary py-4">No low-stock items found for these thresholds.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script>
+function escHtml(v) {
+  if (v === null || v === undefined) return '';
+  return String(v)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function renderScraperDiagnostics(name, data) {
+  const status = data?.status || 'unknown';
+  const fatal = data?.fatal_stage || '-';
+  const stop = data?.stop_reason || data?.message || '-';
+  const errors = Array.isArray(data?.errors) ? data.errors : [];
+  const urls = Array.isArray(data?.first_20_detail_urls) ? data.first_20_detail_urls.slice(0, 5) : [];
+  const ids = Array.isArray(data?.first_20_recipe_ids) ? data.first_20_recipe_ids.slice(0, 5) : [];
+  const traces = Array.isArray(data?.detail_trace_sample) ? data.detail_trace_sample.slice(0, 5) : [];
+  let html = `<div><strong>${escHtml(name)}</strong> status=<strong>${escHtml(status)}</strong></div>`;
+  html += `<div>fatal_stage=${escHtml(fatal)} | stop_reason=${escHtml(stop)}</div>`;
+  html += `<div>queued=${escHtml(data?.queued_detail_pages)} | attempted=${escHtml(data?.detail_attempted)} | succeeded=${escHtml(data?.detail_succeeded)} | failed_before_parse=${escHtml(data?.detail_failed_before_parse)} | http_errors=${escHtml(data?.detail_http_errors)}</div>`;
+  if (errors.length) html += `<div class="mt-1"><strong>errors:</strong><br>${errors.map((e) => escHtml(e)).join('<br>')}</div>`;
+  if (ids.length) html += `<div class="mt-1"><strong>first_5_recipe_ids:</strong> ${ids.map(escHtml).join(', ')}</div>`;
+  if (urls.length) html += `<div class="mt-1"><strong>first_5_detail_urls:</strong><br>${urls.map((u) => escHtml(u)).join('<br>')}</div>`;
+  if (traces.length) {
+    html += `<div class="mt-1"><strong>detail_trace_sample:</strong></div>`;
+    for (const t of traces) {
+      html += `<div style="margin:6px 0; padding:6px; border:1px solid #444; border-radius:4px;">
+        idx=${escHtml(t.index)} id=${escHtml(t.source_recipe_id)} parser_entered=${escHtml(t.parser_entered)} status=${escHtml(t.http_status)} body_len=${escHtml(t.body_len)} body_empty=${escHtml(t.body_empty)} rows=${escHtml(t.flavour_rows_found)} reason=${escHtml(t.reason)}<br>
+        url=${escHtml(t.detail_url)}<br>
+        final=${escHtml(t.final_url)}<br>
+        snippet=${escHtml((t.body_snippet || '').slice(0, 220))}
+      </div>`;
+    }
+  }
+  html += `<details class="mt-1"><summary>raw payload</summary><pre style="white-space:pre-wrap;">${escHtml(JSON.stringify(data || {}, null, 2))}</pre></details>`;
+  return html;
+}
+
+async function triggerScraper(name) {
+  const box = document.getElementById('scraperResult');
+  if (!box) return;
+  box.className = 'mt-3 small text-secondary';
+  box.textContent = `Running ${name}...`;
+  try {
+    const res = await fetch(`/master-admin/scrapers/trigger/${name}`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok || data.status !== 'success') {
+      box.className = 'mt-3 small text-danger';
+      box.innerHTML = renderScraperDiagnostics(name, data);
+      return;
+    }
+    box.className = 'mt-3 small text-success';
+    box.innerHTML = renderScraperDiagnostics(name, data);
+    // Refresh health panel so Latest Runs / Health match this run_id.
+    setTimeout(() => location.reload(), 800);
+  } catch (e) {
+    box.className = 'mt-3 small text-danger';
+    box.textContent = 'Request failed';
+  }
+}
+
+async function verifyLatestScraper(name) {
+  const box = document.getElementById('scraperVerifyResult');
+  if (!box) return;
+  box.className = 'mt-2 small text-secondary font-monospace';
+  box.textContent = `Verifying ${name}...`;
+  try {
+    const res = await fetch(`/master-admin/scrapers/verify/${name}`, { method: 'POST' });
+    const data = await res.json();
+    const checks = (data.checks || []).map(c => `${c.ok ? 'OK' : 'FAIL'} ${c.code}: ${c.detail}`).join('\n');
+    box.className = data.status === 'success' ? 'mt-2 small text-success font-monospace' : 'mt-2 small text-danger font-monospace';
+    box.textContent = `Verify ${name} run #${(data.latest_run||{}).run_id || '?'}: ${data.status}\n${checks}`;
+  } catch (e) {
+    box.className = 'mt-2 small text-danger';
+    box.textContent = 'Verify request failed';
+  }
+}
+
+async function runAllScrapers() {
+  const box = document.getElementById('scraperResult');
+  if (!box) return;
+  box.className = 'mt-3 small text-secondary';
+  box.textContent = 'Running all scrapers...';
+  try {
+    const res = await fetch('/master-admin/scrapers/run-all', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok || (data.status !== 'success' && data.status !== 'partial')) {
+      box.className = 'mt-3 small text-danger';
+      box.textContent = data.message || 'Run all failed';
+      return;
+    }
+    box.className = data.status === 'success' ? 'mt-3 small text-success' : 'mt-3 small text-warning';
+    box.textContent = `Run all: ${data.status} (${JSON.stringify(data.summary || {})})`;
+    setTimeout(() => location.reload(), 1200);
+  } catch (e) {
+    box.className = 'mt-3 small text-danger';
+    box.textContent = 'Request failed';
+  }
+}
+
+function runSelectedVcUser(mode) {
+  const sel = document.getElementById('vcUserSelect');
+  const uid = (sel?.value || '2078').trim();
+  let action = `vc_dtl_user_${uid}`;
+  if (mode === 'resume') action = `vc_dtl_user_resume_${uid}`;
+  if (mode === 'reset') action = `vc_dtl_user_reset_${uid}`;
+  triggerScraper(action);
+}
+
+async function checkSchedulerHealth() {
+  const box = document.getElementById('schedulerHealthResult');
+  if (!box) return;
+  box.className = 'small mt-2 text-secondary';
+  box.textContent = 'Checking scheduler health...';
+  try {
+    const res = await fetch('/master-admin/scrapers/scheduler-health', { method: 'POST' });
+    const data = await res.json();
+    const issues = Array.isArray(data.issues) ? data.issues : [];
+    if (!res.ok || data.health === 'error') {
+      box.className = 'small mt-2 text-danger';
+      box.innerHTML = `health=${escHtml(data.health || 'error')}<br>${issues.map(escHtml).join('<br>')}`;
+      return;
+    }
+    if (data.health === 'warning') {
+      box.className = 'small mt-2 text-warning';
+      box.innerHTML = `health=warning<br>${issues.map(escHtml).join('<br>')}`;
+      return;
+    }
+    box.className = 'small mt-2 text-success';
+    box.textContent = 'Scheduler health OK';
+  } catch (e) {
+    box.className = 'small mt-2 text-danger';
+    box.textContent = 'Scheduler health request failed';
+  }
+}
+
+async function previewMonthlyPlan() {
+  const box = document.getElementById('schedulerHealthResult');
+  if (!box) return;
+  box.className = 'small mt-2 text-secondary';
+  box.textContent = 'Loading monthly scraper plan...';
+  try {
+    const res = await fetch('/master-admin/scrapers/monthly-plan-preview', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok || data.status !== 'success') {
+      box.className = 'small mt-2 text-danger';
+      box.textContent = data.message || 'Failed to load monthly plan';
+      return;
+    }
+    const plan = Array.isArray(data.monthly_scraper_plan) ? data.monthly_scraper_plan : [];
+    box.className = 'small mt-2 text-info';
+    box.innerHTML = `monthly plan: ${plan.map(escHtml).join(' -> ')}<br>vc_included=${escHtml(data.vc_monthly_inclusion)} trigger=${escHtml(data.vc_monthly_trigger || '')}`;
+  } catch (e) {
+    box.className = 'small mt-2 text-danger';
+    box.textContent = 'Monthly plan preview request failed';
+  }
+}
+
+function classificationResultBox() {
+  return document.getElementById('classificationResult') || document.getElementById('scraperResult');
+}
+
+async function runFlavorClassifyDryRun() {
+  const box = classificationResultBox();
+  if (!box) return;
+  box.className = 'mt-3 small text-secondary';
+  box.textContent = 'Running classification dry run...';
+  try {
+    const res = await fetch('/master-admin/flavors/classify-all', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ apply: false })
+    });
+    const data = await res.json();
+    if (!res.ok || data.status !== 'success') {
+      box.className = 'mt-3 small text-danger';
+      box.textContent = data.message || 'Dry run failed';
+      return;
+    }
+    box.className = 'mt-3 small text-info';
+    box.textContent = `Dry run: scanned=${data.total_scanned}, changed=${data.total_changed}, manual_skipped=${data.skipped_manual_overrides}, review=${data.needs_review_count}`;
+  } catch (e) {
+    box.className = 'mt-3 small text-danger';
+    box.textContent = 'Request failed';
+  }
+}
+
+async function runFlavorClassifyApply() {
+  if (!confirm('Apply classification to all non-manual flavors?')) return;
+  const box = classificationResultBox();
+  if (!box) return;
+  box.className = 'mt-3 small text-secondary';
+  box.textContent = 'Applying flavor classification...';
+  try {
+    const res = await fetch('/master-admin/flavors/classify-all', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ apply: true })
+    });
+    const data = await res.json();
+    if (!res.ok || data.status !== 'success') {
+      box.className = 'mt-3 small text-danger';
+      box.textContent = data.message || 'Apply failed';
+      return;
+    }
+    box.className = 'mt-3 small text-success';
+    box.textContent = `Applied: scanned=${data.total_scanned}, updated=${data.total_changed}, manual_skipped=${data.skipped_manual_overrides}, review=${data.needs_review_count}`;
+  } catch (e) {
+    box.className = 'mt-3 small text-danger';
+    box.textContent = 'Request failed';
+  }
+}
+
+async function previewSingleFlavorClassification() {
+  const id = parseInt(document.getElementById('singleFlavorId').value || '0', 10);
+  const box = classificationResultBox();
+  if (!box) return;
+  if (!id) { box.className = 'mt-3 small text-danger'; box.textContent = 'Enter flavor ID'; return; }
+  box.className = 'mt-3 small text-secondary';
+  box.textContent = `Previewing flavor ${id}...`;
+  const res = await fetch(`/master-admin/flavors/classify/${id}`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ apply: false })
+  });
+  const data = await res.json();
+  if (!res.ok || data.status !== 'success') {
+    box.className = 'mt-3 small text-danger';
+    box.textContent = data.message || 'Preview failed';
+    return;
+  }
+  box.className = 'mt-3 small text-info';
+  box.textContent = `Flavor #${id}: profile=${data.result.resolved_profile}, primary=${data.result.keyword_primary || '-'}, confidence=${data.result.confidence}`;
+}
+
+async function applySingleFlavorClassification() {
+  const id = parseInt(document.getElementById('singleFlavorId').value || '0', 10);
+  const box = classificationResultBox();
+  if (!box) return;
+  if (!id) { box.className = 'mt-3 small text-danger'; box.textContent = 'Enter flavor ID'; return; }
+  if (!confirm(`Apply classification to flavor #${id}?`)) return;
+  box.className = 'mt-3 small text-secondary';
+  box.textContent = `Applying flavor ${id}...`;
+  const res = await fetch(`/master-admin/flavors/classify/${id}`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ apply: true })
+  });
+  const data = await res.json();
+  if (!res.ok || data.status !== 'success') {
+    box.className = 'mt-3 small text-danger';
+    box.textContent = data.message || 'Apply failed';
+    return;
+  }
+  box.className = 'mt-3 small text-success';
+  box.textContent = `Flavor #${id} updated: profile=${data.result.resolved_profile}, confidence=${data.result.confidence}`;
+}
+
+function recipeAnalyticsBox() {
+  return document.getElementById('recipeAnalyticsResult');
+}
+
+async function recipeAnalyticsDryRun() {
+  const box = recipeAnalyticsBox();
+  if (!box) return;
+  box.className = 'mt-3 small text-secondary';
+  box.textContent = 'Scanning recipes (dry run)...';
+  try {
+    const res = await fetch('/master-admin/flavors/recipe-analytics/recompute', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ apply: false, mode: 'all' })
+    });
+    const data = await res.json();
+    if (!res.ok || data.status !== 'success') {
+      box.className = 'mt-3 small text-danger';
+      box.textContent = data.message || 'Dry run failed';
+      return;
+    }
+    const s = data.source || {};
+    box.className = 'mt-3 small text-info';
+    box.textContent = `Dry run OK: recipes=${s.recipes_in_set}, flavor_lines=${s.flavor_lines_loaded}, flavors=${s.flavors_with_usage}, pair_rows=${s.pair_rows_computed} (min co-occur ${s.min_pair_recipe_count})`;
+  } catch (e) {
+    box.className = 'mt-3 small text-danger';
+    box.textContent = 'Request failed';
+  }
+}
+
+async function recipeAnalyticsApplyAll() {
+  if (!confirm('Recompute all recipe usage + pairings? This replaces rows in flavor_recipe_analytics and flavor_pairings.')) return;
+  const box = recipeAnalyticsBox();
+  if (!box) return;
+  box.className = 'mt-3 small text-secondary';
+  box.textContent = 'Applying full recipe analytics...';
+  try {
+    const res = await fetch('/master-admin/flavors/recipe-analytics/recompute', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ apply: true, mode: 'all' })
+    });
+    const data = await res.json();
+    if (!res.ok || data.status !== 'success') {
+      box.className = 'mt-3 small text-danger';
+      box.textContent = data.message || 'Failed';
+      return;
+    }
+    const s = data.source || {};
+    box.className = 'mt-3 small text-success';
+    box.textContent = `Done: recipes=${s.recipes_in_set}, flavors=${s.flavors_with_usage}, pairs=${s.pair_rows_computed}`;
+  } catch (e) {
+    box.className = 'mt-3 small text-danger';
+    box.textContent = 'Request failed';
+  }
+}
+
+async function recipeAnalyticsPairingsOnly() {
+  if (!confirm('Recompute pairings only? (Usage table left unchanged unless empty from prior runs.)')) return;
+  const box = recipeAnalyticsBox();
+  if (!box) return;
+  box.textContent = 'Recomputing pairings...';
+  try {
+    const res = await fetch('/master-admin/flavors/recipe-analytics/recompute', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ apply: true, mode: 'pairings' })
+    });
+    const data = await res.json();
+    if (!res.ok || data.status !== 'success') {
+      box.className = 'mt-3 small text-danger';
+      box.textContent = data.message || 'Failed';
+      return;
+    }
+    box.className = 'mt-3 small text-success';
+    box.textContent = `Pairings done: rows=${(data.source || {}).pair_rows_computed}`;
+  } catch (e) {
+    box.className = 'mt-3 small text-danger';
+    box.textContent = 'Request failed';
+  }
+}
+
+async function loadUnresolvedQueue() {
+  const brand = encodeURIComponent((document.getElementById('uqBrand')?.value || '').trim());
+  const search = encodeURIComponent((document.getElementById('uqSearch')?.value || '').trim());
+  const minOcc = encodeURIComponent((document.getElementById('uqMinOcc')?.value || '1').trim());
+  const box = document.getElementById('unresolvedQueueBox');
+  const metricsBox = document.getElementById('unresolvedMetrics');
+  if (!box || !metricsBox) return;
+  box.textContent = 'Loading...';
+  try {
+    const res = await fetch(`/master-admin/vc/unresolved-queue?brand=${brand}&search=${search}&min_occurrence=${minOcc}`);
+    const data = await res.json();
+    if (!res.ok || data.status !== 'success') {
+      box.textContent = data.message || 'Failed to load unresolved queue.';
+      return;
+    }
+    const m = data.metrics || {};
+    metricsBox.textContent = `Rows=${m.total_imported_flavour_rows || 0}, matched=${m.total_matched_rows || 0}, unresolved=${m.total_unresolved_rows || 0}, groups=${m.unresolved_grouped_entries || 0}, match-rate=${m.match_rate_percent || 0}%`;
+    const rows = data.rows || [];
+    if (!rows.length) { box.textContent = 'No unresolved rows found.'; return; }
+    box.innerHTML = rows.slice(0, 60).map((r, idx) => {
+      const prefill = encodeURIComponent(JSON.stringify({
+        alias_raw: (r.sample_raw_names || [''])[0] || r.flavour_name_normalized,
+        brand_canonical: r.brand_canonical,
+      }));
+      return `<div class="border rounded p-2 mb-2">
+        <div><strong>${escHtml(r.brand_canonical || '-')}</strong> :: <span class="font-monospace">${escHtml(r.flavour_name_normalized || '-')}</span> <span class="text-warning">x${escHtml(r.occurrence_count)}</span></div>
+        <div class="text-secondary">sample: ${escHtml((r.sample_raw_names || [''])[0] || '')} | recipe: #${escHtml(r.sample_source_recipe_id || '')} ${escHtml(r.sample_recipe_title || '')}</div>
+        <div class="mt-1 d-flex gap-2 align-items-center">
+          <button class="btn btn-sm btn-outline-info" onclick="loadIdentityCandidates('${encodeURIComponent(r.brand_canonical || '')}','${encodeURIComponent(r.flavour_name_normalized || '')}','cand-${idx}')">Suggestions</button>
+          <button class="btn btn-sm btn-outline-success" onclick="openAliasCreate('${prefill}')">Create Alias</button>
+          <span id="cand-${idx}" class="small text-secondary"></span>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    box.textContent = 'Request failed.';
+  }
+}
+
+async function loadIdentityCandidates(brandEnc, nameEnc, targetId) {
+  const el = document.getElementById(targetId);
+  if (!el) return;
+  el.textContent = 'Loading candidates...';
+  const res = await fetch(`/master-admin/vc/unresolved-candidates?brand_canonical=${brandEnc}&flavour_name_normalized=${nameEnc}`);
+  const data = await res.json();
+  const c = data.candidates || [];
+  if (!c.length) { el.textContent = 'No candidate suggestions'; return; }
+  el.textContent = c.map(x => `#${x.candidate_flavor_id} ${x.candidate_internal_flavor_name} (${x.candidate_brand}) ~${x.confidence_hint}`).join(' | ');
+}
+
+async function openAliasCreate(prefillEnc) {
+  let p = {};
+  try { p = JSON.parse(decodeURIComponent(prefillEnc)); } catch (e) {}
+  const aliasRaw = prompt('Alias raw value', p.alias_raw || '');
+  if (!aliasRaw) return;
+  const brandCanonical = prompt('Brand canonical', p.brand_canonical || '') || '';
+  const targetFlavorName = prompt('Target internal flavor name (exact)', '');
+  if (!targetFlavorName) return;
+  const confidence = parseFloat(prompt('Confidence override (0-1)', '0.9') || '0.9');
+  const notes = prompt('Notes', 'Created from unresolved imported flavour queue') || '';
+  const res = await fetch('/master-admin/vc/create-alias', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      alias_raw: aliasRaw,
+      brand_canonical: brandCanonical,
+      target_flavor_name: targetFlavorName,
+      confidence_override: confidence,
+      notes
+    })
+  });
+  const data = await res.json();
+  if (!res.ok || data.status !== 'success') {
+    alert(data.message || 'Alias create failed');
+    return;
+  }
+  if (confirm('Alias saved. Re-run unresolved-only backfill now?')) {
+    await triggerScraper('vc_flavour_identity_unresolved');
+  }
+  await loadUnresolvedQueue();
+}
+
+async function recipeAnalyticsPreviewSingle() {
+  const id = parseInt(document.getElementById('recipeAnalyticsFlavorId').value || '0', 10);
+  const box = recipeAnalyticsBox();
+  if (!box) return;
+  if (!id) { box.className = 'mt-3 small text-danger'; box.textContent = 'Enter flavor ID'; return; }
+  box.textContent = 'Preview...';
+  try {
+    const res = await fetch('/master-admin/flavors/recipe-analytics/recompute', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ apply: false, mode: 'all', reference_id: id })
+    });
+    const data = await res.json();
+    if (!res.ok || data.status !== 'success') {
+      box.className = 'mt-3 small text-danger';
+      box.textContent = data.message || 'Failed';
+      return;
+    }
+    const fp = data.flavor_preview || {};
+    box.className = 'mt-3 small text-info';
+    box.textContent = `Preview #${id}: recipes=${fp.recipe_count}, avg%=${fp.avg_pct}, role=${fp.likely_recipe_role || '-'}`;
+  } catch (e) {
+    box.className = 'mt-3 small text-danger';
+    box.textContent = 'Request failed';
+  }
+}
+
+async function recipeAnalyticsApplySingle() {
+  const id = parseInt(document.getElementById('recipeAnalyticsFlavorId').value || '0', 10);
+  const box = recipeAnalyticsBox();
+  if (!box) return;
+  if (!id) { box.className = 'mt-3 small text-danger'; box.textContent = 'Enter flavor ID'; return; }
+  if (!confirm(`Update recipe analytics for flavor #${id} (and its pair rows)?`)) return;
+  box.textContent = 'Applying...';
+  try {
+    const res = await fetch(`/master-admin/flavors/recipe-analytics/recompute/${id}`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ apply: true, mode: 'all' })
+    });
+    const data = await res.json();
+    if (!res.ok || data.status !== 'success') {
+      box.className = 'mt-3 small text-danger';
+      box.textContent = data.message || 'Failed';
+      return;
+    }
+    box.className = 'mt-3 small text-success';
+    box.textContent = (data.warning || '').trim() || `Flavor #${id} analytics updated.`;
+  } catch (e) {
+    box.className = 'mt-3 small text-danger';
+    box.textContent = 'Request failed';
+  }
+}
+
+async function saveUser(userId) {
+  const role = document.getElementById(`role-${userId}`).value;
+  const status = document.getElementById(`status-${userId}`).value;
+  try {
+    const res = await fetch('/master-admin/users/update', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ user_id: userId, role, status })
+    });
+    const data = await res.json();
+    if (!res.ok || data.status !== 'success') {
+      alert(data.message || 'Failed to update user');
+      return;
+    }
+    location.reload();
+  } catch (e) {
+    alert('Request failed');
+  }
+}
+
+function openResetPasswordModal(userId, username) {
+  document.getElementById('rpUserId').value = userId;
+  document.getElementById('rpUsername').textContent = username || `#${userId}`;
+  document.getElementById('rpPassword').value = '';
+  document.getElementById('rpConfirm').value = '';
+  const modalEl = document.getElementById('resetPasswordModal');
+  bootstrap.Modal.getOrCreateInstance(modalEl).show();
+}
+
+async function submitResetPassword() {
+  const userId = parseInt(document.getElementById('rpUserId').value || '0', 10);
+  const password = document.getElementById('rpPassword').value || '';
+  const confirm_password = document.getElementById('rpConfirm').value || '';
+  if (!userId) { alert('Missing user'); return; }
+  if (password.length < 4) { alert('Password must be at least 4 characters'); return; }
+  if (password !== confirm_password) { alert('Passwords do not match'); return; }
+  try {
+    const res = await fetch('/master-admin/users/reset-password', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ user_id: userId, password, confirm_password })
+    });
+    const data = await res.json();
+    if (!res.ok || data.status !== 'success') {
+      alert(data.message || 'Password reset failed');
+      return;
+    }
+    alert('Password reset successful');
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('resetPasswordModal')).hide();
+  } catch (e) {
+    alert('Request failed');
+  }
+}
+
+function filterShopping() {
+  const q = (document.getElementById('shopFilter').value || '').toLowerCase().trim();
+  const table = document.getElementById('shoppingTable');
+  if (!table) return;
+  for (const tr of table.querySelectorAll('tbody tr')) {
+    const txt = tr.innerText.toLowerCase();
+    tr.style.display = (!q || txt.includes(q)) ? '' : 'none';
+  }
+}
+
+function openAllUrls() {
+  const table = document.getElementById('shoppingTable');
+  if (!table) return;
+  const urls = [];
+  for (const tr of table.querySelectorAll('tbody tr')) {
+    const u = tr.getAttribute('data-url');
+    if (u) urls.push(u);
+  }
+  if (!urls.length) { alert('No product URLs'); return; }
+  if (!confirm(`Open ${urls.length} product pages in new tabs?`)) return;
+  for (const u of urls) window.open(u, '_blank', 'noopener');
+}
+
+async function regenerateShopping() {
+  const box = document.getElementById('shoppingResult');
+  const thresholds = {
+    Flavor: parseFloat(document.getElementById('t_flavor').value || '10'),
+    Base: parseFloat(document.getElementById('t_base').value || '100'),
+    Nicotine: parseFloat(document.getElementById('t_nic').value || '50'),
+    Hardware: parseFloat(document.getElementById('t_hw').value || '1'),
+  };
+  box.className = 'mt-3 small text-secondary';
+  box.textContent = 'Regenerating...';
+  try {
+    const res = await fetch('/master-admin/shopping/regenerate', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ thresholds })
+    });
+    const data = await res.json();
+    if (!res.ok || data.status !== 'success') {
+      box.className = 'mt-3 small text-danger';
+      box.textContent = data.message || 'Failed';
+      return;
+    }
+    box.className = 'mt-3 small text-success';
+    box.textContent = `Saved run #${data.run_id} (${data.count} items). Reloading...`;
+    setTimeout(() => location.reload(), 800);
+  } catch (e) {
+    box.className = 'mt-3 small text-danger';
+    box.textContent = 'Request failed';
+  }
+}
+</script>
+{% endblock %}
+

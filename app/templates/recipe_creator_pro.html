@@ -1,0 +1,440 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {% if is_edit %}Edit Recipe | Old Goat{% else %}Create Recipe | Old Goat{% endif %}
+{% endblock %}
+
+{% block content %}
+    <style>
+        :root { 
+            --panel-bg: #1a1a1a; --input-bg: #000; --primary-orange: #ff8c00; 
+            --success: #28a745; --warning: #ffc107; --danger: #dc3545;
+            --advanced-purple: #9d50bb;
+        }
+        
+        .lab-container { 
+            display: grid; 
+            grid-template-columns: 320px 1fr 380px; 
+            gap: 20px; 
+            padding: 20px;
+            height: auto;
+        }
+
+        .column { display: flex; flex-direction: column; gap: 20px; overflow-y: auto; padding-right: 5px; }
+        .card { background: var(--panel-bg); padding: 20px; border-radius: 8px; border: 1px solid #333; position: relative; }
+        .card h3 { margin-top: 0; color: var(--primary-orange); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
+
+        .flavor-table { width: 100%; border-collapse: collapse; }
+        .flavor-table th { text-align: left; font-size: 0.65rem; color: #777; text-transform: uppercase; padding-bottom: 10px; }
+        .flavor-table td { padding: 12px 0; border-bottom: 1px solid #222; vertical-align: middle; }
+        
+        .input-inline { 
+            background: var(--input-bg); border: 1px solid #444; color: #fff; 
+            padding: 8px; border-radius: 4px; width: 70px; text-align: center; font-family: 'JetBrains Mono', monospace;
+        }
+        .input-wide { width: 100%; box-sizing: border-box; background: var(--input-bg); color: #fff; border: 1px solid #444; padding: 10px; border-radius: 4px; }
+
+        /* Search & Navigation */
+        .search-container { position: relative; width: 100%; }
+        .search-results { 
+            position: absolute; top: 100%; left: 0; right: 0; 
+            background: #151515; border: 1px solid var(--primary-orange); 
+            z-index: 999; max-height: 300px; overflow-y: auto; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8); display: none;
+        }
+        .result-item { padding: 12px; border-bottom: 1px solid #333; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; }
+        .result-item.highlighted { background: #333; border-left: 3px solid var(--primary-orange); color: var(--primary-orange); }
+        
+        /* Stats & Guardrails */
+        .stat-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; }
+        .guardrail-container { width: 100%; height: 6px; background: #333; border-radius: 3px; margin: 10px 0; overflow: hidden; }
+        .guardrail-bar { height: 100%; width: 0%; transition: width 0.3s, background 0.3s; }
+        
+        .gram-display { color: #888; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; }
+        .warning-text { color: var(--danger); font-size: 0.75rem; margin-top: 5px; font-weight: bold; }
+        
+        .preset-btn { background: #333; border: 1px solid #444; color: #aaa; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; }
+        .preset-btn:hover { border-color: var(--primary-orange); color: #fff; }
+
+        .nav-header { background: #111; padding: 12px 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; }
+        .btn-apply { background: var(--primary-orange); color: #000; border: none; padding: 10px 20px; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        
+        .empty-hint { text-align: center; padding: 50px; color: #444; font-style: italic; }
+
+        /* Recipe Status Styling */
+        .status-select { 
+            background: #111; color: var(--primary-orange); border: 1px solid #444; 
+            padding: 8px; border-radius: 4px; font-weight: bold; width: 100%; cursor: pointer;
+        }
+    </style>
+
+<div class="nav-header">
+    <div style="font-size: 1.2rem; font-weight: bold; color: var(--primary-orange);">
+        GOAT LABS
+        <span style="font-weight:300; color:#777;">
+            {% if is_edit %}EDIT RECIPE{% else %}CREATE RECIPE{% endif %}
+        </span>
+    </div>
+    <div style="display:flex; gap:10px;">
+        <button onclick="saveAjax(document.getElementById('recipe_status').value)" style="background:#444; color:#fff; border:none; padding:10px 20px; border-radius:4px; cursor:pointer;">
+            {% if is_edit %}Update Recipe{% else %}Create Recipe{% endif %}
+        </button>
+        <button onclick="saveAjax('Production')" class="btn-apply">Force to Production</button>
+    </div>
+</div>
+
+<div class="lab-container">
+    <div class="column">
+        <div class="card">
+            <h3>Identity & Permissions</h3>
+            <input type="hidden" id="recipe_id" value="">
+            <input type="hidden" id="existing_image_path" value="">
+            
+            <label style="font-size:0.7rem; color:#777;">RECIPE NAME</label>
+            <input type="text" id="recipe_name" class="input-wide" placeholder="Blue Raspberry Slush" oninput="autoGenCode(this.value)">
+            
+            <label style="font-size:0.7rem; color:#777; margin-top:15px; display:block;">RECIPE CODE</label>
+            <input type="text" id="recipe_code" class="input-wide" style="text-transform: uppercase; margin-bottom:15px;">
+
+            <label style="font-size:0.7rem; color:#777; display:block;">RECIPE STATE (Visibility Gate)</label>
+            <select id="recipe_status" class="status-select">
+                <option value="Development">Development (Draft / Old Goat Only)</option>
+                <option value="Advanced">Advanced (Ram+ Only)</option>
+                <option value="Production" selected>Production (All Roles)</option>
+                <option value="Archived">Archived (Retired / Hidden)</option>
+            </select>
+            <p style="font-size: 0.6rem; color: #555; margin-top: 5px;">* Changing state affects library visibility immediately.</p>
+
+            <div style="margin-top:15px;">
+                <label style="font-size:0.7rem; color:#777; display:block; margin-bottom:6px;">RECIPE IMAGE (Thumbnail)</label>
+                <input type="file" id="recipe_image" name="recipe_image" accept="image/*" class="input-wide" style="padding:8px;">
+                <div id="image_preview_wrap" style="margin-top:10px; display:none;">
+                    <div style="font-size:0.7rem; color:#777; margin-bottom:6px;">CURRENT IMAGE</div>
+                    <img id="image_preview" src="" alt="Recipe image preview" style="width:100%; max-width:260px; height:auto; border-radius:8px; border:1px solid #333;">
+                    <div style="font-size:0.6rem; color:#555; margin-top:6px;">Uploading a new image will replace the current one.</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Batch Specs</h3>
+            <div class="stat-row">
+                <span>Batch (ml)</span>
+                <input type="number" id="batch_size" class="input-inline" value="60" oninput="calculateAll()">
+            </div>
+            <div style="display:flex; gap:5px; margin-bottom:15px; flex-wrap: wrap;">
+                <button class="preset-btn" onclick="setBatch(10)">10ml</button>
+                <button class="preset-btn" onclick="setBatch(30)">30ml</button>
+                <button class="preset-btn" onclick="setBatch(60)">60ml</button>
+                <button class="preset-btn" onclick="setBatch(120)">120ml</button>
+            </div>
+            <div class="stat-row">
+                <span>Ratio</span>
+                <input type="text" id="target_ratio" class="input-inline" value="70/30">
+            </div>
+        </div>
+    </div>
+
+    <div class="column">
+        <div class="card" style="min-height: 400px; flex: 1;">
+            <h3>Flavor Stack</h3>
+            <div class="search-container">
+                <input type="text" id="master-search" class="input-wide" placeholder="🔍 Search DNA Library (Brand or Name)..." autocomplete="off">
+                <div id="search-results" class="search-results"></div>
+            </div>
+
+            <table class="flavor-table" style="margin-top:20px;">
+                <thead>
+                    <tr>
+                        <th>Ingredient</th>
+                        <th width="80">%</th>
+                        <th width="80">ml</th>
+                        <th width="90">g (Weight)</th>
+                        <th width="30"></th>
+                    </tr>
+                </thead>
+                <tbody id="flavor-body"></tbody>
+            </table>
+            <div id="empty-hint" class="empty-hint">Start typing a flavor name to build your stack.</div>
+        </div>
+    </div>
+
+    <div class="column">
+        <div class="card">
+            <h3>Live Analysis</h3>
+            <div class="stat-row"><span>Total Flavor:</span> <strong id="res_total_pct">0.00%</strong></div>
+            <div class="guardrail-container">
+                <div id="pct_bar" class="guardrail-bar"></div>
+            </div>
+            
+            <div class="stat-row" style="margin-top:20px;">
+                <span>Total Weight:</span> 
+                <strong id="res_total_weight" style="color:var(--primary-orange);">0.00 g</strong>
+            </div>
+
+            {% if session['role'] in ['Old Goat', 'Master'] %}
+            <div style="border-top:1px solid #333; margin-top:15px; padding-top:15px;">
+                <div class="stat-row"><span>Batch Cost:</span> <strong id="res_batch_cost">R 0.00</strong></div>
+                <div class="stat-row"><span>Cost/ml:</span> <strong id="res_cost_per_ml">R 0.00</strong></div>
+            </div>
+            {% endif %}
+            
+            <div id="guardrail_alerts" style="margin-top:10px;"></div>
+        </div>
+
+        <div class="card">
+            <h3>Lab Notes</h3>
+            <textarea id="recipe_notes" class="input-wide" style="height:100px; resize:none;" placeholder="Observations..."></textarea>
+        </div>
+    </div>
+</div>
+
+<script>
+let masterLibrary = [];
+let stack = [];
+let selectedIndex = -1;
+
+const searchInput = document.getElementById('master-search');
+const resultsDiv = document.getElementById('search-results');
+
+window.addEventListener('DOMContentLoaded', async () => {
+    const rawData = '{{ existing_data | safe }}';
+    if (rawData && rawData !== 'null') {
+        try {
+            const parsed = JSON.parse(rawData);
+            document.getElementById('recipe_id').value = parsed.recipe_id || '';
+            document.getElementById('recipe_name').value = parsed.name || '';
+            document.getElementById('recipe_code').value = parsed.code || '';
+            document.getElementById('target_ratio').value = parsed.ratio || '70/30';
+
+            if (parsed.status) {
+                document.getElementById('recipe_status').value = parsed.status;
+            }
+
+            if (parsed.image_path) {
+                document.getElementById('existing_image_path').value = parsed.image_path;
+                const img = document.getElementById('image_preview');
+                img.src = `/static/${parsed.image_path}`;
+                document.getElementById('image_preview_wrap').style.display = 'block';
+            }
+
+            stack = (parsed.ingredients || []).map(ing => ({
+                ingredient_id: ing.ingredient_id,
+                brand: ing.brand,
+                name: ing.name,
+                cost_per_ml: ing.price_per_ml || 0,
+                percentage: ing.percent || 0,
+                stock_g: ing.stock_g || 0,
+                density: ing.density || 1.03
+            }));
+            renderStack();
+        } catch (e) {
+            console.error("Existing data parse error:", e);
+        }
+    }
+
+    try {
+        const res = await fetch('/api/flavors/library_dump');
+        if (!res.ok) throw new Error(`library_dump HTTP ${res.status}`);
+        masterLibrary = await res.json();
+    } catch (e) {
+        console.error("Library dump load error:", e);
+        masterLibrary = [];
+    }
+});
+
+// --- SEARCH LOGIC ---
+
+searchInput.addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase().trim();
+    if (q.length < 2) { resultsDiv.style.display = 'none'; return; }
+
+    const matches = masterLibrary.filter(item => 
+        `${item.brand} ${item.name}`.toLowerCase().includes(q)
+    ).slice(0, 10);
+
+    selectedIndex = 0; 
+    if (matches.length > 0) {
+        resultsDiv.innerHTML = matches.map((item, idx) => `
+            <div class="result-item ${idx === 0 ? 'highlighted' : ''}" onclick='addToStack(${JSON.stringify(item)})'>
+                <div>
+                    <strong style="color:var(--primary-orange)">${item.brand}</strong> ${item.name}<br>
+                    <small style="color:#777">Stock: ${item.stock_g}g | ${item.is_nicotine ? '⚠️ NICOTINE' : 'Flavor'}</small>
+                </div>
+            </div>
+        `).join('');
+        resultsDiv.style.display = 'block';
+    } else {
+        resultsDiv.style.display = 'none';
+    }
+});
+
+searchInput.addEventListener('keydown', (e) => {
+    const items = resultsDiv.querySelectorAll('.result-item');
+    if (e.key === 'ArrowDown') {
+        selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+        updateSelection(items);
+        e.preventDefault();
+    } else if (e.key === 'ArrowUp') {
+        selectedIndex = Math.max(selectedIndex - 1, 0);
+        updateSelection(items);
+        e.preventDefault();
+    } else if (e.key === 'Enter' && selectedIndex > -1) {
+        items[selectedIndex].click();
+    }
+});
+
+function updateSelection(items) {
+    items.forEach((item, idx) => item.classList.toggle('highlighted', idx === selectedIndex));
+}
+
+function addToStack(item) {
+    if (stack.find(s => s.ingredient_id === item.id)) return;
+
+    stack.push({
+        ingredient_id: item.id,
+        brand: item.brand,
+        name: item.name,
+        cost_per_ml: item.price_per_ml || 0,
+        percentage: item.avg_percent || 2.0,
+        stock_g: item.stock_g || 0,
+        density: item.density || 1.03
+    });
+    
+    searchInput.value = '';
+    resultsDiv.style.display = 'none';
+    renderStack();
+    
+    const inputs = document.querySelectorAll('.pct-input');
+    if (inputs.length) {
+        inputs[inputs.length - 1].focus();
+        inputs[inputs.length - 1].select();
+    }
+}
+
+// --- CALCULATION ---
+
+function renderStack() {
+    const body = document.getElementById('flavor-body');
+    const hint = document.getElementById('empty-hint');
+    body.innerHTML = '';
+    hint.style.display = stack.length ? 'none' : 'block';
+
+    stack.forEach((ing, index) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>
+                <div style="font-size:0.9rem;"><strong>${ing.brand}</strong></div>
+                <div style="font-size:0.75rem; color:#777;">${ing.name}</div>
+                ${ing.stock_g <= 0 ? '<div class="warning-text">⚠️ OUT OF STOCK</div>' : ''}
+            </td>
+            <td><input type="number" step="0.01" class="input-inline pct-input" value="${ing.percentage}" oninput="updateStackPct(${index}, this.value)"></td>
+            <td id="ml_${index}" class="gram-display" style="color:#aaa;">0.00</td>
+            <td id="g_${index}" class="gram-display" style="font-weight:bold; color:#eee;">0.00 g</td>
+            <td><button onclick="removeFromStack(${index})" style="background:none; border:none; color:#444; cursor:pointer; font-size:1.2rem;">&times;</button></td>
+        `;
+        body.appendChild(tr);
+    });
+    calculateAll();
+}
+
+function calculateAll() {
+    const batchSize = parseFloat(document.getElementById('batch_size').value) || 0;
+    let totalPct = 0;
+    let totalWeight = 0;
+    let totalCost = 0;
+
+    stack.forEach((ing, index) => {
+        const ml = (ing.percentage / 100) * batchSize;
+        const grams = ml * ing.density;
+        
+        document.getElementById(`ml_${index}`).innerText = ml.toFixed(2);
+        document.getElementById(`g_${index}`).innerText = grams.toFixed(2) + ' g';
+        
+        totalPct += ing.percentage;
+        totalWeight += grams;
+        totalCost += (ml * ing.cost_per_ml);
+    });
+
+    document.getElementById('res_total_pct').innerText = totalPct.toFixed(2) + '%';
+    document.getElementById('res_total_weight').innerText = totalWeight.toFixed(2) + ' g';
+    
+    const bar = document.getElementById('pct_bar');
+    bar.style.width = Math.min(totalPct * 4, 100) + '%';
+    if (totalPct < 12) bar.style.background = 'var(--success)';
+    else if (totalPct < 18) bar.style.background = 'var(--warning)';
+    else bar.style.background = 'var(--danger)';
+
+    if (document.getElementById('res_batch_cost')) {
+        document.getElementById('res_batch_cost').innerText = 'R ' + totalCost.toFixed(2);
+        document.getElementById('res_cost_per_ml').innerText = 'R ' + (totalCost / batchSize || 0).toFixed(2);
+    }
+}
+
+// --- UTILITIES ---
+
+function setBatch(val) {
+    document.getElementById('batch_size').value = val;
+    calculateAll();
+}
+
+function autoGenCode(name) {
+    const codeBox = document.getElementById('recipe_code');
+    if (!codeBox.value || codeBox.dataset.auto === "true") {
+        const code = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 5);
+        codeBox.value = code;
+        codeBox.dataset.auto = "true";
+    }
+}
+
+function updateStackPct(index, val) {
+    stack[index].percentage = parseFloat(val) || 0;
+    calculateAll();
+}
+
+function removeFromStack(index) {
+    stack.splice(index, 1);
+    renderStack();
+}
+
+async function saveAjax(status) {
+    const payload = {
+        recipe_id: document.getElementById('recipe_id').value,
+        name: document.getElementById('recipe_name').value,
+        code: document.getElementById('recipe_code').value,
+        status: status,
+        ratio: document.getElementById('target_ratio').value,
+        total_pct: parseFloat(document.getElementById('res_total_pct').innerText),
+        ingredients: stack.map(i => ({ ingredient_id: i.ingredient_id, percent: i.percentage }))
+    };
+
+    if (!payload.name) { alert("Identity Required: Name the recipe."); return; }
+
+    try {
+        const fd = new FormData();
+        fd.append('payload', JSON.stringify(payload));
+        fd.append('existing_image_path', document.getElementById('existing_image_path').value || '');
+
+        const fileInput = document.getElementById('recipe_image');
+        if (fileInput && fileInput.files && fileInput.files.length) {
+            fd.append('recipe_image', fileInput.files[0]);
+        }
+
+        const response = await fetch('/recipes/save_ajax', {
+            method: 'POST',
+            body: fd
+        });
+
+        const resData = await response.json();
+        if (resData.status === "success") {
+            window.location.href = "/recipes";
+        } else {
+            alert("Error: " + resData.message);
+        }
+    } catch (e) {
+        alert("Critical failure saving recipe.");
+    }
+}
+
+</script>
+{% endblock %}

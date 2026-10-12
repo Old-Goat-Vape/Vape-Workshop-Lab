@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Payments - Sales Control{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+  <div><h1 class="h3 mb-1">Payments</h1><div class="text-secondary small">Record client payments and allocations.</div></div>
+  <a class="btn btn-outline-light btn-sm" href="{{ url_for('master_admin.sales_dashboard') }}">Back to Sales Dashboard</a>
+</div>
+
+<div class="card border-0 mb-3" style="background:#151515; border:1px solid #333 !important;">
+  <div class="card-body">
+    <h2 class="h5 mb-2">Record Payment</h2>
+    <form method="POST" class="row g-2 align-items-end">
+      <div class="col-12 col-md-3"><label class="form-label small text-secondary">Client</label><select name="client_id" class="form-select bg-black border-secondary" required><option value="">Select client...</option>{% for c in clients %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
+      <div class="col-6 col-md-2"><label class="form-label small text-secondary">Date</label><input type="date" name="payment_date" class="form-control bg-black border-secondary"></div>
+      <div class="col-6 col-md-2"><label class="form-label small text-secondary">Amount</label><input type="number" name="amount" min="0.01" step="0.01" class="form-control bg-black border-secondary" required></div>
+      <div class="col-6 col-md-2"><label class="form-label small text-secondary">Method</label><input name="payment_method" class="form-control bg-black border-secondary" placeholder="EFT/Cash/Card"></div>
+      <div class="col-6 col-md-3"><label class="form-label small text-secondary">Reference</label><input name="reference" class="form-control bg-black border-secondary"></div>
+      <div class="col-12"><label class="form-label small text-secondary">Notes</label><input name="notes" class="form-control bg-black border-secondary"></div>
+      <div class="col-12">
+        <label class="form-label small text-secondary">Optional Allocations (only fill rows you want)</label>
+        <div class="table-responsive">
+          <table class="table table-dark table-sm align-middle mb-0">
+            <thead><tr><th>Delivery</th><th class="text-end">Due</th><th class="text-end">Allocate</th></tr></thead>
+            <tbody>
+              {% for d in deliveries[:8] %}
+              <tr>
+                <td>
+                  <input type="hidden" name="alloc_delivery_id" value="{{ d.id }}">
+                  {{ d.delivery_number }} - {{ d.client_name }}
+                </td>
+                <td class="text-end">R {{ "%.2f"|format(d.due_value or 0) }}</td>
+                <td><input type="number" step="0.01" min="0" name="alloc_amount_{{ d.id }}" class="form-control bg-black border-secondary text-end" value="0"></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="col-12"><button class="btn btn-warning">Record Payment</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0" style="background:#151515; border:1px solid #333 !important;">
+  <div class="card-body">
+    <h2 class="h5 mb-2">Recent Payments</h2>
+    <div class="table-responsive">
+      <table class="table table-dark table-hover align-middle mb-0">
+        <thead><tr><th>Date</th><th>Client</th><th>Method</th><th>Reference</th><th class="text-end">Amount</th></tr></thead>
+        <tbody>
+          {% for p in payments %}
+          <tr><td>{{ p.payment_date }}</td><td>{{ p.client_name }}</td><td>{{ p.payment_method or '-' }}</td><td>{{ p.reference or '-' }}</td><td class="text-end">R {{ "%.2f"|format(p.amount or 0) }}</td></tr>
+          {% else %}
+          <tr><td colspan="5" class="text-center text-secondary py-4">No payments recorded yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

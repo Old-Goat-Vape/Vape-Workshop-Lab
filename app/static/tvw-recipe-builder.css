@@ -1,0 +1,405 @@
+/* Recipe Builder — Pass 1: wide layout, readable workbench */
+
+.tvw-recipe-builder {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding-bottom: 2.5rem;
+}
+
+.tvw-rb-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.tvw-rb-title {
+  margin: 0 0 0.4rem;
+  font-size: clamp(1.75rem, 2.5vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--tvw-text-primary, #f2f3f6);
+}
+
+.tvw-rb-subtitle {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--tvw-text-secondary, #c4c9d4);
+  max-width: 36rem;
+}
+
+.tvw-rb-back {
+  align-self: center;
+  min-height: 44px;
+  padding: 0.55rem 1.1rem;
+  font-size: 1rem;
+}
+
+.tvw-rb-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 36%);
+  gap: 1.25rem 1.5rem;
+  align-items: start;
+}
+
+.tvw-rb-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.tvw-rb-panel {
+  background: var(--tvw-surface-raised, #1a1d24);
+  border: 1px solid var(--tvw-border, #2d3340);
+  border-radius: var(--tvw-radius-card, 12px);
+  padding: 1.25rem 1.35rem;
+}
+
+.tvw-rb-section-title {
+  margin: 0 0 0.35rem;
+  font-size: clamp(1.25rem, 1.8vw, 1.5rem);
+  font-weight: 600;
+  color: var(--tvw-text-primary, #f2f3f6);
+}
+
+.tvw-rb-section-lead {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  color: var(--tvw-text-secondary, #c4c9d4);
+}
+
+.tvw-rb-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--tvw-text-secondary, #c4c9d4);
+}
+
+.tvw-rb-input,
+.tvw-rb-select,
+.tvw-rb-textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.55rem 0.75rem;
+  font-size: 1rem;
+  color: var(--tvw-text-primary, #f2f3f6);
+  background: var(--tvw-surface, #12151a);
+  border: 1px solid var(--tvw-border, #2d3340);
+  border-radius: var(--tvw-radius-control, 10px);
+}
+
+.tvw-rb-input:focus,
+.tvw-rb-select:focus,
+.tvw-rb-textarea:focus {
+  outline: 2px solid var(--tvw-accent-cyan, #3ec6e0);
+  outline-offset: 1px;
+  border-color: var(--tvw-accent-cyan, #3ec6e0);
+}
+
+.tvw-rb-input.is-invalid,
+.tvw-rb-select.is-invalid,
+.tvw-rb-textarea.is-invalid {
+  border-color: #e85d5d;
+}
+
+.tvw-rb-name {
+  font-size: 1.0625rem;
+  min-height: 48px;
+}
+
+.tvw-rb-textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+
+.tvw-rb-field-error {
+  margin-top: 0.35rem;
+  font-size: 0.9375rem;
+  color: #ff8a8a;
+}
+
+.tvw-rb-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.tvw-rb-details-grid .tvw-rb-span-2 {
+  grid-column: 1 / -1;
+}
+
+.tvw-rb-choice-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.tvw-rb-choice {
+  position: relative;
+  display: block;
+  min-height: 44px;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--tvw-border, #2d3340);
+  border-radius: var(--tvw-radius-control, 10px);
+  background: var(--tvw-surface, #12151a);
+  cursor: pointer;
+}
+
+.tvw-rb-choice input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tvw-rb-choice strong {
+  display: block;
+  font-size: 0.9375rem;
+  color: var(--tvw-text-primary, #f2f3f6);
+}
+
+.tvw-rb-choice span {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.8125rem;
+  color: var(--tvw-text-secondary, #c4c9d4);
+  line-height: 1.35;
+}
+
+.tvw-rb-choice:has(input:checked) {
+  border-color: var(--tvw-accent-orange, #f0a030);
+  box-shadow: inset 0 0 0 1px var(--tvw-accent-orange, #f0a030);
+}
+
+.tvw-rb-flavours-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.tvw-rb-flavour-table-head {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) 4.5rem 4.5rem 4.5rem 4.5rem 5.5rem;
+  gap: 0.5rem;
+  padding: 0 0.5rem 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tvw-text-muted, #8b93a3);
+}
+
+.tvw-rb-flavour-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.tvw-rb-flavour-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) 4.5rem 4.5rem 4.5rem 4.5rem 5.5rem;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.65rem 0.5rem;
+  background: var(--tvw-surface, #12151a);
+  border: 1px solid var(--tvw-border, #2d3340);
+  border-radius: var(--tvw-radius-control, 10px);
+}
+
+.tvw-rb-brand-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--tvw-accent-cyan, #3ec6e0);
+  background: rgba(62, 198, 224, 0.08);
+  border-radius: 6px;
+  text-align: center;
+}
+
+.tvw-rb-col-num {
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--tvw-accent-cyan, #3ec6e0);
+  text-align: right;
+}
+
+.tvw-rb-col-num input {
+  text-align: right;
+}
+
+.tvw-rb-empty-flavours {
+  padding: 1.5rem 1rem;
+  text-align: center;
+  border: 1px dashed var(--tvw-border, #2d3340);
+  border-radius: var(--tvw-radius-control, 10px);
+  color: var(--tvw-text-secondary, #c4c9d4);
+}
+
+.tvw-rb-summary {
+  position: sticky;
+  top: 1rem;
+}
+
+.tvw-rb-summary-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.tvw-rb-stat {
+  padding: 0.65rem 0.75rem;
+  background: var(--tvw-surface, #12151a);
+  border: 1px solid var(--tvw-border, #2d3340);
+  border-radius: var(--tvw-radius-control, 10px);
+}
+
+.tvw-rb-stat-label {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--tvw-text-muted, #8b93a3);
+  margin-bottom: 0.2rem;
+}
+
+.tvw-rb-stat-value {
+  display: block;
+  font-size: 1.125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--tvw-accent-cyan, #3ec6e0);
+}
+
+.tvw-rb-stat-value.is-warn {
+  color: #ffb347;
+}
+
+.tvw-rb-composition {
+  margin-top: 1rem;
+}
+
+.tvw-rb-composition .progress {
+  height: 1.25rem;
+  background: var(--tvw-surface, #12151a);
+}
+
+.tvw-rb-composition-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--tvw-text-secondary, #c4c9d4);
+}
+
+.tvw-rb-calc-status {
+  margin-top: 0.75rem;
+  font-size: 0.9375rem;
+  color: var(--tvw-text-secondary, #c4c9d4);
+}
+
+.tvw-rb-errors {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid #e85d5d;
+  border-radius: var(--tvw-radius-control, 10px);
+  background: rgba(232, 93, 93, 0.1);
+  color: #ffbcbc;
+}
+
+.tvw-rb-errors ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.tvw-rb-footer {
+  margin-top: 1.5rem;
+  padding: 1.1rem 1.25rem;
+  background: var(--tvw-surface-raised, #1a1d24);
+  border: 1px solid var(--tvw-border, #2d3340);
+  border-radius: var(--tvw-radius-card, 12px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.tvw-rb-footer-meta {
+  font-size: 0.9375rem;
+  color: var(--tvw-text-secondary, #c4c9d4);
+}
+
+.tvw-rb-footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.tvw-rb-save {
+  min-height: 48px;
+  min-width: 10rem;
+  padding: 0.65rem 1.5rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.tvw-rb-add-flavour {
+  min-height: 44px;
+}
+
+@media (max-width: 1100px) {
+  .tvw-rb-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .tvw-rb-summary {
+    position: static;
+  }
+}
+
+@media (max-width: 768px) {
+  .tvw-rb-details-grid,
+  .tvw-rb-choice-group {
+    grid-template-columns: 1fr;
+  }
+
+  .tvw-rb-flavour-table-head {
+    display: none;
+  }
+
+  .tvw-rb-flavour-row {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .tvw-rb-flavour-row .tvw-rb-col-num::before {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--tvw-text-muted, #8b93a3);
+    margin-bottom: 0.15rem;
+  }
+
+  .tvw-rb-flavour-row .tvw-rb-pct-col::before { content: "Percentage"; }
+  .tvw-rb-flavour-row .tvw-rb-ml-col::before { content: "ml"; }
+  .tvw-rb-flavour-row .tvw-rb-g-col::before { content: "g"; }
+
+  .tvw-rb-footer-actions {
+    width: 100%;
+  }
+
+  .tvw-rb-save {
+    width: 100%;
+  }
+}

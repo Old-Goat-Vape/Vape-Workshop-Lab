@@ -1,0 +1,137 @@
+================================================================================
+  LAUNCH TEST MODE — environment flags & manual browser QA (existing features)
+================================================================================
+
+This file is for QA and operators. It does not change runtime behavior; it only
+documents how to start the **The Vape Workshop Calculator** build correctly.
+
+--------------------------------------------------------------------------------
+TVW_ENABLE_LAB_MODULES — what it controls (read this first)
+--------------------------------------------------------------------------------
+
+Read from the environment at process start (see app.py). Truthy values are any
+string except: 0, false, off, no (case-insensitive). Unset = false.
+
+When FALSE (TVW-only / default if you do not set the variable):
+  - Community, recipes, TVW API, TVW admin, auth, and related routes stay active.
+  - Lab-style blueprints are NOT registered: no library_main, recipes (lab),
+    mix, inventory, api_lab, master_admin_console from the Lab merge.
+  - Root dashboard is not the Lab dashboard; /lab redirects non-Lab users away.
+  - Maintenance CLI flags that depend on Lab services are unavailable.
+
+When TRUE (TVW + Lab bridge):
+  - The same Lab-related blueprints as the merged build are registered.
+  - Admin-level users can use the Lab bridge (see utils.auth.can_access_lab_bridge).
+  - Mix/inventory/master admin routes exist for authorized roles.
+  - Optional startup monthly catch-up and scheduler can run (still gated by
+    RUN_STARTUP_MONTHLY_CATCHUP and other RUN_STARTUP_* flags).
+
+The shipped Windows starters **Start_TVW_Calculator.bat** and
+**Start_Old_Goat_Lab_NoPause.bat** set TVW_ENABLE_LAB_MODULES=1 so a default
+double-click QA matches “full merged” behavior. For TVW-only QA, change that
+line to 0 or remove it and start Python yourself with the variable unset/0.
+
+--------------------------------------------------------------------------------
+Exact environment flags by scenario
+--------------------------------------------------------------------------------
+
+(1) TVW-only mode (community + TVW surfaces; no Lab bridge routes)
+
+  TVW_ENABLE_LAB_MODULES=0
+  (or leave the variable unset when starting Python)
+
+  Optional: PYTHONUTF8=1 (recommended on Windows; the launchers set it.)
+
+(2) TVW + Lab bridge mode (full merged app — default in Start_TVW_Calculator.bat)
+
+  TVW_ENABLE_LAB_MODULES=1
+
+  Optional: PYTHONUTF8=1
+
+  Heavy startup jobs stay off unless you explicitly set RUN_STARTUP_* vars;
+  defaults are false in app.py.
+
+(3) Lab scrap authorization testing
+
+  **The Vape Workshop Calculator:** scrap authorize lives on the **mix** blueprint.
+  That blueprint is only registered when TVW_ENABLE_LAB_MODULES=1. Use:
+
+    TVW_ENABLE_LAB_MODULES=1
+
+  Then exercise POST /mix/reconcile/scrap-authorize in the browser (or your API
+  client) while logged in as a user who can start a mix session, with a
+  Foreman-or-higher authorizer in the JSON body (see routes/mix.py).
+
+  **Old Goat Lab (standalone Lab app):** the full Lab app always includes mix
+  routes; there is no TVW_ENABLE_LAB_MODULES flag. Use that package for
+  scrap-only QA if you want the dedicated Lab tree.
+
+--------------------------------------------------------------------------------
+Suggested manual browser QA order (existing functionality)
+--------------------------------------------------------------------------------
+
+Use builds from the extracted app folder (same folder as app.py). Pick mode
+first (TVW-only vs TVW+Lab) by setting TVW_ENABLE_LAB_MODULES as above, then
+restart the server so the value is picked up.
+
+A. TVW-only (TVW_ENABLE_LAB_MODULES=0)
+
+  1. Start server; open http://127.0.0.1:5000 (or /recipes per your bookmark).
+  2. Login / signup; confirm redirect to community feed and no broken pages.
+  3. Open a public recipe; confirm detail, stash hints, and version selector if present.
+  4. Community list filters / search (smoke).
+  5. Guided mix via UI or API as you normally ship (POST /api/mix/guided/...).
+  6. Confirm /lab or legacy mix URLs either 404 or redirect as designed for
+     non-Lab mode (no Lab bridge).
+
+B. TVW + Lab bridge (TVW_ENABLE_LAB_MODULES=1)
+
+  1. Start with launcher or set TVW_ENABLE_LAB_MODULES=1; restart server.
+  2. Login as admin-capable user; open /lab — dashboard should load for allowed roles.
+  3. Library / inventory smoke (navigation only if you use those menus).
+  4. Mix flow: safety → init batch → pour steps → finalize (ranked user).
+  5. Reconcile: overpour path, bigger vessel, delta-only queue (smoke one path).
+  6. TVW community + recipe pages still work (regression).
+
+C. Lab scrap authorization (requires Lab routes on the build you test)
+
+  On **TVW calculator:** TVW_ENABLE_LAB_MODULES=1, then:
+  1. Drive a mix to scrap-required (e.g. reconcile with no bigger container under
+     strict policy — see docs/tests for Lab vs TVW policy).
+  2. POST /mix/reconcile/scrap-authorize with valid Foreman+ authorizer credentials.
+  3. Confirm JSON success, batch marked scrapped, audit log row (mix_scrap_authorized).
+
+  On **Old Goat Lab** standalone: start Start_Old_Goat_Lab.bat; repeat scrap path
+  on /mix/reconcile/scrap-authorize without any TVW flag.
+
+--------------------------------------------------------------------------------
+Local .env file (optional)
+--------------------------------------------------------------------------------
+
+If a file named .env exists in the same folder as app.py, the app loads KEY=VALUE
+lines into the process environment before Flask reads SECRET_KEY and paths.
+Existing OS environment variables are not overwritten.
+
+Typical keys (see ENV_TEMPLATE.txt):
+
+  SECRET_KEY              Session signing; required for production
+  DATABASE_PATH           SQLite file path; optional default next to app.py
+  TVW_ENABLE_LAB_MODULES    TVW build only: 0 / 1
+  FLASK_ENV                 e.g. production or development (Flask / tools may read)
+  PYTHONUTF8                Windows UTF-8 console; launchers set 1
+
+Docker Compose can use env_file: .env with the same keys.
+
+--------------------------------------------------------------------------------
+Cross-platform path audit (summary)
+--------------------------------------------------------------------------------
+
+  - DATABASE_PATH and upload paths use app.root_path / os.path.join; no hardcoded
+    Windows drive letters in app code reviewed for this pass.
+  - core/shared_mix_path.py resolves shared_mix_core: prefer normal import, else
+    app/shared_mix_core or an ancestor directory; see RELEASE_PACKAGING.txt.
+    PYTHONPATH is optional for non-standard installs.
+  - Schema and db helpers use paths next to modules where applicable.
+  - Prefer starting the process with cwd = app directory; launchers cd to %~dp0.
+
+================================================================================

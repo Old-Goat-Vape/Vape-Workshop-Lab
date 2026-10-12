@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+
+{% block title %}Recipe Library - Old Goat Lab{% endblock %}
+
+{% block content %}
+<style>
+    .status-badge.production { background: var(--success); color: #000; }
+    .status-badge.experimental { background: var(--primary-orange); color: #000; }
+    .status-badge.advanced { background: #ff00ff; color: #fff; }
+    .status-badge.custom { background: #5d3fd3; color: #fff; }
+    .status-badge.archived { background: #444; color: #ccc; }
+</style>
+
+<div class="d-flex flex-column flex-lg-row align-items-lg-start justify-content-between gap-3 mb-3">
+    <div class="d-flex gap-3 align-items-start">
+        <div class="flex-shrink-0 mt-1 d-none d-sm-block">
+            {% with logo_href = url_for('dashboard_index'), show_wordmark = false %}{% include "partials/og_brand.html" %}{% endwith %}
+        </div>
+        <div>
+            <div class="og-page-eyebrow mb-1">Production</div>
+            <h1 class="h3 mb-1">Recipe Library</h1>
+            <div class="text-secondary small">Search, filter, and start a production batch.{% if not show_reference_library_filter %} Reference formulas are hidden here — use the Old Goat account when you need them.{% endif %}</div>
+        </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2 align-self-lg-center">
+        {% if show_cost %}
+        <a href="{{ url_for('recipes.pricing_sheet') }}" class="btn btn-outline-warning btn-sm">Price List Worksheet</a>
+        <a href="{{ url_for('recipes.cost_calculator') }}" class="btn btn-outline-warning btn-sm">Cost Calculator</a>
+        {% endif %}
+        {% if (session.get('username') or '')|lower == 'old goat' %}
+        <a href="{{ url_for('recipes.create_recipe') }}" class="btn btn-warning fw-semibold">+ New Recipe</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card border-0 mb-3" style="background:#151515; border:1px solid #333 !important;">
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('recipes.library') }}" class="row g-2 align-items-end">
+            <div class="col-12 col-lg-6">
+                <label class="form-label small text-secondary">Search</label>
+                <input type="text" name="search" placeholder="Search name or code..." class="form-control bg-black border-secondary" value="{{ request.args.get('search', '') }}">
+            </div>
+            <div class="col-12 col-lg-2">
+                <label class="form-label small text-secondary">Status</label>
+                <select name="status" class="form-select bg-black border-secondary">
+                    <option value="">All Statuses</option>
+                    <option value="Production" {% if request.args.get('status') == 'Production' %}selected{% endif %}>Production</option>
+                    <option value="Experimental" {% if request.args.get('status') == 'Experimental' %}selected{% endif %}>Experimental</option>
+                    <option value="Advanced" {% if request.args.get('status') == 'Advanced' %}selected{% endif %}>Advanced</option>
+                    <option value="Custom" {% if request.args.get('status') == 'Custom' %}selected{% endif %}>Custom</option>
+                    <option value="Archived" {% if request.args.get('status') == 'Archived' %}selected{% endif %}>Archived</option>
+                </select>
+            </div>
+            <div class="col-12 col-lg-3">
+                <label class="form-label small text-secondary">Library scope</label>
+                <select name="library_type" class="form-select bg-black border-secondary" title="What to list">
+                    <option value="all" {% if library_type_selected == 'all' %}selected{% endif %}>{% if show_reference_library_filter %}All (working + reference){% else %}All working recipes{% endif %}</option>
+                    <option value="personal" {% if library_type_selected == 'personal' %}selected{% endif %}>My recipes</option>
+                    {% if show_reference_library_filter %}
+                    <option value="reference" {% if library_type_selected == 'reference' %}selected{% endif %}>Reference only</option>
+                    <option value="shared" {% if library_type_selected == 'shared' %}selected{% endif %}>Others' working (shared)</option>
+                    {% endif %}
+                </select>
+            </div>
+            <div class="col-12 col-lg-6 d-flex gap-2 justify-content-end">
+                <button type="submit" class="btn btn-outline-light flex-grow-1">Apply</button>
+                {% if request.args.get('search') or request.args.get('status') or (library_type_selected and library_type_selected != 'all') %}
+                    <a href="{{ url_for('recipes.library') }}" class="btn btn-outline-secondary">Clear</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row row-cols-1 row-cols-md-2 row-cols-xxl-3 g-3">
+    {% for r in recipes %}
+    <div class="col">
+        <div class="card h-100 border-0" style="background:#222; border:1px solid var(--border-color) !important;">
+            <div class="card-body d-flex flex-column gap-2">
+                <div class="d-flex gap-3 align-items-start">
+                    <div style="width:84px; flex:0 0 84px;">
+                        {% if r.image_path %}
+                            <img
+                                src="{{ url_for('static', filename=r.image_path) }}"
+                                alt="Recipe image"
+                                style="width:84px; height:84px; object-fit:cover; border-radius:10px; border:1px solid #333; background:#111;"
+                                loading="lazy"
+                            >
+                        {% else %}
+                            <div style="width:84px; height:84px; border-radius:10px; border:1px solid #333; background:#111; display:flex; align-items:center; justify-content:center; color:#666; font-size:0.75rem; text-align:center; padding:6px;">
+                                No<br>Image
+                            </div>
+                        {% endif %}
+                    </div>
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div class="flex-grow-1">
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <h3 class="h5 mb-0">{{ r.name }}</h3>
+                            <span class="badge status-badge {{ r.status|lower }}">{{ r.status }}</span>
+                            {% if r.is_mine %}
+                                <span class="badge text-bg-info text-dark">Mine</span>
+                            {% elif r.library_type == 'reference' %}
+                                <span class="badge text-bg-secondary">Reference</span>
+                            {% elif r.badge_shared %}
+                                <span class="badge border border-secondary text-secondary">Shared</span>
+                            {% endif %}
+                        </div>
+                        <div class="text-warning-emphasis font-monospace">#{{ r.recipe_code }}</div>
+                        <div class="text-secondary small mt-1">
+                            <span class="me-3"><strong>Version:</strong> {{ r.latest_version_number or '1.0' }}</span>
+                            {% if r.has_nicotine %}<span class="badge text-bg-danger">NIC</span>{% endif %}
+                        </div>
+                    </div>
+                </div>
+                </div>
+
+                {% if show_cost and r.cost_per_ml %}
+                <div class="border-top pt-2 small font-monospace d-flex justify-content-between align-items-center flex-wrap gap-1" style="border-color:#333 !important;">
+                    <span class="text-success">R {{ "%.2f"|format(r.cost_per_ml or 0) }}/ml</span>
+                    <span class="text-secondary">60ml: R {{ "%.2f"|format((r.cost_per_ml or 0) * 60) }}</span>
+                    <a href="{{ url_for('recipes.cost_calculator', recipe_id=r.id) }}" class="small text-warning">Cost calc</a>
+                </div>
+                {% elif show_cost %}
+                <div class="border-top pt-2 small" style="border-color:#333 !important;">
+                    <a href="{{ url_for('recipes.cost_calculator', recipe_id=r.id) }}" class="text-warning">Open cost calculator</a>
+                </div>
+                {% endif %}
+
+                <form id="mix-form-{{ r.id }}" action="{{ url_for('mix.init_batch') }}" method="POST" class="mt-2" onsubmit="return handleMixSubmit(event, '{{ r.id }}')">
+                    <input type="hidden" name="recipe_id" value="{{ r.id }}">
+                    <input type="hidden" name="version_id" value="{{ r.latest_version_id }}">
+
+                    <div class="row g-2">
+                        <div class="col-12">
+                            {% if ROLE_HIERARCHY[session.get('role', 'Kid')] >= 5 %}
+                                <select name="mix_mode" class="form-select bg-black border-secondary">
+                                    <option value="longfill" selected>Long Fill</option>
+                                    <option value="fullmix">Full Mix</option>
+                                </select>
+                            {% else %}
+                                <input type="hidden" name="mix_mode" value="longfill">
+                                <div class="small text-secondary">Long Fill Only</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-7">
+                            <div class="input-group">
+                                <input type="number" name="vessel_size" class="form-control bg-black border-secondary" value="120" min="30" max="5000" required>
+                                <span class="input-group-text bg-black border-secondary">ml</span>
+                            </div>
+                        </div>
+                        <div class="col-5">
+                            <select name="style" class="form-select bg-black border-secondary">
+                                <option value="MTL">Bottle Style: MTL (30ml bottle)</option>
+                                <option value="DTL">Bottle Style: DTL (120ml bottle)</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <select name="target_mix_mode" class="form-select bg-black border-secondary">
+                                <option value="DTL" selected>Target Mix Mode: DTL (original)</option>
+                                <option value="MTL">Target Mix Mode: MTL (Convert)</option>
+                                <option value="POD_DISPO">Target Mix Mode: Pod/Dispo (Convert)</option>
+                            </select>
+                        </div>
+                        <div class="col-4 og-nicotine-group">
+                            <label class="form-label small text-secondary mb-1">Nic target (mg/ml)</label>
+                            <input type="number" name="nic_target_mg_per_ml" class="form-control bg-black border-secondary" value="0" min="0" step="0.1">
+                        </div>
+                        <div class="col-4 og-nicotine-group">
+                            <label class="form-label small text-secondary mb-1">Nic base (mg/ml)</label>
+                            <input type="number" name="nic_base_strength_mg_per_ml" class="form-control bg-black border-secondary" value="100" min="1" step="0.1">
+                        </div>
+                        <div class="col-4 og-nicotine-group">
+                            <label class="form-label small text-secondary mb-1">Nic carrier</label>
+                            <select name="nic_carrier" class="form-select bg-black border-secondary">
+                                <option value="PG" selected>PG-based</option>
+                                <option value="VG">VG-based</option>
+                            </select>
+                        </div>
+                        {% if (session.get('username') or '')|lower == 'old goat' %}
+                        <div class="col-12">
+                            <div class="border border-warning border-opacity-25 rounded p-2" style="background:#1a1208;">
+                                <div class="form-check mb-0">
+                                    <input class="form-check-input" type="checkbox" name="og_stock_override" value="1" id="og-stock-{{ r.id }}">
+                                    <label class="form-check-label small text-warning" for="og-stock-{{ r.id }}">
+                                        <strong>Override stock check (Old Goat test mix)</strong><br>
+                                        <span class="text-secondary">Use when ingredients are missing or low. Finalize will <em>not</em> deduct inventory; batch is logged as a test run.</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-warning w-100 fw-bold">Start Production Mix</button>
+                        </div>
+                    </div>
+                </form>
+
+                <div class="mt-auto d-grid gap-2 d-sm-flex">
+                    {% if ROLE_HIERARCHY[session.get('role', 'Kid')] >= 4 %}
+                        <a href="/recipes/{{ r.id }}/edit" class="btn btn-outline-light btn-sm flex-fill">Edit</a>
+                    {% endif %}
+                    <a href="{{ url_for('recipes.view_recipe', id=r.id) }}" class="btn btn-outline-secondary btn-sm flex-fill">View</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12">
+        <div class="text-center py-5 text-secondary">No recipes found in the Lab Library.</div>
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const forms = Array.from(document.querySelectorAll('form[id^="mix-form-"]'));
+    forms.forEach((form) => {
+        const modeEl = form.querySelector('select[name="mix_mode"], input[name="mix_mode"]');
+        const nicGroups = Array.from(form.querySelectorAll('.og-nicotine-group'));
+        const nicInputs = Array.from(form.querySelectorAll('[name="nic_target_mg_per_ml"], [name="nic_base_strength_mg_per_ml"], [name="nic_carrier"]'));
+        if (!modeEl || !nicGroups.length || !nicInputs.length) return;
+
+        const applyState = () => {
+            const isFullMix = String(modeEl.value || '').toLowerCase() === 'fullmix';
+            nicGroups.forEach((el) => { el.style.display = isFullMix ? '' : 'none'; });
+            nicInputs.forEach((el) => { el.disabled = !isFullMix; });
+        };
+
+        if (modeEl.tagName === 'SELECT') {
+            modeEl.addEventListener('change', applyState);
+        }
+        applyState();
+    });
+});
+</script>
+
+{% if total_pages and total_pages > 1 %}
+<div class="d-flex justify-content-center mt-4">
+    <nav aria-label="Recipe library pagination">
+        <ul class="pagination pagination-sm mb-0">
+            <li class="page-item {% if page|int <= 1 %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('recipes.library', page=page|int - 1, search=request.args.get('search',''), status=request.args.get('status',''), library_type=library_type_selected) }}">Prev</a>
+            </li>
+            <li class="page-item disabled">
+                <span class="page-link">Page {{ page|int }} / {{ total_pages|int }}</span>
+            </li>
+            <li class="page-item {% if page|int >= total_pages|int %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('recipes.library', page=page|int + 1, search=request.args.get('search',''), status=request.args.get('status',''), library_type=library_type_selected) }}">Next</a>
+            </li>
+        </ul>
+    </nav>
+</div>
+{% endif %}
+
+{% endblock %}

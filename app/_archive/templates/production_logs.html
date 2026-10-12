@@ -1,0 +1,41 @@
+{% for batch in batches %}
+<tr style="vertical-align: middle; border-bottom: 1px solid #222;">
+    <td>
+        <span class="badge-id" title="System ID: {{ batch.id }}" style="background: #333; padding: 2px 6px; border-radius: 4px; font-family: monospace;">
+            {{ batch.batch_number }}
+        </span>
+    </td>
+    <td style="font-size: 0.8rem; white-space: nowrap; color: var(--text-muted);">
+        {{ batch.created_at }}
+    </td>
+    <td>
+        <div style="display: flex; flex-direction: column;">
+            <strong style="color: var(--primary-orange);">{{ batch.recipe_name }}</strong> 
+            <span style="color: var(--text-muted); font-size: 0.75rem;">v{{ batch.version_number }}</span>
+        </div>
+    </td>
+    <td>
+        <div style="display: flex; flex-direction: column;">
+            <span style="font-weight: 500;">{{ batch.username }}</span>
+            {% if batch.supervisor_name %}
+            <span style="font-size: 0.7rem; color: #ff4444; display: flex; align-items: center; gap: 3px; margin-top: 2px;">
+                🛡️ <span style="text-transform: uppercase; letter-spacing: 0.5px;">Auth: {{ batch.supervisor_name }}</span>
+            </span>
+            {% endif %}
+        </div>
+    </td>
+    <td style="text-align: center; font-weight: bold;">
+        {{ "{:,.0f}".format(batch.batch_size) }}<span style="font-size: 0.7rem; color: var(--text-muted); margin-left: 2px;">ml</span>
+    </td>
+    <td class="cost-text" style="color: var(--success); font-family: 'Courier New', monospace; font-weight: bold;">
+        R{{ "%.2f"|format(batch.total_cost) }}
+    </td>
+    <td style="font-size: 0.8rem; color: var(--text-muted); font-family: 'Courier New', monospace;">
+        {% if batch.batch_size and batch.batch_size > 0 %}
+            R{{ "%.2f"|format(batch.total_cost / batch.batch_size) }}
+        {% else %}
+            R0.00
+        {% endif %}
+    </td>
+</tr>
+{% endfor %}

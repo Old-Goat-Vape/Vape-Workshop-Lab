@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}Client Statement - {{ statement.client.name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h3 mb-1">Client Statement</h1>
+    <div class="text-secondary small">{{ statement.client.name }} • {{ statement.client.client_type }}{% if statement.client.payment_terms_days %} • Terms {{ statement.client.payment_terms_days }} days{% endif %}</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-light btn-sm" href="{{ url_for('master_admin.sales_client_detail', client_id=statement.client.id) }}">Back to Client</a>
+    <a class="btn btn-outline-warning btn-sm" href="{{ url_for('master_admin.sales_client_statement_pdf', client_id=statement.client.id, date_from=statement.date_from, date_to=statement.date_to) }}">PDF</a>
+    <a class="btn btn-outline-warning btn-sm" href="{{ url_for('master_admin.sales_client_statement_csv', client_id=statement.client.id, date_from=statement.date_from, date_to=statement.date_to) }}">CSV</a>
+    <select id="wa-tone" class="form-select form-select-sm bg-black border-secondary" style="width:auto;">
+      <option value="neutral" selected>Neutral Tone</option>
+      <option value="old_goat">Old Goat Tone</option>
+    </select>
+    <button type="button" id="wa-copy-btn" class="btn btn-warning btn-sm">Copy WhatsApp Summary</button>
+  </div>
+</div>
+<div id="wa-copy-toast" class="alert alert-success py-2 px-3" style="display:none;">Copied!</div>
+
+<div class="card border-0 mb-3" style="background:#151515; border:1px solid #333 !important;">
+  <div class="card-body">
+    <form method="GET" class="row g-2 align-items-end">
+      <div class="col-6 col-md-3"><label class="form-label small text-secondary">Date From</label><input type="date" name="date_from" value="{{ statement.date_from }}" class="form-control bg-black border-secondary"></div>
+      <div class="col-6 col-md-3"><label class="form-label small text-secondary">Date To</label><input type="date" name="date_to" value="{{ statement.date_to }}" class="form-control bg-black border-secondary"></div>
+      <div class="col-12 col-md-6 d-flex gap-2 flex-wrap">
+        <button class="btn btn-warning">Apply Range</button>
+        <a class="btn btn-outline-light" href="{{ url_for('master_admin.sales_client_statement', client_id=statement.client.id, preset='this_month') }}">This Month</a>
+        <a class="btn btn-outline-light" href="{{ url_for('master_admin.sales_client_statement', client_id=statement.client.id, preset='last_month') }}">Last Month</a>
+        <a class="btn btn-outline-light" href="{{ url_for('master_admin.sales_client_statement', client_id=statement.client.id, preset='last_30_days') }}">Last 30 Days</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if statement.closing.has_corrected_deliveries %}
+<div class="alert alert-warning py-2 px-3">Statement includes corrected deliveries.</div>
+{% endif %}
+
+<div class="row g-3 mb-3">
+  <div class="col-12 col-lg-3"><div class="card border-0 h-100" style="background:#151515; border:1px solid #333 !important;"><div class="card-body"><div class="text-secondary small">Opening Balance</div><div class="h5 mb-0">R {{ "%.2f"|format(statement.opening.opening_balance_due or 0) }}</div></div></div></div>
+  <div class="col-12 col-lg-3"><div class="card border-0 h-100" style="background:#151515; border:1px solid #333 !important;"><div class="card-body"><div class="text-secondary small">Payments In Period</div><div class="h5 mb-0">R {{ "%.2f"|format(statement.activity.totals.total_payments_received or 0) }}</div></div></div></div>
+  <div class="col-12 col-lg-3"><div class="card border-0 h-100" style="background:#151515; border:1px solid #333 !important;"><div class="card-body"><div class="text-secondary small">Net Movement Due</div><div class="h5 mb-0">R {{ "%.2f"|format(statement.activity.totals.net_movement_amount_due or 0) }}</div></div></div></div>
+  <div class="col-12 col-lg-3"><div class="card border-0 h-100" style="background:#151515; border:1px solid #333 !important;"><div class="card-body"><div class="text-secondary small">Closing Balance</div><div class="h5 mb-0">R {{ "%.2f"|format(statement.closing.closing_balance_due or 0) }}</div></div></div></div>
+</div>
+
+<div class="card border-0 mb-3" style="background:#151515; border:1px solid #333 !important;">
+  <div class="card-body">
+    <h2 class="h5 mb-2">In-Period Delivery Activity</h2>
+    <div class="table-responsive">
+      <table class="table table-dark table-hover align-middle mb-0">
+        <thead><tr><th>Date</th><th>#</th><th>Type</th><th>Status</th><th class="text-end">Sent</th><th class="text-end">Sold</th><th class="text-end">Payments Allocated (period)</th><th class="text-end">Outstanding</th><th>Corrections</th></tr></thead>
+        <tbody>
+          {% for d in statement.activity.deliveries %}
+          <tr>
+            <td>{{ d.delivery_date }}</td>
+            <td><a href="{{ url_for('master_admin.sales_delivery_detail', delivery_id=d.delivery_id) }}">{{ d.delivery_number }}</a></td>
+            <td>{{ d.delivery_type }}</td>
+            <td>{{ d.status }}</td>
+            <td class="text-end">R {{ "%.2f"|format(d.sent_value or 0) }}</td>
+            <td class="text-end">R {{ "%.2f"|format(d.sold_value or 0) }}</td>
+            <td class="text-end">R {{ "%.2f"|format(d.payments_allocated_in_period or 0) }}</td>
+            <td class="text-end">R {{ "%.2f"|format(d.outstanding_after_allocations or 0) }}</td>
+            <td>{% if d.has_corrections %}<span class="badge text-bg-warning">Corrected</span>{% else %}<span class="text-secondary">No</span>{% endif %}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="9" class="text-center text-secondary py-3">No deliveries in this period.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-12 col-lg-6">
+    <div class="card border-0 h-100" style="background:#151515; border:1px solid #333 !important;">
+      <div class="card-body">
+        <h2 class="h5 mb-2">Period Totals</h2>
+        <div class="small text-secondary">Sent value: <strong class="text-light">R {{ "%.2f"|format(statement.activity.totals.total_sent_value or 0) }}</strong></div>
+        <div class="small text-secondary">Sold value: <strong class="text-light">R {{ "%.2f"|format(statement.activity.totals.total_sold_value or 0) }}</strong></div>
+        <div class="small text-secondary">Returned qty/value: <strong class="text-light">{{ statement.activity.totals.total_returned_qty or 0 }}</strong> / <strong class="text-light">R {{ "%.2f"|format(statement.activity.totals.total_returned_value or 0) }}</strong></div>
+        <div class="small text-secondary">Damaged qty/value: <strong class="text-light">{{ statement.activity.totals.total_damaged_qty or 0 }}</strong> / <strong class="text-light">R {{ "%.2f"|format(statement.activity.totals.total_damaged_value or 0) }}</strong></div>
+        <div class="small text-secondary">Payments received: <strong class="text-light">R {{ "%.2f"|format(statement.activity.totals.total_payments_received or 0) }}</strong></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-6">
+    <div class="card border-0 h-100" style="background:#151515; border:1px solid #333 !important;">
+      <div class="card-body">
+        <h2 class="h5 mb-2">Closing Position</h2>
+        <div class="small text-secondary">Closing balance due: <strong class="text-light">R {{ "%.2f"|format(statement.closing.closing_balance_due or 0) }}</strong></div>
+        <div class="small text-secondary">Open deliveries: <strong class="text-light">{{ statement.closing.open_deliveries|length }}</strong></div>
+        <div class="small text-secondary">Overdue / unpaid flags: <strong class="text-light">{{ statement.closing.overdue_unpaid_count or 0 }}</strong></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0" style="background:#151515; border:1px solid #333 !important;">
+  <div class="card-body">
+    <h2 class="h5 mb-2">Stock Currently Held By Client (Closing)</h2>
+    <div class="table-responsive">
+      <table class="table table-dark table-sm align-middle mb-0">
+        <thead><tr><th>Product</th><th class="text-end">Bottle Size</th><th class="text-end">Qty Still Held</th><th>Delivery Refs</th></tr></thead>
+        <tbody>
+          {% for s in statement.closing.stock_currently_held %}
+          <tr><td>{{ s.product_name_snapshot }}</td><td class="text-end">{{ "%.0f"|format(s.bottle_size_ml or 0) }}ml</td><td class="text-end">{{ s.qty_still_held or 0 }}</td><td class="small text-secondary">{{ s.delivery_refs or '' }}</td></tr>
+          {% else %}
+          <tr><td colspan="4" class="text-center text-secondary py-3">No stock currently held.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<script>
+(() => {
+  const btn = document.getElementById('wa-copy-btn');
+  const toneEl = document.getElementById('wa-tone');
+  const toast = document.getElementById('wa-copy-toast');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    const old = btn.textContent;
+    btn.textContent = 'Preparing...';
+    try {
+      const url = "{{ url_for('master_admin.sales_client_statement_whatsapp', client_id=statement.client.id) }}" +
+        "?date_from={{ statement.date_from }}&date_to={{ statement.date_to }}" +
+        "&tone=" + encodeURIComponent((toneEl && toneEl.value) ? toneEl.value : "neutral");
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      const data = await res.json();
+      if (!res.ok || !data || data.status !== 'success' || !data.message) {
+        throw new Error((data && data.message) || 'Could not prepare WhatsApp summary.');
+      }
+      await navigator.clipboard.writeText(String(data.message));
+      if (toast) {
+        toast.style.display = 'block';
+        setTimeout(() => { toast.style.display = 'none'; }, 1800);
+      }
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = old; }, 1200);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to copy WhatsApp summary.');
+      btn.textContent = old;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+})();
+</script>
+{% endblock %}
+

@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Add Item - Old Goat Lab{% endblock %}
+
+{% block content %}
+<style>
+    .form-container {
+        max-width: 700px;
+        margin: 40px auto;
+        background: #111;
+        padding: 40px;
+        border-radius: 12px;
+        border: 1px solid #222;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    .form-group {
+        margin-bottom: 25px;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 10px;
+        color: var(--primary-orange);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: bold;
+    }
+    .form-control {
+        width: 100%;
+        padding: 14px;
+        background: #0a0a0a;
+        border: 1px solid #333;
+        color: white;
+        border-radius: 8px;
+        box-sizing: border-box;
+        font-size: 1rem;
+        transition: border-color 0.2s;
+    }
+    .form-control:focus {
+        border-color: var(--primary-orange);
+        outline: none;
+        background: #0d0d0d;
+    }
+    .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 25px;
+    }
+    .btn-submit {
+        background: var(--primary-orange);
+        color: black;
+        border: none;
+        padding: 18px 30px;
+        border-radius: 8px;
+        font-weight: 900;
+        cursor: pointer;
+        width: 100%;
+        font-size: 1rem;
+        margin-top: 20px;
+        text-transform: uppercase;
+        transition: transform 0.1s, background 0.2s;
+    }
+    .btn-submit:hover {
+        background: #e67e00;
+        transform: translateY(-2px);
+    }
+    .btn-submit:active {
+        transform: translateY(0);
+    }
+</style>
+
+<div class="nav-header" style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px;">
+    <h2 style="color: #fff; margin: 0; font-weight: 800;">➕ ADD TO <span style="color: var(--primary-orange);">INVENTORY</span></h2>
+    <a href="{{ url_for('library.index') }}" class="btn-back" style="text-decoration: none; color: #888; background: #222; padding: 8px 15px; border-radius: 6px; font-size: 0.8rem; border: 1px solid #333;">
+        ← CANCEL & BACK
+    </a>
+</div>
+
+<div class="form-container">
+    <p style="color: #666; font-size: 0.9rem; margin-bottom: 30px; border-bottom: 1px solid #222; padding-bottom: 20px;">
+        Register a new physical item into your lab's stock system.
+    </p>
+
+    <form method="POST">
+        <div class="form-group">
+            <label>Item Name</label>
+            <input type="text" name="name" class="form-control" placeholder="e.g. Strawberry Ripe" required>
+        </div>
+
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Brand</label>
+                <input type="text" name="brand" class="form-control" placeholder="e.g. TFA / CAP">
+            </div>
+            <div class="form-group">
+                <label>Category</label>
+                <select name="category" class="form-control">
+                    <option value="Flavor">Flavor</option>
+                    <option value="Base">Base (Nic/VG/PG)</option>
+                    <option value="Packaging">Packaging</option>
+                    <option value="Hardware">Hardware</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Unit Type</label>
+                <select name="unit" class="form-control">
+                    <option value="ml">Milliliters (ml)</option>
+                    <option value="g">Grams (g)</option>
+                    <option value="pcs">Pieces (pcs)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Cost per Unit (R)</label>
+                <input type="number" step="0.01" name="cost_per_unit" class="form-control" placeholder="0.00" required>
+            </div>
+        </div>
+
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Current Stock</label>
+                <input type="number" step="0.01" name="current_stock" class="form-control" placeholder="0.00" required>
+            </div>
+            <div class="form-group">
+                <label>Low Stock Alert Level</label>
+                <input type="number" step="0.01" name="low_stock_threshold" class="form-control" value="10.00">
+            </div>
+        </div>
+
+        <button type="submit" class="btn-submit">Register Item</button>
+    </form>
+</div>
+{% endblock %}

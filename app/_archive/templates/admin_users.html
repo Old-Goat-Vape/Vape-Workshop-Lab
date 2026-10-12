@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}Personnel Management - Old Goat Lab{% endblock %}
+
+{% block content %}
+<style>
+    .role-pill { 
+        padding: 4px 10px; 
+        border-radius: 20px; 
+        font-size: 0.75rem; 
+        font-weight: bold;
+        text-transform: uppercase;
+        font-size: 0.7rem;
+    }
+    .role-Master { background: var(--primary-orange); color: black; }
+    .role-Manager { background: #444; color: white; }
+    .role-Standard { background: #222; color: #888; }
+    
+    .status-badge { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; margin-left: 5px; }
+    .status-Active { background: rgba(40, 167, 69, 0.2); color: #28a745; }
+    .status-Disabled { background: rgba(220, 53, 69, 0.2); color: #dc3545; }
+
+    .role-select, .pw-input {
+        background: #111;
+        color: white;
+        border: 1px solid #333;
+        padding: 8px;
+        border-radius: 4px;
+        font-size: 0.85rem;
+    }
+    .pw-input { width: 140px; }
+    .btn-save { background: var(--primary-orange); color: black; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+    .btn-save:hover { opacity: 0.8; }
+    
+    .create-user-box {
+        background: #1a1a1a;
+        padding: 25px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+        border: 1px solid #333;
+    }
+</style>
+
+<div class="container">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h1>👥 Personnel Management</h1>
+        <a href="{{ url_for('index') }}" class="btn-secondary">Back to Dashboard</a>
+    </div>
+
+    <div class="create-user-box">
+        <h3 style="margin-top: 0; margin-bottom: 15px; color: var(--primary-orange);">Onboard New Personnel</h3>
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <input type="text" id="new-username" placeholder="Username" class="role-select">
+            <input type="password" id="new-password" placeholder="Initial Password" class="role-select">
+            <select id="new-role" class="role-select">
+                <option value="Standard">Standard</option>
+                <option value="Manager">Manager</option>
+                <option value="Master">Master</option>
+            </select>
+            <button onclick="createUser()" class="btn-save">+ Create User</button>
+        </div>
+    </div>
+
+    <div class="section-card">
+        <div class="section-title">Lab Staff Access Control</div>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+            <thead>
+                <tr style="text-align: left; color: #666; font-size: 0.8rem; border-bottom: 2px solid #333;">
+                    <th style="padding: 10px;">User</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Security</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr id="user-row-{{ u.id }}" style="border-bottom: 1px solid #222;">
+                    <td style="padding: 15px 10px;">
+                        <strong>{{ u.username }}</strong>
+                        <span class="status-badge status-{{ u.status }}">{{ u.status }}</span>
+                        {% if u.id == session.user_id %}<br><small style="color: var(--success);">Logged in as You</small>{% endif %}
+                    </td>
+                    <td>
+                        <select class="role-select edit-role" {{ 'disabled' if u.id == session.user_id }}>
+                            <option value="Standard" {{ 'selected' if u.role == 'Standard' }}>Standard</option>
+                            <option value="Manager" {{ 'selected' if u.role == 'Manager' }}>Manager</option>
+                            <option value="Master" {{ 'selected' if u.role == 'Master' }}>Master</option>
+                        </select>
+                    </td>
+                    <td>
+                        <select class="role-select edit-status" {{ 'disabled' if u.id == session.user_id }}>
+                            <option value="Active" {{ 'selected' if u.status == 'Active' }}>Active</option>
+                            <option value="Disabled" {{ 'selected' if u.status == 'Disabled' }}>Disabled</option>
+                        </select>
+                    </td>
+                    <td>
+                        <input type="password" class="pw-input edit-password" placeholder="Reset Password">
+                    </td>
+                    <td>
+                        <button onclick="updateAccount({{ u.id }})" class="btn-save" title="Save Changes">💾</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+function updateAccount(userId) {
+    const row = document.getElementById(`user-row-${userId}`);
+    const payload = {
+        id: userId,
+        role: row.querySelector('.edit-role').value,
+        status: row.querySelector('.edit-status').value,
+        password: row.querySelector('.edit-password').value
+    };
+
+    if (payload.password && !confirm("Are you sure you want to reset this user's password?")) return;
+
+    fetch("/admin/users/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === "success") {
+            alert("Account updated successfully.");
+            location.reload();
+        } else {
+            alert("Error: " + data.message);
+        }
+    });
+}
+
+function createUser() {
+    const payload = {
+        username: document.getElementById('new-username').value,
+        password: document.getElementById('new-password').value,
+        role: document.getElementById('new-role').value
+    };
+
+    if(!payload.username || !payload.password) {
+        alert("Username and Password are required.");
+        return;
+    }
+
+    fetch("/admin/users/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === "success") {
+            location.reload();
+        } else {
+            alert("Error: " + data.message);
+        }
+    });
+}
+</script>
+{% endblock %}

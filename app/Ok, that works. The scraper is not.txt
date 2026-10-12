@@ -1,0 +1,73 @@
+Ok, that works. The scraper is not finding all the base liquid sizes, so the math is not working. I will need to add it to the code manually. Unless we can force the scraper to search deeper and find this data.
+
+
+
+Here is a list of items and bottle sizes,
+
+
+
+AuNic- Freebase Nicotine (comes in VG and PG base, we need to create a line for each)
+
+- VG - 1000ml = R1200
+- VG - 5000ml = R6000
+- PG - 1000ml = R1200
+- PG - 5000ml = R6000
+
+
+AuNic- Salt Nicotine (same as above)
+
+- VG - 1000ml = R1250
+- VG - 5000ml = R6250
+- PG - 1000ml = R1250
+- PG - 5000ml = R6250
+
+
+
+BLCK FlavourPG (Propylene Glycol)
+
+- 100ml = R35
+- 500ml = R65
+- 1000ml = R119
+- 5000ml = R495
+- 24000ml = R2495
+
+
+
+BLCK FlavourVG (Vegetable Glycerine)
+
+- 500ml = R49
+- 1000ml = R89
+- 2000ml = R175
+- 5000ml = R349
+- 24000ml = R1795
+
+
+Gold-Nic	Gold Nic (Nicotine)
+- 36mg/ml VG 100ml = R99
+- 36mg/ml PG 100ml = R99
+- 36mg/ml PG 500ml = R495
+- 48mg/ml VG 100ml = R130
+- 48mg/ml PG 100ml = R150
+- 48mg/ml PG 500ml = R695
+- 100mg/ml VG 100ml = R195
+- 100mg/ml VG 500ml = R795
+- 100mg/ml PG 100ml = R195
+- 100mg/ml PG 500ml = R795
+- 100mg/ml PG 1 Litre = R1590
+- 100mg/ml VG 1 Litre = R1590
+
+Gold-Nic	Nicotine Salts (Gold Nic)
+- 100mg/ml VG Base (100ml) = R250
+- 100mg/ml PG Base (100ml) = R250
+
+Prime-Nic	Nicotine Salts (Prime Nic) 100mg
+- 100mg/ml PG Base (50ml) = R160
+
+Prime-Nic	Prime Nicotine
+- 36mg/ml PG Base (100ml) = R195
+- 36mg/ml VG Base (100ml) = R195
+
+Scrawny Gecko	(White Label) Nicotine
+- VG 36mg 100ml = R110
+
+

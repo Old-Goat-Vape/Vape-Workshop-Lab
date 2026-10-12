@@ -1,0 +1,55 @@
+cd "C:\Users\Wynand Vermeulen\OneDrive - Nemtek (Pty) Ltd\Desktop\Old_Goat_Mixing_Lab\app"
+
+python app.py
+
+
+Old_Goat_Mixing_Lab/
+├── app.py
+├── db.py
+├── library_main.py
+├── logs.py
+├── old_goat_lab.db
+├── pdf_reports.py
+├── schema.sql
+├── users.py
+├── static/
+│   └── style.css
+├── templates/
+│   ├── add_stock.html
+│   ├── admin_backups.html
+│   ├── admin_users.html
+│   ├── base.html
+│   ├── dashboard.html
+│   ├── edit_items.html
+│   ├── library_add.html
+│   ├── library_main.html
+│   ├── login.html
+│   ├── mix.html
+│   ├── mix_history.html
+│   ├── mix_longfill.html
+│   ├── recipe_creator.html
+│   ├── recipe_creator_pro.html
+│   ├── recipe_form.html
+│   ├── recipe_library.html
+│   ├── recipe_view.html
+│   ├── recipes.html
+└── routes/
+    ├── admin.py
+    ├── api_lab.py
+    ├── auth.py
+    ├── backup.py
+    ├── ingredients.py
+    ├── inventory.py
+    ├── library_main.py
+    ├── main.py
+    ├── mix.py
+    ├── recipes.py
+    ├── users.py
+└── _pycach_/ 
+    ├── admin.cpython-314.pyc
+    ├── auth.cpython-314.pyc
+    ├── backup.cpython-314.pyc
+    ├── db.cpython-314.pyc
+    ├── ingredients.cpython-314.pyc
+    ├── mix.cpython-314.pyc
+    └── recipes.cpython-314.pyc

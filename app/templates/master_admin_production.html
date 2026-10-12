@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Production & Decanting - Old Goat Lab{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h3 mb-1">Production & Decanting</h1>
+    <div class="text-secondary small">Bulk batches, decant runs, and finished bottle stock.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-warning btn-sm" href="{{ url_for('master_admin.sales_dashboard') }}">Sales Control</a>
+    <a class="btn btn-outline-light btn-sm" href="{{ url_for('master_admin.console', tab='scrapers') }}">Back to Master Admin</a>
+  </div>
+</div>
+
+<div class="card border-0 mb-3" style="background:#151515; border:1px solid #333 !important;">
+  <div class="card-body">
+    <h2 class="h5 mb-2">Create Bulk Batch</h2>
+    <form method="POST" action="{{ url_for('master_admin.create_production_batch') }}" class="row g-2 align-items-end">
+      <div class="col-12 col-md-4">
+        <label class="form-label small text-secondary">Batch Name</label>
+        <input name="batch_name" class="form-control bg-black border-secondary" placeholder="e.g. Mango Ice Bulk #1" required>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small text-secondary">Total Volume (ml)</label>
+        <input type="number" step="0.01" min="0.01" name="total_volume_ml" class="form-control bg-black border-secondary" required>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small text-secondary">Recipe ID (optional)</label>
+        <input name="recipe_id" class="form-control bg-black border-secondary" placeholder="optional">
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label small text-secondary">Notes</label>
+        <input name="notes" class="form-control bg-black border-secondary" placeholder="optional">
+      </div>
+      <div class="col-12 col-md-1">
+        <button class="btn btn-warning w-100">Create</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0 mb-3" style="background:#151515; border:1px solid #333 !important;">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h2 class="h5 mb-0">Bulk Batches</h2>
+      <form method="GET" class="d-flex gap-2">
+        <input type="hidden" name="fg_search" value="{{ fg_search or '' }}">
+        <select name="status" class="form-select form-select-sm bg-black border-secondary">
+          <option value="" {% if not status %}selected{% endif %}>All Statuses</option>
+          <option value="open" {% if status == 'open' %}selected{% endif %}>Open</option>
+          <option value="depleted" {% if status == 'depleted' %}selected{% endif %}>Depleted</option>
+          <option value="archived" {% if status == 'archived' %}selected{% endif %}>Archived</option>
+        </select>
+        <select name="decant" class="form-select form-select-sm bg-black border-secondary">
+          <option value="" {% if not decant %}selected{% endif %}>All Decant States</option>
+          <option value="not_decanted" {% if decant == 'not_decanted' %}selected{% endif %}>Not Decanted</option>
+          <option value="partially_decanted" {% if decant == 'partially_decanted' %}selected{% endif %}>Partially Decanted</option>
+          <option value="fully_decanted" {% if decant == 'fully_decanted' %}selected{% endif %}>Fully Decanted</option>
+        </select>
+        <button class="btn btn-outline-light btn-sm">Filter</button>
+      </form>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-dark table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Batch</th>
+            <th>Status</th>
+            <th class="text-end">Total ml</th>
+            <th class="text-end">Remaining ml</th>
+            <th class="text-end">Bottles</th>
+            <th class="text-end">Wastage ml</th>
+            <th>Decant Progress</th>
+            <th>Mixed by</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in batches %}
+          <tr>
+            <td class="font-monospace">{{ b.id }}</td>
+            <td>{{ b.batch_name }}</td>
+            <td><span class="badge text-bg-{{ 'success' if b.batch_status == 'open' else 'secondary' }}">{{ b.batch_status }}</span></td>
+            <td class="text-end">{{ "%.2f"|format(b.total_volume_ml or 0) }}</td>
+            <td class="text-end {% if (b.remaining_volume_ml or 0) <= 0.01 %}text-danger{% else %}text-success{% endif %}">
+              {{ "%.2f"|format(b.remaining_volume_ml or 0) }}
+            </td>
+            <td class="text-end">{{ b.total_bottles_produced or 0 }}</td>
+            <td class="text-end">{{ "%.2f"|format(b.total_wastage_ml or 0) }}</td>
+            <td>
+              {% if b.decant_state == 'not_decanted' %}
+                <span class="badge text-bg-danger">Not Decanted</span>
+              {% elif b.decant_state == 'partially_decanted' %}
+                <span class="badge text-bg-warning">Partially Decanted</span>
+              {% else %}
+                <span class="badge text-bg-success">Fully Decanted</span>
+              {% endif %}
+            </td>
+            <td class="small text-secondary">{{ b.mixed_by_name }}</td>
+            <td class="text-end">
+              <a class="btn btn-sm btn-outline-warning" href="{{ url_for('master_admin.production_decant', batch_id=b.id) }}">
+                {{ 'Start Decant' if b.decant_state == 'not_decanted' else 'Continue Decant' }}
+              </a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="10" class="text-center text-secondary py-4">No production batches for this filter.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0" style="background:#151515; border:1px solid #333 !important;">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h2 class="h5 mb-0">Finished Goods Inventory</h2>
+      <form method="GET" class="d-flex gap-2">
+        <input type="hidden" name="status" value="{{ status or '' }}">
+        <input name="fg_search" value="{{ fg_search or '' }}" class="form-control form-control-sm bg-black border-secondary" placeholder="Search product...">
+        <button class="btn btn-outline-light btn-sm">Search</button>
+      </form>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-dark table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th class="text-end">Bottle Size</th>
+            <th class="text-end">Qty On Hand</th>
+            <th>Batch</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for fg in finished_goods %}
+          <tr>
+            <td>{{ fg.product_name }}</td>
+            <td class="text-end">{{ "%.0f"|format(fg.bottle_size_ml or 0) }}ml</td>
+            <td class="text-end">{{ fg.quantity_on_hand }}</td>
+            <td class="small text-secondary">{{ fg.batch_name or ('#' ~ (fg.production_batch_id or '')) }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="text-center text-secondary py-4">No finished bottle stock yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,186 @@
+{% extends "base_public.html" %}
+{% block title %}{{ u.username }} | Users | TVW Admin{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw.css') }}">
+<div class="tvw-page">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h1 class="h4 mb-0">@{{ u.username }}</h1>
+    <div class="d-flex gap-2 flex-wrap">
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.user_moderation') }}">All users</a>
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.dashboard') }}">Dashboard</a>
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.audit_log') }}">Audit</a>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-md-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <h2 class="h6 text-secondary">Account</h2>
+          <p class="mb-1"><strong>ID:</strong> {{ u.id }}</p>
+          <p class="mb-1"><strong>Email:</strong> {{ u.email or "—" }}</p>
+          <p class="mb-1"><strong>Role:</strong> <span class="badge text-bg-primary">{{ u.role }}</span></p>
+          <p class="mb-1"><strong>Legacy status:</strong> {{ u.status }}</p>
+          <p class="mb-1"><strong>Created:</strong> {{ u.created_at or "—" }}</p>
+          <p class="mb-0">
+            <strong>Flags:</strong>
+            {% if u.is_suspended %}<span class="badge text-bg-warning ms-1">suspended</span>{% endif %}
+            {% if u.is_banned %}<span class="badge text-bg-danger ms-1">banned</span>{% endif %}
+            {% if u.is_muted %}<span class="badge text-bg-info ms-1">muted</span>{% endif %}
+            {% if not u.is_suspended and not u.is_banned and not u.is_muted %}<span class="text-secondary">none</span>{% endif %}
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-md-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <h2 class="h6 text-secondary">Content (counts)</h2>
+          <p class="mb-1">Recipes: <strong>{{ u.recipe_count }}</strong></p>
+          <p class="mb-1">Flavour notes: <strong>{{ u.note_count }}</strong></p>
+          <p class="mb-1">Flavour reviews: <strong>{{ u.review_count }}</strong></p>
+          <p class="mb-0">Recipe feedback: <strong>{{ u.feedback_count }}</strong></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <h2 class="h6 text-secondary">Role management</h2>
+      <p class="small text-secondary mb-2">
+        Your clearance: <strong>{{ actor_role }}</strong>.
+        You cannot promote anyone to your own level or higher (except Old Goat rules). No self-changes.
+      </p>
+      {% if assignable_roles %}
+        <form method="post" action="{{ url_for('tvw_admin.update_user_role', user_id=u.id) }}" id="tvwRoleChangeForm" class="row g-2 align-items-end">
+          <div class="col-12 col-md-4">
+            <label class="form-label small mb-1">New role</label>
+            <select class="form-select form-select-sm" name="new_role" required>
+              <option value="" disabled selected>Choose role…</option>
+              {% for r in assignable_roles %}
+                <option value="{{ r }}" {% if r == u.role %}disabled{% endif %}>{{ r }}{% if r == u.role %} (current){% endif %}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12 col-md-5">
+            <label class="form-label small mb-1">Reason <span class="text-warning">(required)</span></label>
+            <input class="form-control form-control-sm" name="reason" required placeholder="Audit note (e.g. trusted contributor)">
+          </div>
+          <div class="col-12 col-md-3 d-grid">
+            <button type="submit" class="btn btn-sm btn-outline-warning">Update role</button>
+          </div>
+        </form>
+        <script>
+          (function () {
+            var f = document.getElementById("tvwRoleChangeForm");
+            if (!f) return;
+            var current = {{ u.role | tojson }};
+            var high = new Set(["admin", "Foreman", "Master", "Old Goat"]);
+            f.addEventListener("submit", function (ev) {
+              var sel = f.querySelector('[name="new_role"]');
+              var nr = sel && sel.value;
+              if (!nr || nr === current) return;
+              if (high.has(nr) || high.has(current)) {
+                if (!confirm("Confirm role change: " + current + " → " + nr + "?")) ev.preventDefault();
+              }
+            });
+          })();
+        </script>
+      {% else %}
+        <p class="small text-secondary mb-0">No roles can be assigned at your clearance level.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <h2 class="h6 text-secondary">Moderation note</h2>
+      <div class="tvw-list-row small mb-3" style="white-space: pre-wrap;">{{ u.moderation_note or "—" }}</div>
+      <p class="small text-secondary mb-2">Internal note stored on the user record (shown only in admin).</p>
+
+      <form method="post" action="{{ url_for('tvw_admin.update_user_moderation_action', user_id=u.id) }}" class="mb-0">
+        <label class="form-label small">Update note</label>
+        <textarea class="form-control form-control-sm mb-2" name="moderation_note" rows="3" placeholder="Moderation note">{{ u.moderation_note or '' }}</textarea>
+        <input type="hidden" name="action" value="set_moderation_note">
+        <input class="form-control form-control-sm mb-2" name="reason" placeholder="Reason (audit)">
+        <button class="btn btn-sm btn-outline-light" type="submit">Save note</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <h2 class="h6 text-secondary">Moderation status</h2>
+      <p class="small text-secondary">Current: <span class="badge text-bg-dark">{{ u.moderation_status }}</span></p>
+      <form method="post" action="{{ url_for('tvw_admin.update_user_moderation_action', user_id=u.id) }}" class="row g-2 align-items-end">
+        <div class="col-auto">
+          <select class="form-select form-select-sm" name="moderation_status">
+            <option value="active" {% if u.moderation_status|lower == 'active' %}selected{% endif %}>active</option>
+            <option value="review" {% if u.moderation_status|lower == 'review' %}selected{% endif %}>review</option>
+            <option value="flagged" {% if u.moderation_status|lower == 'flagged' %}selected{% endif %}>flagged</option>
+            <option value="suspended" {% if u.moderation_status|lower == 'suspended' %}selected{% endif %}>suspended</option>
+            <option value="banned" {% if u.moderation_status|lower == 'banned' %}selected{% endif %}>banned</option>
+          </select>
+        </div>
+        <div class="col">
+          <input class="form-control form-control-sm" name="reason" placeholder="Reason (audit)">
+        </div>
+        <div class="col-auto">
+          <input type="hidden" name="action" value="set_moderation_status">
+          <button class="btn btn-sm btn-outline-light" type="submit">Set status</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <h2 class="h6 text-secondary mb-3">Quick actions</h2>
+      <p class="small text-secondary mb-3">Each action is audited. You cannot moderate an account at or above your rank. Add an optional reason per action.</p>
+
+      <div class="row g-2">
+        {% for label, act, cls in [
+          ('Mute', 'mute', 'btn-outline-info'),
+          ('Unmute', 'unmute', 'btn-outline-secondary'),
+          ('Suspend', 'suspend', 'btn-outline-warning'),
+          ('Unsuspend', 'unsuspend', 'btn-outline-light'),
+          ('Ban', 'ban', 'btn-outline-danger'),
+          ('Unban', 'unban', 'btn-outline-success'),
+        ] %}
+          <div class="col-12 col-md-6 col-lg-4">
+            <form method="post" action="{{ url_for('tvw_admin.update_user_moderation_action', user_id=u.id) }}" class="card card-body py-2 px-3 bg-dark border-secondary">
+              <input type="hidden" name="action" value="{{ act }}">
+              <input class="form-control form-control-sm mb-2" name="reason" placeholder="Reason (audit)">
+              <button class="btn btn-sm {{ cls }} w-100" type="submit">{{ label }}</button>
+            </form>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <section class="card shadow-sm">
+    <div class="card-body">
+      <h2 class="h6 mb-3">Recent admin actions (this user)</h2>
+      <div class="table-responsive">
+        <table class="table table-dark table-sm">
+          <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Reason</th></tr></thead>
+          <tbody>
+            {% for log in u.recent_audits %}
+              <tr>
+                <td class="small">{{ log.created_at }}</td>
+                <td class="small">{{ log.actor_username }} ({{ log.actor_role }})</td>
+                <td class="small">{{ log.action }}</td>
+                <td class="small">{{ log.reason or "—" }}</td>
+              </tr>
+            {% else %}
+              <tr><td colspan="4" class="text-secondary">No audit rows yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}

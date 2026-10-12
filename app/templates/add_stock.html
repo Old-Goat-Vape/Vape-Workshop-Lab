@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Old Goat - Add Stock{% endblock %}
+
+{% block content %}
+    <div class="nav-header">
+        <div class="logo-small">🐐 Old Goat Lab</div>
+        <a href="{{ url_for('index') }}" class="btn-back"><span>←</span> Dashboard</a>
+    </div>
+
+    <h1>Add to Lab Library</h1>
+
+    <div class="tabs">
+        <button id="defaultTab" class="tab-btn active" onclick="openTab(event, 'flavor')">Add Flavor</button>
+        <button class="tab-btn" onclick="openTab(event, 'base')">Add VG/PG/Nic</button>
+        <button class="tab-btn" onclick="openTab(event, 'hardware')">Add Hardware</button>
+    </div>
+
+    <div class="section-card" style="border-top-left-radius: 0;">
+        <div id="flavor" class="tab-content active">
+            <div class="section-title">New Flavor Concentrate</div>
+            <form action="{{ url_for('ingredients.add_flavor') }}" method="POST">
+                <label>Name (Required)</label><br>
+                <input type="text" name="name" class="form-input" required><br>
+                
+                <label>Brand</label><br>
+                <input type="text" name="brand" class="form-input" placeholder="e.g. TFA, Capella"><br>
+                
+                <label>Category</label><br>
+                <select name="category" class="form-input" required>
+                    <option>Fruit</option><option>Dessert</option><option>Cream</option><option>Menthol</option><option>Tobacco</option>
+                </select><br>
+
+                <div style="display:flex; gap:20px;">
+                    <div>
+                        <label>Initial Stock (ml)</label><br>
+                        <input type="number" step="0.001" name="stock" class="form-input" style="width:150px;" required>
+                    </div>
+                    <div>
+                        <label>Cost per ml</label><br>
+                        <input type="number" step="0.0001" name="cost" class="form-input" style="width:150px;" required>
+                    </div>
+                </div>
+                
+                <button type="submit" class="save-btn">Save Flavor</button>
+            </form>
+        </div>
+
+        <div id="base" class="tab-content">
+            <div class="section-title">New Base Liquid</div>
+            <form action="{{ url_for('ingredients.add_base') }}" method="POST">
+                <label>Name</label><br>
+                <input type="text" name="name" class="form-input" required><br>
+                <label>Type</label><br>
+                <select name="type" class="form-input" required>
+                    <option value="VG">VG</option><option value="PG">PG</option><option value="Nicotine">Nicotine</option>
+                </select><br>
+                <label>Strength (mg/ml)</label><br>
+                <input type="number" step="0.1" name="strength" value="0" class="form-input"><br>
+                <label>Current Volume (ml)</label><br>
+                <input type="number" step="0.1" name="quantity" class="form-input" required><br>
+                <button type="submit" class="save-btn">Save Base</button>
+            </form>
+        </div>
+
+        <div id="hardware" class="tab-content">
+            <div class="section-title">New Hardware Item</div>
+            <form action="{{ url_for('ingredients.add_stock_item') }}" method="POST">
+                <label>Item Name</label><br>
+                <input type="text" name="item_name" class="form-input" required><br>
+                <label>Type</label><br>
+                <select name="type" class="form-input" required>
+                    <option>Bottle</option><option>Cap</option><option>Label</option>
+                </select><br>
+                <label>Quantity</label><br>
+                <input type="number" name="quantity" class="form-input" required><br>
+                <button type="submit" class="save-btn">Save Item</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openTab(evt, tabId) {
+            var i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName("tab-content");
+            for (i = 0; i < tabcontent.length; i++) { tabcontent[i].classList.remove("active"); }
+            tablinks = document.getElementsByClassName("tab-btn");
+            for (i = 0; i < tablinks.length; i++) { tablinks[i].classList.remove("active"); }
+            document.getElementById(tabId).classList.add("active");
+            evt.currentTarget.classList.add("active");
+        }
+    </script>
+{% endblock %}

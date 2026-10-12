@@ -1,0 +1,160 @@
+{% extends "base_public.html" %}
+{% from "partials/tvw_dashboard_illustrations.html" import mix_bench_illustration, create_recipe_illustration %}
+{% block body_class %}tvw-dashboard-route{% endblock %}
+{% block title %}Home | The Vape Workshop Calculator{% endblock %}
+{% block content %}
+
+<div class="tvw-dashboard-shell">
+  <header class="tvw-dashboard-welcome">
+    <p class="tvw-dashboard-kicker">The mixing bench</p>
+    <h1 class="tvw-dashboard-title">Welcome back, {{ user.username if user else 'mixer' }}</h1>
+    <p class="tvw-dashboard-lead">What would you like to do?</p>
+  </header>
+
+  <div class="tvw-action-grid">
+    {# --- Start Mixing (always primary, left) --- #}
+    <article class="tvw-action-card tvw-action-card--primary tvw-action-card--mix">
+      <div class="tvw-card-mix-layout">
+        <div class="tvw-card-mix-body">
+          <h2 class="tvw-action-card-title">Start mixing</h2>
+          <p class="tvw-card-tagline">Choose a recipe and mix one ingredient at a time.</p>
+          <ol class="tvw-workflow-steps" aria-label="Guided mix workflow">
+            <li class="tvw-workflow-step">
+              <span class="tvw-workflow-step-icon" aria-hidden="true">1</span>
+              <span class="tvw-workflow-step-label">Pick recipe</span>
+            </li>
+            <li class="tvw-workflow-step tvw-workflow-step--arrow" aria-hidden="true"></li>
+            <li class="tvw-workflow-step">
+              <span class="tvw-workflow-step-icon" aria-hidden="true">2</span>
+              <span class="tvw-workflow-step-label">Weigh ingredients</span>
+            </li>
+            <li class="tvw-workflow-step tvw-workflow-step--arrow" aria-hidden="true"></li>
+            <li class="tvw-workflow-step">
+              <span class="tvw-workflow-step-icon" aria-hidden="true">3</span>
+              <span class="tvw-workflow-step-label">Finish batch</span>
+            </li>
+          </ol>
+          <div class="tvw-card-actions">
+            <a class="tvw-action-card-btn tvw-action-card-btn--primary"
+               href="{{ url_for('tvw_recipes.tvw_recipe_library') }}">Start a mix</a>
+          </div>
+        </div>
+        <div class="tvw-card-mix-art">
+          {{ mix_bench_illustration() }}
+        </div>
+      </div>
+    </article>
+
+    {% if active_guided_mix %}
+    {# --- Resume (right top when active) --- #}
+    {% set mix_total = active_guided_mix.total_steps|int %}
+    {% set mix_open = active_guided_mix.open_steps|int %}
+    {% set mix_done = (mix_total - mix_open) if mix_total > 0 else 0 %}
+    {% set mix_pct = ((mix_done * 100) // mix_total) if mix_total > 0 else 0 %}
+    {% set mix_current = (mix_done + 1) if mix_open > 0 and mix_total > 0 else mix_done %}
+    <article class="tvw-action-card tvw-action-card--resume tvw-action-card--slot-top">
+      <div class="tvw-card-resume-layout">
+        <div class="tvw-card-resume-head">
+          <span class="tvw-status-pill tvw-status-pill--active">In progress</span>
+          <h2 class="tvw-action-card-title tvw-action-card-title--compact">Resume your mix</h2>
+        </div>
+        <p class="tvw-resume-recipe-name">{{ active_guided_mix.recipe_name }}</p>
+        <p class="tvw-resume-progress-label">
+          {% if mix_total > 0 %}
+            Step {{ mix_current }} of {{ mix_total }}
+            {% if mix_open > 0 %} · {{ mix_open }} remaining{% endif %}
+          {% else %}
+            {{ mix_open }} step(s) remaining
+          {% endif %}
+        </p>
+        <p class="tvw-resume-meta">
+          {% if active_guided_mix.target_ml is not none %}{{ active_guided_mix.target_ml|int }} ml batch{% endif %}
+          {% if active_guided_mix.target_pgvg %}{% if active_guided_mix.target_ml is not none %} · {% endif %}{{ active_guided_mix.target_pgvg }} PG/VG{% endif %}
+          {% if active_guided_mix.version_number %}{% if active_guided_mix.target_ml is not none or active_guided_mix.target_pgvg %} · {% endif %}v{{ active_guided_mix.version_number }}{% endif %}
+        </p>
+        <div class="tvw-progress" role="progressbar"
+             aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ mix_pct }}"
+             aria-label="Mix progress">
+          <div class="tvw-progress-track">
+            <div class="tvw-progress-fill" style="width: {{ mix_pct }}%;"></div>
+          </div>
+          <span class="tvw-progress-text">{{ mix_pct }}% complete</span>
+        </div>
+        <div class="tvw-card-actions">
+          <a class="tvw-action-card-btn tvw-action-card-btn--resume"
+             href="{{ url_for('tvw_recipes.tvw_guided_mix_session', session_id=active_guided_mix.id) }}">Continue mix</a>
+        </div>
+      </div>
+    </article>
+
+    {# --- Create Recipe (right bottom when active) --- #}
+    <article class="tvw-action-card tvw-action-card--create tvw-action-card--slot-bottom">
+      <div class="tvw-card-create-layout">
+        <div class="tvw-card-create-body">
+          <h2 class="tvw-action-card-title tvw-action-card-title--compact">Create a recipe</h2>
+          <p class="tvw-card-tagline">Build a new recipe from your flavour library.</p>
+          <ul class="tvw-chip-row" aria-label="Recipe building blocks">
+            <li class="tvw-chip">Flavours</li>
+            <li class="tvw-chip">Percentages</li>
+            <li class="tvw-chip">Notes</li>
+          </ul>
+          <div class="tvw-card-actions">
+            <a class="tvw-action-card-btn tvw-action-card-btn--secondary"
+               href="{{ url_for('tvw_recipes.tvw_recipe_new') }}">Create recipe</a>
+          </div>
+        </div>
+        <div class="tvw-card-create-art">
+          {{ create_recipe_illustration() }}
+        </div>
+      </div>
+    </article>
+
+    {% else %}
+    {# --- Create Recipe (right top, no active mix) --- #}
+    <article class="tvw-action-card tvw-action-card--create tvw-action-card--slot-top">
+      <div class="tvw-card-create-layout">
+        <div class="tvw-card-create-body">
+          <h2 class="tvw-action-card-title tvw-action-card-title--compact">Create a recipe</h2>
+          <p class="tvw-card-tagline">Build a new recipe from your flavour library.</p>
+          <ul class="tvw-chip-row" aria-label="Recipe building blocks">
+            <li class="tvw-chip">Flavours</li>
+            <li class="tvw-chip">Percentages</li>
+            <li class="tvw-chip">Notes</li>
+          </ul>
+          <div class="tvw-card-actions">
+            <a class="tvw-action-card-btn tvw-action-card-btn--secondary"
+               href="{{ url_for('tvw_recipes.tvw_recipe_new') }}">Create recipe</a>
+          </div>
+        </div>
+        <div class="tvw-card-create-art">
+          {{ create_recipe_illustration() }}
+        </div>
+      </div>
+    </article>
+
+    {# --- My Recipes (right bottom, no active mix) --- #}
+    <article class="tvw-action-card tvw-action-card--library tvw-action-card--slot-bottom">
+      <div class="tvw-card-library-layout">
+        <h2 class="tvw-action-card-title tvw-action-card-title--compact">My recipes</h2>
+        <p class="tvw-card-tagline">Open, edit, or mix your saved recipes.</p>
+        <div class="tvw-library-motif" aria-hidden="true">
+          <span class="tvw-library-line"></span>
+          <span class="tvw-library-line tvw-library-line--short"></span>
+          <span class="tvw-library-line"></span>
+        </div>
+        <div class="tvw-card-actions">
+          <a class="tvw-action-card-btn tvw-action-card-btn--secondary"
+             href="{{ url_for('tvw_recipes.tvw_recipe_library', mine=1) }}">View my recipes</a>
+        </div>
+      </div>
+    </article>
+    {% endif %}
+  </div>
+
+  {% include "partials/tvw_discovery_section.html" %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='tvw-discovery-tabs.js') }}" defer></script>
+{% endblock %}

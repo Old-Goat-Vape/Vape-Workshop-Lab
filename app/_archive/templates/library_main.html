@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Universal Library - Old Goat Lab{% endblock %}
+
+{% block content %}
+<style>
+    .category-header {
+        background: #222;
+        padding: 10px 15px;
+        margin: 20px 0 10px 0;
+        border-left: 4px solid var(--primary-orange);
+        font-weight: bold;
+        text-transform: uppercase;
+        font-size: 0.9rem;
+        color: var(--primary-orange);
+    }
+    .stock-input {
+        width: 60px;
+        background: #111;
+        border: 1px solid #333;
+        color: white;
+        padding: 5px;
+        text-align: center;
+    }
+    .low-stock-row { background: rgba(255, 68, 68, 0.05) !important; }
+    .btn-mini {
+        background: #333;
+        border: 1px solid #444;
+        color: white;
+        padding: 2px 8px;
+        cursor: pointer;
+        border-radius: 4px;
+        font-weight: bold;
+    }
+    .btn-mini:hover { background: #444; }
+</style>
+
+<div class="nav-header" style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px;">
+    <h2 style="color: var(--primary-orange); margin: 0;">🐐 UNIVERSAL LIBRARY</h2>
+    <a href="{{ url_for('dashboard_index') }}" class="btn-back" style="text-decoration: none; color: #fff; background: #444; padding: 8px 15px; border-radius: 4px;">Dashboard</a>
+</div>
+
+<div class="toolbar" style="display: flex; justify-content: space-between; align-items: center; margin: 20px 0;">
+    <input type="text" id="libSearch" placeholder="Search by name or brand..." onkeyup="filterLibrary()" style="width: 300px; padding: 12px; background: #111; border: 1px solid #333; color: white; border-radius: 6px;">
+    
+    {% if session.get('role') in ['Old Goat', 'Master'] %}
+    <a href="{{ url_for('library.add_item') }}" class="btn-primary" style="text-decoration: none; background: var(--primary-orange); color: #000; padding: 10px 20px; border-radius: 6px; font-weight: bold;">+ Add New Item</a>
+    {% endif %}
+</div>
+
+<div class="section-card" style="background: #111; padding: 20px; border-radius: 12px; border: 1px solid #222;">
+    <table id="libTable" style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="text-align: left; color: #666; border-bottom: 2px solid #333; text-transform: uppercase; font-size: 0.75rem;">
+                <th style="padding: 12px;">Category</th>
+                <th>Brand / Name</th>
+                <th>Current Stock</th>
+                {% if session.get('role') == 'Old Goat' %}
+                <th>Unit Cost</th>
+                {% endif %}
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr class="item-row {{ 'low-stock-row' if item.current_stock <= item.low_stock_threshold }}" data-category="{{ item.category }}" style="border-bottom: 1px solid #222;">
+                <td style="padding: 15px;"><span class="badge" style="background: #222; padding: 4px 8px; border-radius: 4px; font-size: 0.7rem;">{{ item.category }}</span></td>
+                <td><strong style="color: #fff;">{{ item.brand if item.brand else '' }}</strong> {{ item.name }}</td>
+                <td>
+                    <button onclick="adjust({{ item.id }}, -10)" class="btn-mini">-</button>
+                    <span id="stock-{{ item.id }}" style="display: inline-block; width: 80px; text-align: center; font-family: monospace;">{{ item.current_stock }} {{ item.unit }}</span>
+                    <button onclick="adjust({{ item.id }}, 10)" class="btn-mini">+</button>
+                </td>
+                {% if session.get('role') == 'Old Goat' %}
+                <td style="color: var(--success);">R {{ "%.2f"|format(item.cost_per_unit) }}</td>
+                {% endif %}
+                <td>
+                    <button onclick="logReason({{ item.id }})" class="btn-mini">📝 Log</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+function filterLibrary() {
+    let input = document.getElementById("libSearch").value.toUpperCase();
+    let rows = document.querySelectorAll(".item-row");
+    rows.forEach(row => {
+        let text = row.innerText.toUpperCase();
+        row.style.display = text.includes(input) ? "" : "none";
+    });
+}
+
+function adjust(itemId, amount) {
+    // Ensuring it points to the correct blueprint route
+    fetch("{{ url_for('library.adjust_stock') }}", {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ item_id: itemId, amount: amount, reason: 'Manual Quick-Adjust' })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(data.status === 'success') {
+            location.reload(); 
+        } else {
+            alert("Error: " + (data.message || "Could not update stock"));
+        }
+    });
+}
+
+function logReason(itemId) {
+    let amount = prompt("Amount to change (e.g., -50 or 100):");
+    if (!amount || isNaN(amount)) return;
+    let reason = prompt("Reason for change:");
+    if (!reason) reason = "Manual Adjustment";
+    
+    fetch("{{ url_for('library.adjust_stock') }}", {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ item_id: itemId, amount: parseFloat(amount), reason: reason })
+    }).then(() => location.reload());
+}
+</script>
+{% endblock %}

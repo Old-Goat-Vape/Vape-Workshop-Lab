@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}Master Recipe Creator - Old Goat{% endblock %}
+
+{% block content %}
+    <style>
+        .creator-container { display: grid; grid-template-columns: 300px 1fr 350px; gap: 20px; padding: 20px; }
+        .flavor-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        .warning-box { background: #442222; border-left: 5px solid var(--danger); padding: 10px; margin-top: 10px; font-size: 0.85rem; }
+        .intelligence-card { background: #1a1a1a; padding: 20px; border-radius: 8px; position: sticky; top: 20px; }
+        .health-metric { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.9rem; }
+    </style>
+
+<div class="nav-header">
+    <div class="logo-small">🐐 Master Creator</div>
+    <a href="{{ url_for('recipes.library') }}" class="btn-back">Cancel</a>
+</div>
+
+<div class="creator-container">
+    <div class="section-card">
+        <h3>Recipe Meta</h3>
+        <label>Recipe Name</label>
+        <input type="text" id="recipe_name" class="adjust-input" placeholder="e.g. Old Goat Berry">
+        
+        <label>Type</label>
+        <select id="recipe_type" class="adjust-input">
+            <option>Shake & Vape</option>
+            <option>Shortfill</option>
+            <option>Concentrate</option>
+        </select>
+
+        <label>Total Batch (ml)</label>
+        <input type="number" id="batch_size" value="30" class="adjust-input" oninput="calculateLive()">
+        
+        <label>Target PG/VG</label>
+        <input type="text" id="ratio" value="30/70" class="adjust-input">
+    </div>
+
+    <div class="section-card">
+        <h3>Flavor Stack</h3>
+        <div id="flavor-list">
+            </div>
+        <button onclick="addFlavorRow()" class="btn-primary" style="width: 100%; background: #333;">+ Add Flavor</button>
+        
+        <div style="margin-top: 30px;">
+            <label>Master Notes (Steeping, Quirks)</label>
+            <textarea id="notes" class="adjust-input" style="height: 150px;"></textarea>
+        </div>
+    </div>
+
+    <div class="intelligence-card">
+        <h3>Analysis & Health</h3>
+        
+        <div class="health-metric">
+            <span>Total Flavor:</span>
+            <span id="stat-total-pct">0%</span>
+        </div>
+        <div class="health-metric">
+            <span>Batch Cost:</span>
+            <span id="stat-cost" style="color: var(--success);">R 0.00</span>
+        </div>
+        <div class="health-metric">
+            <span>Cost per ml:</span>
+            <span id="stat-cost-ml">R 0.00</span>
+        </div>
+
+        <div id="warnings-container">
+            </div>
+
+        <hr style="border: 0; border-top: 1px solid #333; margin: 20px 0;">
+        
+        <button onclick="saveRecipe('Draft')" class="btn-apply" style="width: 100%; margin-bottom: 10px;">💾 Save Draft</button>
+        <button onclick="saveRecipe('Final')" class="btn-primary" style="width: 100%;">🔒 Lock & Finalize</button>
+    </div>
+</div>
+
+<script>
+    function addFlavorRow() {
+        const container = document.getElementById('flavor-list');
+        const row = document.createElement('div');
+        row.className = 'flavor-row';
+        row.innerHTML = `
+            <select class="adjust-input flavor-select" onchange="calculateLive()">
+                <option value="">Select Flavor...</option>
+                {% for f in flavors %}
+                <option value="{{ f.id }}">{{ f.brand }} {{ f.name }}</option>
+                {% endfor %}
+            </select>
+            <input type="number" class="adjust-input flavor-pct" placeholder="%" oninput="calculateLive()">
+            <span class="ml-calc" style="padding-top:10px; color:#777;">0ml</span>
+            <button onclick="this.parentElement.remove(); calculateLive()" style="background:none; border:none; color:red; cursor:pointer;">&times;</button>
+        `;
+        container.appendChild(row);
+    }
+
+    async function calculateLive() {
+        const batchSize = document.getElementById('batch_size').value;
+        const rows = document.querySelectorAll('.flavor-row');
+        let ingredients = [];
+
+        rows.forEach(row => {
+            const id = row.querySelector('.flavor-select').value;
+            const pct = row.querySelector('.flavor-pct').value;
+            if(id && pct) {
+                ingredients.push({id: id, percent: pct});
+                row.querySelector('.ml-calc').innerText = ((pct/100)*batchSize).toFixed(2) + 'ml';
+            }
+        });
+
+        const response = await fetch('/api/calculate-recipe', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({batch_size: batchSize, ingredients: ingredients})
+        });
+        const data = await response.json();
+
+        // Update Stats
+        document.getElementById('stat-total-pct').innerText = data.total_flavor_pct.toFixed(2) + '%';
+        document.getElementById('stat-cost').innerText = 'R ' + data.total_cost.toFixed(2);
+        document.getElementById('stat-cost-ml').innerText = 'R ' + (data.total_cost / batchSize).toFixed(4);
+
+        // Update Warnings
+        const warnBox = document.getElementById('warnings-container');
+        warnBox.innerHTML = '';
+        data.warnings.forEach(w => {
+            warnBox.innerHTML += `<div class="warning-box">${w}</div>`;
+        });
+    }
+
+    // Initial Row
+    addFlavorRow();
+</script>
+{% endblock %}

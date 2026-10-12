@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Create Production Job · Lab{% endblock %}
+{% block content %}
+<div class="mb-4">
+  <div class="og-page-eyebrow mb-1" style="color:#5ec8d8;">Production</div>
+  <h1 class="h3 mb-1">Create Production Job</h1>
+  <div class="text-secondary small">Configure the project once. Live prices and batches stay attached to it.</div>
+</div>
+
+<form method="post" class="row g-3" style="max-width:640px;">
+  <div class="col-12">
+    <label class="form-label small text-secondary" for="name">Job name</label>
+    <input class="form-control bg-black border-secondary" id="name" name="name" required placeholder="Trinidad">
+  </div>
+  <div class="col-md-6">
+    <label class="form-label small text-secondary" for="job_type">Job type</label>
+    <select class="form-select bg-black border-secondary" id="job_type" name="job_type">
+      {% for t in job_types %}
+      <option value="{{ t }}">{{ t }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-6">
+    <label class="form-label small text-secondary" for="reference_label">Customer / event reference</label>
+    <input class="form-control bg-black border-secondary" id="reference_label" name="reference_label" placeholder="Optional">
+  </div>
+  <div class="col-12">
+    <label class="form-label small text-secondary" for="description">Description</label>
+    <textarea class="form-control bg-black border-secondary" id="description" name="description" rows="2"></textarea>
+  </div>
+  <div class="col-12">
+    <label class="form-label small text-secondary" for="notes">Notes</label>
+    <textarea class="form-control bg-black border-secondary" id="notes" name="notes" rows="2"></textarea>
+  </div>
+  <div class="col-12 d-flex gap-2">
+    <button type="submit" class="btn btn-warning fw-semibold">Create job</button>
+    <a href="{{ url_for('production_jobs.index') }}" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+{% endblock %}

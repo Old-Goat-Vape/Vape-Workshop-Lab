@@ -1,0 +1,80 @@
+================================================================================
+  Release ZIP — do not ship these paths
+================================================================================
+
+Exclude from end-user or production zip archives:
+
+  venv/                 recreated by Start_*.bat or run_*_dev.sh
+  .venv/
+  __pycache__/          all directories
+  *.pyc, *.pyo
+  *.log, logs/
+  *.bak, *.backup, backup/, backups/
+  *_backup.db
+  *.sqlite-shm, *.sqlite-wal
+  .pytest_cache/, .mypy_cache/, .ruff_cache/
+  .coverage, htmlcov/
+  .env                  never ship real secrets; use ENV_TEMPLATE.txt only
+  .git/                 optional for source drops
+
+Optional: omit large local SQLite files from public drops if they contain real
+data; ship empty DB or let app create schema on first start.
+
+Include:
+
+  app.py, requirements.txt, schema.sql, deploy_env.py, routes/, templates/,
+  static/, core/, services/, models/, migrations.py, utils/, config/, etc.
+
+--------------------------------------------------------------------------------
+  shared_mix_core — required folder layout (Pauly / zip / Linux / Docker)
+--------------------------------------------------------------------------------
+
+The Flask process must be able to import the top-level package shared_mix_core.
+core/shared_mix_path.py discovers it automatically (no fixed parents[N], no
+PYTHONPATH required) if you ship one of these layouts:
+
+  (A) In-app copy (recommended for a single release zip):
+
+      YourZipRoot/
+        app/
+          app.py
+          requirements.txt
+          schema.sql
+          deploy_env.py
+          core/
+            calculator.py
+            shared_mix_path.py
+            ...
+          routes/
+          templates/
+          static/
+          ...
+          shared_mix_core/
+            __init__.py
+            calculator.py
+            policy.py
+            guided_steps.py
+            guided_narrative.py
+
+  (B) Sibling next to app/ (mono-repo style on disk):
+
+      ParentFolder/
+        app/
+          app.py
+          core/
+          ...
+        shared_mix_core/
+          __init__.py
+          ...
+
+  (C) shared_mix_core higher on the same ancestor chain (unusual); discovery
+      walks upward from the app directory and from the process cwd.
+
+If shared_mix_core is missing, the app exits with:
+
+  shared_mix_core folder is missing. Re-extract the full release zip.
+
+PYTHONPATH is optional: use it only if you deliberately install shared_mix_core
+elsewhere and want Python to find it without the layouts above.
+
+================================================================================

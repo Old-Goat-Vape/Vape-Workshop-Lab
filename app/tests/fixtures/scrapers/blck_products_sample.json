@@ -1,0 +1,37 @@
+{
+  "products": [
+    {
+      "title": "AIO Dispo Additive",
+      "vendor": "BLCK Flavour",
+      "product_type": "Flavour Concentrate",
+      "handle": "aio-dispo-additive",
+      "variants": [
+        {
+          "price": "39.00"
+        }
+      ]
+    },
+    {
+      "title": "Null Salt/MTL Longfill - Tobacco Reserve",
+      "vendor": "<null/> Null",
+      "product_type": "E-Liquid",
+      "handle": "null-salt-mtl-longfill-tobacco-reserve",
+      "variants": [
+        {
+          "price": "250.00"
+        }
+      ]
+    },
+    {
+      "title": "Null Salt/MTL Longfill - Milktart Milkshake",
+      "vendor": "<null/> Null",
+      "product_type": "E-Liquid",
+      "handle": "null-salt-mtl-longfill-milktart-milkshake",
+      "variants": [
+        {
+          "price": "250.00"
+        }
+      ]
+    }
+  ]
+}

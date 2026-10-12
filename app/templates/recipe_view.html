@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+
+{% block title %}{{ recipe.name }} - Old Goat Lab{% endblock %}
+
+{% block content %}
+    <style>
+        .view-container { display: grid; grid-template-columns: 1fr 350px; gap: 25px; padding: 20px; }
+        .version-tag { background: #333; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; color: var(--primary-orange); }
+        .inventory-warn { color: var(--danger); font-weight: bold; font-size: 0.8rem; margin-left: 5px; }
+        .rule-hint { color: var(--text-muted); font-size: 0.75rem; display: block; text-transform: uppercase; }
+        
+        .commercial-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .comm-box { background: #111; padding: 10px; border-radius: 4px; border: 1px solid #222; }
+        .comm-box span { font-size: 0.7rem; color: #777; display: block; }
+        .comm-box strong { font-family: monospace; font-size: 1rem; color: var(--success); }
+        
+        .history-item { 
+            padding: 10px; 
+            border-bottom: 1px solid #222; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            transition: background 0.2s;
+        }
+        .history-item:hover { background: #1a1a1a; }
+        .toolbar { display: flex; justify-content: space-between; align-items: center; padding: 20px; background: #111; border-bottom: 1px solid #333; }
+
+        /* Safety Modal (Same as Library for consistency) */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .safety-modal {
+            background: #1a1a1a;
+            padding: 30px;
+            border-radius: 8px;
+            border: 2px solid var(--primary-orange);
+            max-width: 450px;
+            width: 90%;
+        }
+        .safety-list { margin: 20px 0; list-style: none; padding: 0; }
+        .safety-list li { margin-bottom: 12px; display: flex; align-items: center; gap: 10px; color: #eee; }
+        .safety-list input { width: 18px; height: 18px; accent-color: var(--primary-orange); }
+        
+        .mix-options-bar {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            border: 1px solid #333;
+        }
+    </style>
+
+<div class="nav-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+    <div class="d-flex align-items-center gap-2">
+        <div class="flex-shrink-0">{% with logo_href = url_for('recipes.library'), show_wordmark = false %}{% include "partials/og_brand.html" %}{% endwith %}</div>
+        <span class="og-page-eyebrow mb-0">Recipe</span>
+    </div>
+    <div style="display: flex; gap: 15px; align-items: center;">
+        <span class="user-badge">{{ session.get('role', 'Kid') }}</span>
+        <a href="{{ url_for('recipes.library') }}" class="btn-back"><span>←</span> Library</a>
+    </div>
+</div>
+
+<div class="toolbar">
+    <div>
+        <h1 style="margin: 0;">{{ recipe.name }} <span class="version-tag">v{{ version.version_number }}</span></h1>
+        <p style="color: var(--text-muted); font-family: monospace; margin: 5px 0;">
+            ID: <span style="color: var(--primary-orange);">#{{ recipe.recipe_code }}</span> | Status: {{ recipe.status }}
+        </p>
+    </div>
+    
+    <div style="display: flex; gap: 10px; align-items: center;">
+        {% if (session.get('username') or '')|lower == 'old goat' %}
+            <a href="{{ url_for('recipes.edit_recipe', recipe_id=recipe.id) }}" class="btn-apply" style="background: #333; text-decoration: none; padding: 10px 15px; border-radius: 4px; color: white;">✏️ Edit / Update</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="view-container">
+    <div class="column">
+        <div class="section-card" style="border-left: 4px solid var(--primary-orange);">
+            <div class="section-title">Batch Configuration</div>
+            <form id="view-mix-form" action="{{ url_for('mix.init_batch') }}" method="POST" class="mix-options-bar" onsubmit="return handleMixSubmit(event, 'view-mix-form')">
+                <input type="hidden" name="recipe_id" value="{{ recipe.id }}">
+                <input type="hidden" name="version_id" value="{{ version.id }}">
+                
+                <div style="flex: 1;">
+                    <label class="rule-hint">Mix Format</label>
+                    {% if ROLE_HIERARCHY[session.get('role', 'Kid')] >= 5 %}
+                        <select name="mix_mode" class="adjust-input" style="width: 100%;">
+                            <option value="longfill" selected>Long Fill</option>
+                            <option value="fullmix">Full Mix</option>
+                        </select>
+                    {% else %}
+                        <input type="hidden" name="mix_mode" value="longfill">
+                        <div style="color:#666; font-size:0.8rem; padding:10px 0;">Long Fill Only</div>
+                    {% endif %}
+                </div>
+                
+                <div style="flex: 1;">
+                    <label class="rule-hint">Vessel Size (ml)</label>
+                    <input type="number" name="vessel_size" class="adjust-input" value="120" min="30" max="5000" required style="width: 100%;">
+                </div>
+
+                <div style="flex: 2;">
+                    <label class="rule-hint">Bottle Style</label>
+                    <select name="style" class="adjust-input" style="width: 100%;">
+                        <option value="MTL">Bottle Style: MTL (30ml bottle)</option>
+                        <option value="DTL">Bottle Style: DTL (120ml bottle)</option>
+                    </select>
+                </div>
+
+                <div style="flex: 2;">
+                    <label class="rule-hint">Target Mix Mode</label>
+                    <select name="target_mix_mode" class="adjust-input" style="width: 100%;">
+                        <option value="DTL" selected>Target Mix Mode: DTL (no conversion)</option>
+                        <option value="MTL">Convert to MTL</option>
+                        <option value="POD_DISPO">Target Mix Mode: Pod/Dispo (convert)</option>
+                    </select>
+                </div>
+                <div class="og-nicotine-group" style="flex: 1;">
+                    <label class="rule-hint">Nic target (mg/ml)</label>
+                    <input type="number" name="nic_target_mg_per_ml" class="adjust-input" value="0" min="0" step="0.1" style="width: 100%;">
+                </div>
+                <div class="og-nicotine-group" style="flex: 1;">
+                    <label class="rule-hint">Nic base (mg/ml)</label>
+                    <input type="number" name="nic_base_strength_mg_per_ml" class="adjust-input" value="100" min="1" step="0.1" style="width: 100%;">
+                </div>
+                <div class="og-nicotine-group" style="flex: 1;">
+                    <label class="rule-hint">Nic carrier</label>
+                    <select name="nic_carrier" class="adjust-input" style="width: 100%;">
+                        <option value="PG" selected>PG-based</option>
+                        <option value="VG">VG-based</option>
+                    </select>
+                </div>
+
+                {% if (session.get('username') or '')|lower == 'old goat' %}
+                <div style="flex: 1 1 100%;">
+                    <div class="border border-warning border-opacity-25 rounded p-2" style="background:#1a1208;">
+                        <label class="small text-warning" style="display:flex; gap:8px; align-items:flex-start; cursor:pointer;">
+                            <input type="checkbox" name="og_stock_override" value="1" style="margin-top:4px;">
+                            <span><strong>Override stock check (Old Goat test mix)</strong><br><span style="color:#888;">Finalize will not deduct inventory.</span></span>
+                        </label>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div style="flex: 1;">
+                    <button type="submit" class="btn-apply" style="border: none; cursor: pointer; background: var(--success); color: black; font-weight: bold; padding: 10px 15px; border-radius: 4px; width: 100%;">🧪 Start Mix Session</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="section-card">
+            <div class="section-title">Formula Breakdown</div>
+            <table class="flavor-table" style="width: 100%; text-align: left; border-collapse: collapse;">
+                <thead>
+                    <tr style="color: #666; font-size: 0.8rem;">
+                        <th style="padding: 10px 0;">Component</th>
+                        <th>Type</th>
+                        <th>Percentage</th>
+                        {% if ROLE_HIERARCHY[session.get('role', 'Kid')] >= 5 %}<th>Live Stock</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in ingredients %}
+                    <tr style="border-bottom: 1px solid #222;">
+                        <td style="padding: 12px 0;">
+                            {% if item.is_imported_identity_row %}
+                                {% if item.is_matched_identity %}
+                                    <strong style="color: #eee;">{{ item.brand }}</strong> {{ item.name }}
+                                    <span class="badge text-bg-success ms-2" title="Linked to internal flavor_reference">Matched</span>
+                                    <div style="color:#8f8f8f; font-size:0.8rem; margin-top:2px;">
+                                        Imported as: {{ item.brand_raw }} {{ item.flavour_name_raw }}
+                                    </div>
+                                    <div style="color:#6f6f6f; font-size:0.75rem;">
+                                        Linked internal flavour: {{ item.name }} (#{{ item.matched_flavor_id }})
+                                        {% if item.match_method %} | method: {{ item.match_method }}{% endif %}
+                                        {% if item.match_confidence is not none %} | confidence: {{ '%.2f'|format(item.match_confidence) }}{% endif %}
+                                    </div>
+                                {% else %}
+                                    <strong style="color: #eee;">{{ item.brand_raw }}</strong> {{ item.flavour_name_raw }}
+                                    <span class="badge text-bg-warning ms-2">Unresolved</span>
+                                    <div style="color:#6f6f6f; font-size:0.75rem;">
+                                        Unresolved, no internal match
+                                        {% if item.match_method %} | method: {{ item.match_method }}{% endif %}
+                                        {% if item.match_confidence is not none %} | confidence: {{ '%.2f'|format(item.match_confidence) }}{% endif %}
+                                    </div>
+                                {% endif %}
+                                {% if item.needs_review %}
+                                    <span class="badge text-bg-danger mt-1">Needs Review</span>
+                                {% endif %}
+                            {% else %}
+                                <strong style="color: #eee;">{{ item.brand }}</strong> {{ item.name }}
+                            {% endif %}
+                            {% if item.is_nicotine %}<span style="color: var(--primary-orange); font-size: 0.7rem;">[NIC]</span>{% endif %}
+                        </td>
+                        <td><span class="rule-hint">{{ 'Flavor' if not item.is_nicotine else 'Base' }}</span></td>
+                        <td style="font-family: monospace; font-size: 1.1rem;">
+                            {{ item.amount_percent }}%
+                        </td>
+                        {% if ROLE_HIERARCHY[session.get('role', 'Kid')] >= 5 %}
+                        <td>
+                            <span style="color: {{ 'var(--danger)' if (item.stock_g or 0) < 10 else '#999' }}; font-size: 0.85rem;">
+                                {{ item.stock_g or 0 }}g
+                            </span>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <div style="margin-top: 30px; padding: 20px; background: #000; border-radius: 8px; border: 1px solid #222;">
+                <div class="section-title" style="font-size: 0.8rem; color: var(--primary-orange); margin-bottom: 10px;">Operational Notes</div>
+                <div style="display: flex; gap: 20px; margin-bottom: 15px; font-size: 0.9rem;">
+                    <span><strong>Target Ratio:</strong> {{ version.target_vg_pg_ratio }}</span>
+                    <span><strong>Total Flavor:</strong> {{ version.total_flavor_percent }}%</span>
+                </div>
+                <p style="white-space: pre-wrap; color: #bbb; font-style: italic; font-size: 0.95rem;">
+                    {{ recipe.notes or 'No specific lab notes for this version.' }}
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="sidebar">
+        {% if ROLE_HIERARCHY[session.get('role', 'Kid')] >= 5 %}
+        <div class="section-card" style="border-top: 3px solid var(--success); padding: 15px; background: #151515; border-radius: 8px;">
+            <h3 style="margin-top: 0; font-size: 0.9rem; color: var(--success);">Commercial Intel</h3>
+            <div class="commercial-grid">
+                <div class="comm-box">
+                    <span>Est. Cost / ml</span>
+                    <strong>R {{ "%.2f"|format(ingredients|sum(attribute='price_per_ml') / ingredients|length if ingredients else 0) }}</strong>
+                </div>
+                <div class="comm-box">
+                    <span>Nicotine</span>
+                    <strong style="color: {{ 'var(--danger)' if has_nicotine else 'var(--success)' }}">
+                        {{ 'PRESENT' if has_nicotine else 'NONE' }}
+                    </strong>
+                </div>
+            </div>
+            <p style="font-size: 0.65rem; color: #555; margin-top: 10px;">Internal pricing only. Do not share with customers.</p>
+        </div>
+        {% endif %}
+
+        <div class="section-card" style="margin-top: 20px; padding: 15px; background: #151515; border-radius: 8px;">
+            <h3 style="margin-top: 0; font-size: 0.9rem;">Safety Compliance</h3>
+            <div style="font-size: 0.8rem; color: #aaa;">
+                <p>Status: <span style="color: var(--primary-orange);">{{ recipe.status }}</span></p>
+                <p>Handling: {{ 'Restricted (Class 2)' if has_nicotine else 'Standard' }}</p>
+                <p>Latest Revision: {{ version.created_at }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('view-mix-form');
+    if (!form) return;
+    const modeEl = form.querySelector('select[name="mix_mode"], input[name="mix_mode"]');
+    const nicGroups = Array.from(form.querySelectorAll('.og-nicotine-group'));
+    const nicInputs = Array.from(form.querySelectorAll('[name="nic_target_mg_per_ml"], [name="nic_base_strength_mg_per_ml"], [name="nic_carrier"]'));
+    if (!modeEl || !nicGroups.length || !nicInputs.length) return;
+
+    const applyState = () => {
+        const isFullMix = String(modeEl.value || '').toLowerCase() === 'fullmix';
+        nicGroups.forEach((el) => { el.style.display = isFullMix ? '' : 'none'; });
+        nicInputs.forEach((el) => { el.disabled = !isFullMix; });
+    };
+
+    if (modeEl.tagName === 'SELECT') {
+        modeEl.addEventListener('change', applyState);
+    }
+    applyState();
+});
+</script>
+
+{% endblock %}

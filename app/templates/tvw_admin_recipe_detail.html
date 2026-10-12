@@ -1,0 +1,115 @@
+{% extends "base_public.html" %}
+{% block title %}{{ recipe.name }} | Recipe moderation{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw.css') }}">
+<div class="tvw-page">
+  <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+    <div>
+      <h1 class="h4 mb-1">{{ recipe.name }}</h1>
+      <div class="small text-secondary">#{{ recipe.id }} · slug: {{ recipe.slug or "—" }} · owner: {{ recipe.owner_username or "—" }}</div>
+      <div class="mt-2">
+        <span class="badge text-bg-secondary">{{ recipe.moderation_status or "active" }}</span>
+        {% if recipe.is_hidden %}<span class="badge text-bg-warning">hidden</span>{% endif %}
+        {% if not recipe.active %}<span class="badge text-bg-dark">archived/inactive</span>{% endif %}
+        <span class="badge text-bg-info">{{ recipe.visibility or "private" }}</span>
+        <span class="badge text-bg-light text-dark">{{ recipe.status or "—" }}</span>
+      </div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.recipe_moderation') }}">Back to list</a>
+      <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_admin.community_moderation', type='feedback') }}">Community UGC</a>
+      {% if recipe.slug or recipe.id %}
+      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('tvw_recipes.tvw_recipe_detail', slug=(recipe.slug or recipe.id)) }}" target="_blank" rel="noopener">Public recipe page</a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if recipe.moderation_reason %}
+    <div class="alert alert-secondary py-2 small">Moderation note: {{ recipe.moderation_reason }}</div>
+  {% endif %}
+
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-md-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <h2 class="h6">Current version</h2>
+          {% if recipe.current_version_row %}
+            <div class="small text-secondary">v{{ recipe.current_version_row.version_number }} · {{ recipe.current_version_row.total_flavor_percent }}% flavour · {{ recipe.current_version_row.target_vg_pg_ratio or "—" }}</div>
+            <div class="small mt-2">Created: {{ recipe.current_version_row.created_at or "—" }}</div>
+            {% if recipe.current_version_row.notes %}
+              <div class="mt-2 small"><strong>Notes:</strong> {{ recipe.current_version_row.notes }}</div>
+            {% endif %}
+          {% else %}
+            <div class="text-secondary small">No current version pointer.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-md-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <h2 class="h6">Versions</h2>
+          <div class="table-responsive" style="max-height: 220px; overflow-y: auto;">
+            <table class="table table-sm table-dark mb-0">
+              <thead><tr><th>ID</th><th>Ver</th><th>%</th><th>Created</th></tr></thead>
+              <tbody>
+                {% for v in recipe.versions %}
+                  <tr class="{% if recipe.current_version_id and v.id == recipe.current_version_id %}table-active{% endif %}">
+                    <td>{{ v.id }}</td>
+                    <td>{{ v.version_number }}</td>
+                    <td>{{ v.total_flavor_percent }}</td>
+                    <td class="small">{{ v.created_at }}</td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="4" class="text-secondary">No versions.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h2 class="h6 mb-3">Moderation actions</h2>
+      <form method="post" action="{{ url_for('tvw_admin.update_recipe_moderation', recipe_id=recipe.id) }}" class="vstack gap-3">
+        <div>
+          <label class="form-label small">Reason / internal note (optional)</label>
+          <textarea class="form-control form-control-sm" name="reason" rows="2" placeholder="Context for audit log">{{ recipe.moderation_reason or "" }}</textarea>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          {% if not recipe.is_hidden %}
+            <button class="btn btn-sm btn-outline-warning" name="action" value="hide">Hide recipe</button>
+          {% else %}
+            <button class="btn btn-sm btn-outline-success" name="action" value="unhide">Unhide recipe</button>
+          {% endif %}
+          {% if recipe.active %}
+            <button class="btn btn-sm btn-outline-secondary" name="action" value="archive">Archive (soft)</button>
+          {% else %}
+            <button class="btn btn-sm btn-outline-success" name="action" value="restore">Restore</button>
+          {% endif %}
+        </div>
+        <hr>
+        <div class="row g-2 align-items-end">
+          <div class="col-12 col-md-4">
+            <label class="form-label small">Moderation status</label>
+            <select class="form-select form-select-sm" name="moderation_status">
+              <option value="active" {% if (recipe.moderation_status or 'active')|lower == 'active' %}selected{% endif %}>active</option>
+              <option value="review" {% if (recipe.moderation_status or '')|lower == 'review' %}selected{% endif %}>review</option>
+              <option value="flagged" {% if (recipe.moderation_status or '')|lower == 'flagged' %}selected{% endif %}>flagged</option>
+              <option value="hidden" {% if (recipe.moderation_status or '')|lower == 'hidden' %}selected{% endif %}>hidden</option>
+              <option value="archived" {% if (recipe.moderation_status or '')|lower == 'archived' %}selected{% endif %}>archived</option>
+              <option value="removed" {% if (recipe.moderation_status or '')|lower == 'removed' %}selected{% endif %}>removed</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-4 d-grid">
+            <button class="btn btn-sm btn-warning" name="action" value="set_moderation">Apply status + reason</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,1228 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mix-v2-shell" id="mixing-app">
+    {# Batch JSON must NOT live in a quoted HTML attribute — apostrophes in names break the page. #}
+    <script type="application/json" id="og-mix-batch-json">{{ mix_batch|tojson }}</script>
+    <div id="mix-init-error" class="alert alert-danger my-3" style="display:none;" role="alert"></div>
+    <div id="mix-policy-banner" class="alert my-3" style="display:none;" role="alert"></div>
+    <div id="conversion-preview-card" class="section-card" style="border-left: 4px solid #4e79a7; display:none;">
+        <div class="section-title">Conversion Preview</div>
+        <div id="conversion-summary" style="font-size:0.9rem; color:#bbb; margin-bottom:10px;"></div>
+        <div id="conversion-note" style="font-size:0.85rem; margin-bottom:10px;"></div>
+        <div id="conversion-table-wrap"></div>
+        <div style="display:flex; gap:10px; margin-top:12px;">
+            <button id="apply-tuning-btn" class="btn-primary" style="display:none;">Apply Master Tuning</button>
+            <button id="start-mix-btn" class="btn-primary" style="background:var(--success);">Confirm Formula & Start Mixing</button>
+        </div>
+    </div>
+
+    <div class="section-card">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+                <h1 style="margin:0; color: var(--primary-orange);">{{ recipe_name }}</h1>
+                <div style="margin-top: 10px;">
+                    <span class="badge" style="background: #333; color: var(--primary-orange); border: 1px solid var(--primary-orange); padding: 4px 8px; border-radius: 4px; font-weight: bold; text-transform: uppercase; font-size: 0.75rem;">
+                        Bottle Style: {{ style }} • Mix Format: {{ (mix_mode or 'longfill')|upper }}
+                    </span>
+                    <span class="badge" style="border: 1px solid #444; padding: 4px 8px; border-radius: 4px; margin-left: 5px; color: #888; font-size: 0.75rem;">
+                        BATCH: {{ batch_number }}
+                    </span>
+                    {% if stock_override_active %}
+                    <span class="badge" style="border: 1px solid #ffc107; color: #ffc107; padding: 4px 8px; border-radius: 4px; margin-left: 5px; font-size: 0.75rem;">STOCK OVERRIDE</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 1.5rem; font-weight: bold; color: #fff;">
+                    Units: {{ num_units }}
+                </div>
+                <small style="color: var(--text-muted);">
+                    Batch Total: <span id="batch-vol-display">{{ "%.1f"|format(total_volume) }}</span>ml
+                    {% if retail_bottle_ml and fill_per_bottle_ml %}
+                        • Fills {{ num_units }} × {{ "%.0f"|format(retail_bottle_ml) }}ml bottles ({{ "%.0f"|format(fill_per_bottle_ml) }}ml each)
+                    {% endif %}
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <div id="mix-setup-card" class="section-card" style="border-left: 4px solid #76b7b2; margin-top:12px;">
+        <div class="section-title">Mix Setup</div>
+        <div id="mix-setup-summary" style="color:#bbb; font-size:0.92rem; line-height:1.45; margin-top:8px;"></div>
+        <div style="display:flex; gap:10px; margin-top:14px;">
+            <button id="setup-continue-btn" class="btn-primary" style="background:var(--primary-orange); border:none; width:100%; padding:14px; font-size:1.05rem; text-transform:uppercase; letter-spacing:0.8px;">
+                Continue to Conversion Preview
+            </button>
+        </div>
+        <div style="color:#777; margin-top:10px; font-size:0.78rem;">
+            Fine-tuning is Master-only. Overpour recalculates targets after conversion/tuning.
+        </div>
+    </div>
+
+    <div id="step-card" class="section-card mix-v2-step-card" style="display:none;">
+        <div id="step-ui-content">
+            <div class="section-title mix-v2-step-counter" id="step-counter">Step --</div>
+            <h2 id="ingredient-name" class="mix-v2-step-title">--</h2>
+            <div id="ingredient-brand" class="mix-v2-step-brand"></div>
+            <div class="mix-v2-copy-grid">
+                <div>
+                    <div class="mix-v2-copy-label">Why this matters</div>
+                    <div id="step-why" class="mix-v2-copy-text"></div>
+                </div>
+                <div>
+                    <div class="mix-v2-copy-label">Next preview</div>
+                    <div id="next-step-preview" class="mix-v2-copy-text is-next"></div>
+                </div>
+            </div>
+
+            <div id="tare-gate" style="max-width: 620px; margin: 0 auto;">
+                <div style="background:#111; border:1px solid #333; border-radius: 12px; padding: 18px; text-align:left;">
+                    <div style="font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--primary-orange); font-size: 0.85rem;">
+                        Mandatory tare step
+                    </div>
+                    <div style="color: #ccc; margin-top: 10px; font-size: 1.05rem;">
+                        Tare your scale to <strong>0.00g</strong> before adding this ingredient.
+                    </div>
+                    <div style="color:#777; margin-top:6px; font-size:0.85rem;">
+                        You cannot skip this step.
+                    </div>
+                    <button onclick="confirmTare()" id="tare-btn" class="btn-primary"
+                            style="margin-top: 16px; width: 100%; padding: 16px; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px;">
+                        I tared to 0.00g
+                    </button>
+                </div>
+            </div>
+
+            <div id="pour-ui" style="display:none;">
+                <p id="step-subtitle" style="color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; font-size: 0.8rem; margin-bottom: 12px;">
+                    Target grams (after tare)
+                </p>
+
+                <div id="target-display" class="mix-v2-target-display">0.00g</div>
+                <div class="mix-v2-measured-readout">
+                    <span class="mix-v2-copy-label">Measured now</span>
+                    <span id="measured-live-display">0.00g</span>
+                </div>
+
+                <div style="max-width: 480px; margin: 0 auto;">
+                    <input type="number" id="actual-input" step="0.01" inputmode="decimal" placeholder="0.00"
+                           style="font-size: 3.8rem; width: 100%; text-align: center; background: #000; border: 2px solid #444; color: #fff; border-radius: 12px; padding: 10px; outline: none; margin-bottom: 10px;">
+
+                    <p id="overpour-msg" style="color: var(--danger); margin: 15px 0; display: none; font-weight: bold; background: rgba(255,0,0,0.1); padding: 10px; border-radius: 4px;"></p>
+
+                    <button onclick="confirmPour()" id="confirm-btn" class="btn-primary" style="margin-top: 20px; width: 100%; padding: 25px; font-size: 1.25rem; text-transform: uppercase; letter-spacing: 1px;">
+                        Confirm & Next
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="progress-card" class="section-card mix-v2-progress-card" style="display:none;">
+        <div class="section-title" style="margin-bottom: 8px; color: #555; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 1px;">Guided Session Trail</div>
+        <div id="progress-summary" style="font-size:0.9rem; color:#aaa; margin-bottom:10px;"></div>
+        <details>
+            <summary style="cursor:pointer; color:#888; font-size:0.8rem;">Completed steps history</summary>
+            <div id="ingredient-list" style="margin-top:8px;"></div>
+        </details>
+    </div>
+</div>
+
+<style>
+    .mix-v2-shell .section-card {
+        border-radius: 14px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    }
+    .mix-v2-step-card {
+        border-top: 4px solid var(--primary-orange);
+        text-align: center;
+        padding: 42px 22px;
+        background: radial-gradient(circle at top right, rgba(255, 152, 0, 0.14), transparent 35%), #161616;
+    }
+    .mix-v2-step-card.is-tare { border-top-color: #6c757d; background: radial-gradient(circle at top right, rgba(108,117,125,0.18), transparent 38%), #141414; }
+    .mix-v2-step-card.is-recovery { border-top-color: #dc3545; background: radial-gradient(circle at top right, rgba(220,53,69,0.2), transparent 38%), #170f10; }
+    .mix-v2-step-card.is-ingredient { border-top-color: var(--primary-orange); }
+    .mix-v2-step-counter { margin-bottom: 12px; }
+    .mix-v2-step-title { font-size: 2.3rem; margin-bottom: 6px; color: #fff; }
+    .mix-v2-step-brand { color: #808080; font-size: 0.95rem; margin-bottom: 16px; }
+    .mix-v2-copy-grid { display: grid; gap: 10px; grid-template-columns: 1fr; max-width: 780px; margin: 0 auto 16px auto; text-align: left; }
+    .mix-v2-copy-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1.1px; color: #8f8f8f; }
+    .mix-v2-copy-text { color: #c9c9c9; font-size: 0.92rem; }
+    .mix-v2-copy-text.is-next { color: #a9b7c9; }
+    .mix-v2-target-display { font-size: 5.8rem; font-weight: 800; font-family: 'Courier New', monospace; color: var(--primary-orange); line-height: 1; margin-bottom: 10px; }
+    .mix-v2-measured-readout { margin: 0 auto 14px auto; max-width: 380px; border: 1px solid #3a3a3a; border-radius: 10px; background: #101010; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; color: #ececec; font-family: 'Courier New', monospace; font-size: 1.25rem; }
+    .mix-v2-progress-card { background: #101010; border-left: 4px solid #2f2f2f; }
+    /* Animation for the target display */
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.7; }
+        100% { opacity: 1; }
+    }
+    .pulse { animation: pulse 1.5s infinite; }
+</style>
+
+<script src="{{ url_for('static', filename='policy_feedback.js') }}"></script>
+<script>
+/** Parsed from &lt;script type="application/json" id="og-mix-batch-json"&gt; (|tojson) — safe for quotes/apostrophes. */
+let batch = null;
+const recipeName = {{ recipe_name|tojson }};
+const canMasterTune = {{ 'true' if can_master_tune else 'false' }};
+const APP_TONE = "tvw";
+let mixingStarted = false;
+
+function showMixInitError(message, err) {
+    const panel = document.getElementById('mix-init-error');
+    const app = document.getElementById('mixing-app');
+    if (err) {
+        console.error('Mix page init failed:', err);
+    } else {
+        console.error('Mix page init failed:', message);
+    }
+    if (panel) {
+        panel.style.display = 'block';
+        panel.textContent = message;
+    }
+    if (app) {
+        app.querySelectorAll('.section-card').forEach((el) => {
+            el.style.display = 'none';
+        });
+    }
+}
+
+function parseMixBatchFromDom() {
+    const el = document.getElementById('og-mix-batch-json');
+    if (!el) {
+        throw new Error('Batch script tag #og-mix-batch-json not found');
+    }
+    const raw = (el.textContent || '').trim();
+    if (!raw) {
+        throw new Error('Batch JSON is empty');
+    }
+    return JSON.parse(raw);
+}
+
+try {
+    batch = parseMixBatchFromDom();
+} catch (e) {
+    showMixInitError(
+        'Could not load mix batch data. Try reloading the page. If a recipe or ingredient name has unusual characters, it should still work after this update — please report if this persists.',
+        e
+    );
+}
+const GUIDED_SESSION_ID = Number((batch && batch.guided_session_id) || 0);
+
+// A proper step queue: [tare, ingredient, tare, ingredient, ...]
+let steps = [];
+let stepIdx = 0;
+
+function normalizeTarget(ing) {
+    const t = Number(ing.delta_to_add ?? ing.target_grams ?? 0);
+    return isFinite(t) ? t : 0;
+}
+
+function _escHtml(s) {
+    return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+async function autoInsertGuidedEvent(eventType, payload) {
+    if (!GUIDED_SESSION_ID) return;
+    try {
+        await fetch(`/api/mix/guided/session/${GUIDED_SESSION_ID}/events`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                event_type: eventType,
+                message: String((payload && payload.message) || "Guided event triggered."),
+                detail: String((payload && payload.detail) || ""),
+                severity: String((payload && payload.severity) || "warning"),
+                tone_profile: APP_TONE,
+                context: (payload && payload.context) || {},
+            }),
+        });
+    } catch (_) {
+        // Non-blocking for mix runtime path.
+    }
+}
+
+function buildSteps() {
+    const prebuilt = Array.isArray(batch.guided_narrative_steps) ? batch.guided_narrative_steps : [];
+    if (prebuilt.length) {
+        steps = prebuilt.map((s, idx) => {
+            const out = { ...s, step_number: idx + 1 };
+            if (String(out.step_type || "") === "add_ingredient") {
+                out.target_grams = Number(out.target_grams || 0);
+            }
+            return out;
+        });
+        return;
+    }
+    const ingredientSteps = (batch.ingredients || []).filter(i => (i.status !== 'skip') && normalizeTarget(i) > 0);
+    const built = [];
+    for (const ing of ingredientSteps) {
+        built.push({
+            step_type: "tare",
+            title: `Tare before ${ing.name}`,
+            what: "Reset scale to 0.00g.",
+            why: APP_TONE === "lab" ? "Mandatory process gate before controlled pours." : "Keeps each pour accurate and easy to track.",
+            tip: APP_TONE === "lab" ? "Do not proceed without tare confirmation." : "Quick tip: tare every step for cleaner targets.",
+            action_label: APP_TONE === "lab" ? "Tare confirmed" : "I tared to 0.00g",
+            severity: "info",
+        });
+        if (String(ing.name || "").toLowerCase().includes("nicotine")) {
+            built.push({
+                step_type: "caution",
+                title: "Nicotine caution",
+                what: "Confirm PPE and controlled handling before this pour.",
+                why: "Nicotine steps require extra care and process discipline.",
+                tip: APP_TONE === "lab" ? "Treat this as a critical safety gate." : "Pause and verify before continuing.",
+                action_label: "Safety confirmed",
+                severity: "warning",
+            });
+        }
+        built.push({
+            step_type: "add_ingredient",
+            ingredient_id: ing.ingredient_id,
+            name: ing.name,
+            brand: ing.brand || "",
+            target_grams: normalizeTarget(ing),
+            already_added_grams: Number(ing.already_added_grams ?? ing.actual_grams ?? 0),
+            recalculated_target_grams: Number(ing.new_target_grams ?? ing.target_grams ?? 0),
+            delta_to_add_grams: Number(ing.delta_to_add ?? normalizeTarget(ing)),
+            title: `Add ${normalizeTarget(ing).toFixed(2)}g ${ing.name}`,
+            what: `Add ${normalizeTarget(ing).toFixed(2)}g and confirm actual pour.`,
+            why: APP_TONE === "lab" ? "This pour is part of the controlled production sequence." : "This keeps your recipe profile aligned.",
+            tip: "Approach target slowly to avoid overpour.",
+            action_label: "Confirm pour",
+            severity: APP_TONE === "lab" ? "critical" : "info",
+        });
+        built.push({
+            step_type: "transition",
+            title: "Checkpoint",
+            what: "Confirm this step and move to the next guided action.",
+            why: "Checkpointing catches drift early.",
+            tip: APP_TONE === "lab" ? "No skipped checkpoints in production flow." : "Nice progress - keep the rhythm steady.",
+            action_label: "Continue",
+            severity: "info",
+        });
+    }
+    built.push({
+        step_type: "recovery",
+        title: "Recovery protocol",
+        what: "If any overpour occurs, run reconcile before final sign-off.",
+        why: "Recovery keeps the batch safe and coherent after deviations.",
+        tip: APP_TONE === "lab" ? "Recovery is mandatory when policy flags a deviation." : "Recovery helps you continue without guesswork.",
+        action_label: "Recovery checked",
+        severity: "warning",
+    });
+    built.push({
+        step_type: "completion",
+        title: "Completion",
+        what: "Seal, label, and close out the batch.",
+        why: "Clean close-out preserves traceability.",
+        tip: APP_TONE === "lab" ? "Finalize inventory and production records now." : "Log tasting notes when ready.",
+        action_label: "Finish batch",
+        severity: "success",
+    });
+    steps = built.map((s, idx) => ({ ...s, step_number: idx + 1 }));
+}
+
+function renderMixSetupSummary() {
+    const summaryEl = document.getElementById('mix-setup-summary');
+    if (!summaryEl) return;
+
+    const sourceMode = String(batch.source_recipe_mode || 'DTL').toUpperCase();
+    const targetMode = String(batch.target_mix_mode || 'DTL').toUpperCase();
+    const bottleStyle = String(batch.style || '');
+    const mixFormatRaw = String(batch.mix_mode || 'longfill').toLowerCase();
+    const mixFormat = mixFormatRaw === 'fullmix' ? 'Full Mix' : 'Long Fill';
+    const vesselSize = Number(batch.vessel_size || 0);
+    const units = Number(batch.units_produced || batch.num_units || 0);
+    const retailBottle = Number(batch.retail_bottle_size_ml || batch.retail_bottle_ml || 0);
+    const perUnitFill = Number(batch.lab_fill_per_unit_ml || batch.fill_per_bottle_ml || 0);
+    const usedVolume = Number(batch.used_volume_ml || batch.total_volume || 0);
+    const headroom = Number(batch.headroom_ml || 0);
+    const nic = batch.nicotine || {};
+    const nicCarrier = String(nic.carrier || 'PG').toUpperCase();
+    const nicTarget = Number(nic.target_mg_per_ml || 0);
+    const nicBase = Number(nic.base_strength_mg_per_ml || 0);
+    const nicVol = Number(nic.nicotine_volume_ml || 0);
+    const pgVgText = mixFormatRaw === 'fullmix' ? 'PG + VG final mix' : 'PG + flavour base (no VG in lab mix)';
+
+    const policyThreshold = Number(batch.overpour_threshold_multiplier || 1.02);
+    const overpourPct = ((policyThreshold - 1) * 100).toFixed(1);
+    const overpourText = `Overpour policy: if you exceed target by more than +${overpourPct}%, reconcile policy applies.`;
+
+    const targetBadgeColor = targetMode === 'MTL' ? '#76b7b2' : (targetMode === 'POD_DISPO' ? '#f0b400' : '#4e79a7');
+    summaryEl.innerHTML = `
+        <div style="margin-bottom:6px;"><strong>Recipe:</strong> ${recipeName || ''}</div>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:10px 0 6px;">
+            <div style="font-size:0.78rem; color:#9a9a9a; text-transform:uppercase;">Target Vape Style</div>
+            <div style="background:${targetBadgeColor}; color:#0b0b0b; font-weight:900; padding:6px 12px; border-radius:6px; letter-spacing:0.2px;">
+                ${targetMode === 'POD_DISPO' ? 'Pod/Dispo' : targetMode}
+            </div>
+            <div style="font-size:0.78rem; color:#9a9a9a; text-transform:uppercase;">
+                ${canMasterTune ? 'Fine-tune enabled' : 'Preview only'}
+            </div>
+        </div>
+        <div style="margin-bottom:6px;"><strong>Source Recipe Mode:</strong> ${sourceMode}</div>
+        <div style="margin-bottom:6px;"><strong>Bottle Style:</strong> ${bottleStyle}</div>
+        <div style="margin-bottom:6px;"><strong>Mix Format:</strong> ${mixFormat} (${pgVgText})</div>
+        <div style="margin-bottom:6px;"><strong>Vessel Size:</strong> ${vesselSize.toFixed(0)} ml</div>
+        ${mixFormatRaw === 'longfill' ? `
+            <div style="margin-bottom:6px;"><strong>Retail bottle:</strong> ${retailBottle.toFixed(0)} ml</div>
+            <div style="margin-bottom:6px;"><strong>Fill per bottle:</strong> ${perUnitFill.toFixed(0)} ml</div>
+            <div style="margin-bottom:6px;"><strong>Complete bottles possible:</strong> ${units}</div>
+            <div style="margin-bottom:6px;"><strong>Used production volume:</strong> ${usedVolume.toFixed(1)} ml</div>
+            <div style="margin-bottom:6px;"><strong>Headroom:</strong> ${headroom.toFixed(1)} ml</div>
+        ` : `
+            <div style="margin-bottom:6px;"><strong>Final bottle volume:</strong> ${usedVolume.toFixed(1)} ml</div>
+            <div style="margin-bottom:6px;"><strong>Nicotine target:</strong> ${nicTarget.toFixed(2)} mg/ml</div>
+            <div style="margin-bottom:6px;"><strong>Nicotine base:</strong> ${nicBase.toFixed(2)} mg/ml (${nicCarrier})</div>
+            <div style="margin-bottom:6px;"><strong>Nicotine to add:</strong> ${nicVol.toFixed(2)} ml (~${nicVol.toFixed(2)} g)</div>
+        `}
+        <div style="margin-bottom:6px; color:#ddd;">${overpourText}</div>
+        <div style="margin-top:8px; color:#888; font-size:0.85rem;">
+            ${canMasterTune ? 'Master/Old Goat tuning is advisory-guarded; overpour recalculates after confirmation.' : 'Preview: only Master/Old Goat can fine-tune converted percentages.'}
+        </div>
+    `;
+}
+
+function renderPolicyBanner(policy, defaultTone) {
+    const box = document.getElementById('mix-policy-banner');
+    if (!box) return;
+    window.PolicyFeedback.render(box, policy || {}, {
+        tone: 'tvw',
+        forceBlocked: defaultTone === 'danger',
+        blockLead: 'Policy hard stop: action required before continuing.',
+        warnLead: 'Policy warning: reconcile is allowed but review the warning.',
+    });
+}
+
+function proceedFromSetup() {
+    const setupCard = document.getElementById('mix-setup-card');
+    if (setupCard) setupCard.style.display = 'none';
+    renderConversionPreview();
+}
+
+function renderConversionPreview() {
+    const card = document.getElementById('conversion-preview-card');
+    const summary = document.getElementById('conversion-summary');
+    const note = document.getElementById('conversion-note');
+    const tableWrap = document.getElementById('conversion-table-wrap');
+    const applyBtn = document.getElementById('apply-tuning-btn');
+    const startBtn = document.getElementById('start-mix-btn');
+    const cp = batch.conversion_preview || {};
+    const targetMode = String(batch.target_mix_mode || 'DTL').toUpperCase();
+    const cpTarget = String(cp.target_mix_mode || targetMode || '').toUpperCase();
+    card.style.display = 'block';
+    const allowEdit = canMasterTune && targetMode !== 'DTL';
+    const confidenceLabel = cp.confidence_label || 'Low';
+    const strengths = Array.isArray(cp.strengths) ? cp.strengths.filter(Boolean) : [];
+    const warnings = Array.isArray(cp.warnings) ? cp.warnings.filter(Boolean) : [];
+    const guardrails = Array.isArray(cp.tuning_guardrails) ? cp.tuning_guardrails.filter(Boolean) : [];
+
+    const podBand = (cp.pod_target_band_pct && cp.pod_target_band_pct.length === 2)
+        ? ` | Pod/Dispo target saturation: <strong>${Number(cp.pod_target_saturation_pct || 0).toFixed(2)}%</strong> (band <strong>${Number(cp.pod_target_band_pct[0]).toFixed(1)}–${Number(cp.pod_target_band_pct[1]).toFixed(1)}%</strong>, min <strong>${Number(cp.pod_minimum_total_flavor_pct || 0).toFixed(1)}%</strong>)`
+        : '';
+    summary.innerHTML = `Source Recipe Mode: <strong>${cp.source_recipe_mode || 'DTL'}</strong> -> Target Vape Style: <strong>${cp.target_mix_mode || targetMode}</strong> | Original total: <strong>${Number(cp.original_total_flavor_pct || 0).toFixed(2)}%</strong> | Suggested total: <strong>${Number(cp.suggested_total_flavor_pct || 0).toFixed(2)}%</strong> | Final total: <strong>${Number(cp.final_total_flavor_pct || 0).toFixed(2)}%</strong>${podBand} | Confidence: <strong>${_escHtml(confidenceLabel)}</strong> (${Number(cp.algorithm_confidence || 0).toFixed(2)})`;
+
+    let noteHtml = '';
+    if (allowEdit) {
+        noteHtml = `<span style="color:#9ad;">Master/Old Goat tuning enabled. Your edits become the final formula used for mixing.</span>`;
+    } else if (targetMode === 'DTL') {
+        noteHtml = `<span style="color:#9ad;">DTL target: no conversion needed (suggested equals original). Review then start mixing.</span>`;
+    } else {
+        noteHtml = `<span style="color:#e0b35c;">Preview only — fine-tuning is restricted to Master/Old Goat users.</span>`;
+    }
+
+    if (strengths.length) {
+        noteHtml += `<div style="margin-top:8px; color:#bbb;"><strong>Conversion strengths:</strong><ul style="margin:6px 0 0 16px; padding:0; color:#bbb; line-height:1.35;">${strengths.slice(0,4).map(s => `<li>${_escHtml(s)}</li>`).join('')}</ul></div>`;
+    }
+    if (cp.recipe_family || cp.target_family_profile_name) {
+        const sec = cp.recipe_family_secondary ? ` · secondary: <code>${_escHtml(String(cp.recipe_family_secondary))}</code>` : '';
+        const conf = Number(cp.recipe_family_confidence);
+        const confStr = Number.isFinite(conf) ? conf.toFixed(2) : '—';
+        const pname = cp.target_family_profile_name ? _escHtml(String(cp.target_family_profile_name)) : '—';
+        const pkey = cp.target_family_profile_key ? _escHtml(String(cp.target_family_profile_key)) : '';
+        const famNote = cp.family_layer_note ? `<div style="color:#777;font-size:0.8rem;margin-top:6px;">${_escHtml(String(cp.family_layer_note))}</div>` : '';
+        const rs = Array.isArray(cp.recipe_family_reasoning) ? cp.recipe_family_reasoning.filter(Boolean) : [];
+        noteHtml += `<div style="margin-top:10px;padding:10px;border:1px solid #2a3a2a;border-radius:6px;background:#0e140e;">
+            <div style="color:#8c8;font-weight:600;margin-bottom:6px;">Recipe family (structural layer)</div>
+            <div style="color:#bbb;font-size:0.88rem;line-height:1.4;">Detected: <strong>${_escHtml(String(cp.recipe_family || '—'))}</strong>${sec} · confidence <strong>${confStr}</strong></div>
+            <div style="color:#9a9;font-size:0.85rem;margin-top:6px;">Target profile (for allocator): <strong>${pname}</strong>${pkey ? ` <span style="color:#666;">(${pkey})</span>` : ''}</div>
+            ${rs.length ? `<ul style="margin:6px 0 0 16px;padding:0;color:#888;font-size:0.82rem;line-height:1.35;">${rs.slice(0,4).map(x => `<li>${_escHtml(x)}</li>`).join('')}</ul>` : ''}
+            ${famNote}
+        </div>`;
+    }
+    if (cpTarget !== 'DTL' && (cp.diagnostics || cp.fit_rating)) {
+        const fr = cp.fit_rating || {};
+        const diag = cp.diagnostics || {};
+        const dTags = Object.keys(diag).filter(k => diag[k]).map(k => `<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 6px;border-radius:4px;background:#222;color:#bbb;font-size:0.78rem;">${_escHtml(k)}</span>`).join('');
+        const ws = Array.isArray(cp.weakness_summary) ? cp.weakness_summary.filter(Boolean) : [];
+        const asn = Array.isArray(cp.adjustment_strategy_notes) ? cp.adjustment_strategy_notes.filter(Boolean) : [];
+        const cpn = Array.isArray(cp.cluster_preservation_notes) ? cp.cluster_preservation_notes.filter(Boolean) : [];
+        const dclus = Array.isArray(cp.dominant_clusters) ? cp.dominant_clusters : [];
+        const perc = Array.isArray(cp.perceptual_dominance_notes) ? cp.perceptual_dominance_notes.filter(Boolean) : [];
+        const rf = cp.restraint_factor != null ? Number(cp.restraint_factor).toFixed(2) : '—';
+        noteHtml += `<div style="margin-top:10px;padding:10px;border:1px solid #2a3038;border-radius:6px;background:#0c1014;">
+            <div style="color:#8ab4d8;font-weight:600;margin-bottom:6px;">Conversion diagnostics &amp; fit</div>
+            <div style="color:#bbb;font-size:0.88rem;">Engine fit: <strong>${_escHtml(String(fr.label || '—'))}</strong> (${Number(fr.score || 0).toFixed(1)}/100)
+            ${cp.restraint_applied ? ` · restraint <strong>on</strong> (×${rf})` : ''}</div>
+            ${Array.isArray(fr.reasons) && fr.reasons.length ? `<ul style="margin:6px 0 0 16px;padding:0;color:#888;font-size:0.82rem;line-height:1.35;">${fr.reasons.slice(0,5).map(x => `<li>${_escHtml(x)}</li>`).join('')}</ul>` : ''}
+            ${dTags ? `<div style="margin-top:6px;"><span style="color:#666;font-size:0.8rem;">Flags:</span> ${dTags}</div>` : ''}
+            ${ws.length ? `<div style="color:#c9a27a;font-size:0.82rem;margin-top:8px;"><strong>Weakness summary:</strong><ul style="margin:4px 0 0 16px;padding:0;line-height:1.35;">${ws.slice(0,6).map(x => `<li>${_escHtml(x)}</li>`).join('')}</ul></div>` : ''}
+            ${asn.length ? `<div style="color:#9aa;font-size:0.82rem;margin-top:6px;"><strong>Strategy:</strong><ul style="margin:4px 0 0 16px;padding:0;line-height:1.35;">${asn.slice(0,5).map(x => `<li>${_escHtml(x)}</li>`).join('')}</ul></div>` : ''}
+            ${dclus.length ? `<div style="color:#777;font-size:0.8rem;margin-top:6px;"><strong>Clusters:</strong> ${dclus.slice(0,4).map(c => `${_escHtml(String(c.type || '?'))} (${Number(c.member_count || 0)} flv, ${Number(c.weight_pct || 0).toFixed(2)}%)`).join(' · ')}</div>` : ''}
+            ${cpn.length ? `<div style="color:#7a9a7a;font-size:0.8rem;margin-top:6px;"><strong>Cluster preservation:</strong> ${cpn.slice(0,3).map(x => _escHtml(x)).join(' ')}</div>` : ''}
+            ${perc.length ? `<div style="color:#a8b8c8;font-size:0.8rem;margin-top:8px;line-height:1.35;"><strong>Perceptual dominance (Pod/Dispo):</strong><ul style="margin:4px 0 0 16px;padding:0;">${perc.slice(0,6).map(x => `<li>${_escHtml(x)}</li>`).join('')}</ul></div>` : ''}
+            ${cpTarget === 'POD_DISPO' && cp.pod_subtype ? `<div style="color:#c4b8a8;font-size:0.82rem;margin-top:10px;padding:8px;border-radius:6px;background:#141008;border:1px solid #3a3020;">
+                <div style="font-weight:600;color:#daa;">Pod subtype</div>
+                <div><strong>${_escHtml(String(cp.pod_subtype_display_name || cp.pod_subtype))}</strong> <span style="color:#888;">(${_escHtml(String(cp.pod_subtype))})</span></div>
+                <div style="color:#888;margin-top:4px;">Confidence: <strong>${Number(cp.pod_subtype_confidence || 0).toFixed(2)}</strong></div>
+                ${cp.pod_subtype_description ? `<div style="color:#999;margin-top:6px;line-height:1.35;">${_escHtml(String(cp.pod_subtype_description))}</div>` : ''}
+                ${Array.isArray(cp.pod_subtype_reasoning) && cp.pod_subtype_reasoning.length ? `<ul style="margin:6px 0 0 16px;padding:0;color:#777;font-size:0.78rem;line-height:1.35;">${cp.pod_subtype_reasoning.slice(0,4).map(x => `<li>${_escHtml(x)}</li>`).join('')}</ul>` : ''}
+                ${Array.isArray(cp.pod_subtype_warnings) && cp.pod_subtype_warnings.length ? `<div style="color:#c9a080;margin-top:6px;font-size:0.78rem;"><strong>Subtype notes:</strong> ${cp.pod_subtype_warnings.map(w => _escHtml(w)).join(' ')}</div>` : ''}
+            </div>` : ''}
+        </div>`;
+    }
+    if (cpTarget === 'POD_DISPO' && (cp.dispo_fit_rating || cp.dispo_fingerprint)) {
+        const fp = cp.dispo_fingerprint || {};
+        const fpAfter = cp.dispo_fingerprint_after || {};
+        const rateLabel = String(cp.dispo_fit_rating || '').replace(/_/g, ' ');
+        const subLbl = cp.dispo_subtype_label ? _escHtml(String(cp.dispo_subtype_label)) : '';
+        const scoreN = Number(cp.dispo_fit_score);
+        const row = (label, a, b) => {
+            const av = a != null && a !== '' ? Number(a).toFixed(2) : '—';
+            const bv = b != null && b !== '' ? Number(b).toFixed(2) : '';
+            return `<tr><td style="padding:3px 8px 3px 0;color:#888;">${_escHtml(label)}</td><td style="padding:3px;text-align:right;font-family:monospace;">${av}</td>${bv ? `<td style="padding:3px;text-align:right;font-family:monospace;color:#8c8;">→ ${bv}</td>` : '<td></td>'}</tr>`;
+        };
+        const wk = Array.isArray(cp.dispo_key_weaknesses) ? cp.dispo_key_weaknesses.filter(Boolean) : [];
+        const st = Array.isArray(cp.dispo_key_strengths) ? cp.dispo_key_strengths.filter(Boolean) : [];
+        const sug = Array.isArray(cp.dispo_suggestions) ? cp.dispo_suggestions.filter(Boolean) : [];
+        const chg = Array.isArray(cp.dispo_change_summary) ? cp.dispo_change_summary.filter(Boolean) : [];
+        noteHtml += `<div style="margin-top:10px;padding:10px;border:1px solid #333;border-radius:6px;background:#111;">
+            <div style="color:#9ad;font-weight:600;margin-bottom:6px;">Commercial dispo fingerprint</div>
+            <div style="color:#bbb;font-size:0.9rem;margin-bottom:6px;">${rateLabel ? `<strong>${_escHtml(rateLabel)}</strong> (${Number.isFinite(scoreN) ? scoreN.toFixed(2) : '—'})` : ''}${subLbl ? ` · ${subLbl}` : ''}</div>
+            <table style="width:100%;font-size:0.82rem;border-collapse:collapse;margin-bottom:8px;">
+            ${row('Impact', fp.impact_score, fpAfter.impact_score)}
+            ${row('Saturation', fp.saturation_score, fpAfter.saturation_score)}
+            ${row('Sweet backbone', fp.sweet_backbone_score, fpAfter.sweet_backbone_score)}
+            ${row('Body density', fp.body_density_score, fpAfter.body_density_score)}
+            ${row('Top-note punch', fp.topnote_punch_score, fpAfter.topnote_punch_score)}
+            ${row('Cooling', fp.cooling_presentation_score, fpAfter.cooling_presentation_score)}
+            </table>
+            ${wk.length ? `<div style="color:#e9a08c;font-size:0.85rem;margin-top:6px;"><strong>Weaknesses:</strong> ${wk.map(w => _escHtml(w)).join(' ')}</div>` : ''}
+            ${st.length ? `<div style="color:#9acd9a;font-size:0.85rem;margin-top:6px;"><strong>Strengths:</strong> ${st.map(w => _escHtml(w)).join(' ')}</div>` : ''}
+            ${sug.length ? `<div style="color:#aaa;font-size:0.85rem;margin-top:6px;"><strong>Suggestions:</strong><ul style="margin:4px 0 0 18px;padding:0;line-height:1.35;">${sug.slice(0,5).map(s => `<li>${_escHtml(s)}</li>`).join('')}</ul></div>` : ''}
+            ${chg.length ? `<div style="color:#888;font-size:0.8rem;margin-top:6px;"><strong>Key score shifts:</strong> ${chg.slice(0,8).map(c => _escHtml(c)).join(' · ')}</div>` : ''}
+            ${cp.dispo_why_changed ? `<div style="color:#666;font-size:0.8rem;margin-top:6px;line-height:1.35;">${_escHtml(String(cp.dispo_why_changed))}</div>` : ''}
+        </div>`;
+    }
+    if (warnings.length) {
+        noteHtml += `<div style="margin-top:8px; color:#bbb;"><strong>Warnings:</strong> ${warnings.map(w => _escHtml(w)).join(' ')}</div>`;
+    }
+    if (guardrails.length) {
+        noteHtml += `<div style="margin-top:10px; color:#cfcfcf;"><strong>Advisories (not blockers):</strong><ul style="margin:6px 0 0 16px; padding:0; line-height:1.35;">${guardrails.map(g => `<li>${_escHtml(g)}</li>`).join('')}</ul></div>`;
+    }
+    note.innerHTML = noteHtml;
+    const rows = cp.rows || [];
+    tableWrap.innerHTML = `
+      <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+        <thead><tr style="color:#888; border-bottom:1px solid #333;">
+          <th style="text-align:left; padding:6px;">Flavor</th>
+          <th style="text-align:right; padding:6px;">Original %</th>
+          <th style="text-align:right; padding:6px;">Suggested %</th>
+          <th style="text-align:right; padding:6px;">Final %</th>
+          <th style="text-align:right; padding:6px;">Change</th>
+          <th style="text-align:left; padding:6px;">Reason</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr style="border-bottom:1px solid #222;">
+              <td style="padding:6px;"><strong>${_escHtml(r.brand || '')}</strong> ${_escHtml(r.name || '')}</td>
+              <td style="padding:6px; text-align:right;">${Number(r.original_pct || 0).toFixed(2)}</td>
+              <td style="padding:6px; text-align:right;">${Number(r.suggested_pct || 0).toFixed(2)}</td>
+              <td style="padding:6px; text-align:right;">
+                ${allowEdit ? `
+                    <div style="display:flex; gap:8px; justify-content:flex-end; align-items:center;">
+                      <input data-tune-id="${r.ingredient_id}"
+                             data-original-pct="${Number(r.original_pct || 0).toFixed(4)}"
+                             data-suggested-pct="${Number(r.suggested_pct || 0).toFixed(4)}"
+                             type="number" step="0.01"
+                             value="${Number(r.final_pct || 0).toFixed(2)}"
+                             style="width:90px; background:#000; color:#fff; border:1px solid #444; border-radius:4px; padding:4px;">
+                      <div style="display:flex; gap:6px;">
+                        <button type="button" class="btn-mini" style="padding:4px 6px;" onclick="resetTuneValue(${r.ingredient_id}, 'original')">Orig</button>
+                        <button type="button" class="btn-mini" style="padding:4px 6px;" onclick="resetTuneValue(${r.ingredient_id}, 'suggested')">Sug</button>
+                      </div>
+                    </div>
+                ` : Number(r.final_pct || 0).toFixed(2)}
+              </td>
+              <td style="padding:6px; text-align:right; color:${(Math.abs(Number(r.change_pct || 0)) < 0.001) ? '#999' : (Number(r.change_pct || 0) < 0 ? '#e88' : '#8e8')};">${Number(r.change_pct || 0).toFixed(2)}</td>
+              <td style="padding:6px; color:#999;">
+                ${_escHtml(r.reason || '')}
+                ${r.confidence_note ? `<div style="font-size:0.75rem; color:#666; margin-top:4px;">${_escHtml(r.confidence_note)}</div>` : ''}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+    applyBtn.style.display = allowEdit ? 'inline-block' : 'none';
+    applyBtn.onclick = applyMasterTuning;
+    startBtn.onclick = startMixingSession;
+}
+
+function resetTuneValue(ingredientId, which) {
+    const input = document.querySelector(`input[data-tune-id="${ingredientId}"]`);
+    if (!input) return;
+    if (which === 'original') {
+        const v = input.getAttribute('data-original-pct');
+        input.value = Number(v || 0).toFixed(2);
+    } else if (which === 'suggested') {
+        const v = input.getAttribute('data-suggested-pct');
+        input.value = Number(v || 0).toFixed(2);
+    }
+}
+
+async function applyMasterTuning() {
+    const inputs = [...document.querySelectorAll('input[data-tune-id]')];
+    const tuned = {};
+    for (const el of inputs) tuned[String(el.getAttribute('data-tune-id'))] = parseFloat(el.value || '0');
+    const res = await fetch('/mix/tune-formula', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            recipe_id: batch.recipe_id,
+            version_id: batch.version_id,
+            vessel_size: batch.vessel_size,
+            style: batch.style,
+            mix_mode: batch.mix_mode,
+            target_mix_mode: batch.target_mix_mode,
+            nic_target_mg_per_ml: Number((batch.nicotine && batch.nicotine.target_mg_per_ml) || 0),
+            nic_base_strength_mg_per_ml: Number((batch.nicotine && batch.nicotine.base_strength_mg_per_ml) || 100),
+            nic_carrier: String((batch.nicotine && batch.nicotine.carrier) || 'PG'),
+            tuned_formula: tuned,
+            og_stock_override: !!batch.stock_override_used
+        })
+    });
+    const data = await res.json();
+    if (!res.ok || data.status !== 'success') {
+        window.PolicyFeedback.notice('#mix-policy-banner', data.message || 'Failed to apply tuning', { tone: "tvw", severity: "danger" });
+        return;
+    }
+    batch = data.batch || batch;
+    renderConversionPreview();
+}
+
+function startMixingSession() {
+    if (mixingStarted) return;
+    mixingStarted = true;
+    const card = document.getElementById('conversion-preview-card');
+    if (card) card.style.display = 'none';
+    document.getElementById('step-card').style.display = 'block';
+    document.getElementById('progress-card').style.display = 'block';
+    buildSteps();
+    stepIdx = 0;
+    renderStep();
+}
+
+function getStep() {
+    return steps[stepIdx] || null;
+}
+
+function setError(html) {
+    document.getElementById('step-ui-content').innerHTML = html;
+}
+
+function renderProgressList() {
+    let html = "";
+    const all = (batch.ingredients || []);
+    const completed = all.filter(i => i.status === 'complete');
+    const pending = all.filter(i => i.status !== 'complete');
+    const summaryEl = document.getElementById('progress-summary');
+    if (summaryEl) {
+        summaryEl.textContent = `${completed.length} completed · ${pending.length} remaining`;
+    }
+    completed.forEach((ing) => {
+        const opacity = "0.6";
+        const color = 'var(--success)';
+        html += `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:1px solid #222; opacity:${opacity}">
+                <div style="display:flex; align-items:center; gap:15px;">
+                    <span style="width:25px; font-size: 1.2rem;">✅</span>
+                    <div>
+                        <div style="font-weight:bold; color:${color};">${ing.name}</div>
+                        <div style="font-size:0.7rem; color:#666;">${ing.brand || ''}</div>
+                    </div>
+                </div>
+                <div style="text-align:right; font-family:monospace;">
+                    <div style="color:var(--primary-orange); font-size: 1.1rem;">${(ing.actual_grams || 0).toFixed(2)}g</div>
+                    <div style="font-size:0.7rem; color:#444;">Target: ${Number(ing.target_grams || 0).toFixed(2)}g</div>
+                </div>
+            </div>`;
+    });
+    document.getElementById('ingredient-list').innerHTML = html;
+}
+
+function renderStep() {
+    const s = getStep();
+    if (!s) { showFinalizeUI(); return; }
+    const whyEl = document.getElementById('step-why');
+    const nextEl = document.getElementById('next-step-preview');
+    const next = steps[stepIdx + 1] || null;
+
+    const msg = document.getElementById('overpour-msg');
+    msg.style.display = "none";
+    msg.innerText = "";
+
+    const typ = String(s.step_type || s.type || "");
+    if (typ === "completion") {
+        showFinalizeUI();
+        return;
+    }
+
+    // Sequential step numbering includes tare steps
+    const card = document.getElementById('step-card');
+    if (card) {
+        card.classList.remove('is-tare', 'is-recovery', 'is-ingredient');
+        if (typ === "tare") card.classList.add('is-tare');
+        else if (typ === "recovery" || typ === "caution" || typ === "instruction") card.classList.add('is-recovery');
+        else if (typ === "add_ingredient") card.classList.add('is-ingredient');
+    }
+
+    if (typ === "tare") {
+        document.getElementById('step-counter').innerText = `Step ${s.step_number}: ${s.title || "Tare Scale"}`;
+        document.getElementById('ingredient-name').innerText = s.what || "Tare Scale";
+        document.getElementById('ingredient-brand').innerText = "";
+        if (whyEl) whyEl.textContent = `Why: ${s.why || "Tare protects next target accuracy."}`;
+        if (nextEl) nextEl.textContent = next && String(next.step_type || next.type || '') === 'add_ingredient'
+            ? `Next action: add ${Number(next.target_grams || 0).toFixed(2)}g of ${next.name}.`
+            : "Next: continue guided preparation.";
+        document.getElementById('tare-gate').innerHTML = `
+          <div style="background:#111; border:1px solid #333; border-radius: 12px; padding: 18px; text-align:left;">
+            <div style="font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--primary-orange); font-size: 0.85rem;">Mandatory tare step</div>
+            <div style="color: #ccc; margin-top: 10px; font-size: 1.05rem;">${_escHtml(s.what || "Tare your scale to 0.00g before adding this ingredient.")}</div>
+            <div style="color:#777; margin-top:6px; font-size:0.85rem;">${_escHtml(s.tip || "You cannot skip this step.")}</div>
+            <button onclick="confirmTare()" id="tare-btn" class="btn-primary" style="margin-top: 16px; width: 100%; padding: 16px; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px;">${_escHtml(s.action_label || "I tared to 0.00g")}</button>
+          </div>`;
+        document.getElementById('tare-gate').style.display = 'block';
+        document.getElementById('pour-ui').style.display = 'none';
+        renderProgressList();
+        return;
+    }
+    if (typ === "caution" || typ === "transition" || typ === "recovery" || typ === "instruction") {
+        document.getElementById('step-counter').innerText = `Step ${s.step_number}: ${s.title || "Guided step"}`;
+        document.getElementById('ingredient-name').innerText = s.what || "Follow guided instruction";
+        document.getElementById('ingredient-brand').innerText = "";
+        if (whyEl) whyEl.textContent = `Why: ${s.why || "Maintain guided flow quality."}`;
+        if (nextEl) nextEl.textContent = s.tip || "Continue when ready.";
+        document.getElementById('tare-gate').innerHTML = `
+          <div style="background:#111; border:1px solid #333; border-radius: 12px; padding: 18px; text-align:left;">
+            <div style="font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--primary-orange); font-size: 0.85rem;">${_escHtml(String(typ).replaceAll("_", " "))}</div>
+            <div style="color: #ccc; margin-top: 10px; font-size: 1.05rem;">${_escHtml(s.what || "Follow instruction.")}</div>
+            <div style="color:#777; margin-top:6px; font-size:0.85rem;">${_escHtml(s.tip || "")}</div>
+            <button onclick="nextStep()" id="tare-btn" class="btn-primary" style="margin-top: 16px; width: 100%; padding: 16px; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px;">${_escHtml(s.action_label || "Continue")}</button>
+          </div>`;
+        document.getElementById('tare-gate').style.display = 'none';
+        document.getElementById('pour-ui').style.display = 'none';
+        document.getElementById('tare-gate').style.display = 'block';
+        renderProgressList();
+        return;
+    }
+
+    // Step 2 must be the first ingredient and must have a valid non-zero target
+    const target = Number(s.target_grams || 0);
+    if (!s.name || !isFinite(target) || target <= 0) {
+        setError(`
+            <div style="border: 2px solid var(--danger); padding: 22px; border-radius: 12px; background: rgba(255,0,0,0.1); text-align:left;">
+                <h2 style="color: var(--danger); margin-top: 0;">Invalid recipe step</h2>
+                <p>Ingredient step has an invalid target (0.00g) or missing name.</p>
+                <p style="color:#bbb; font-size:0.9rem;">This indicates a recipe/version configuration issue.</p>
+                <a href="{{ url_for('recipes.library') }}" class="btn btn-outline-light">Back to Library</a>
+            </div>
+        `);
+        return;
+    }
+
+    document.getElementById('step-counter').innerText = `Step ${s.step_number}: Add ${target.toFixed(2)}g ${s.name}${s.brand ? ` (${s.brand})` : ""}`;
+    document.getElementById('ingredient-name').innerText = s.name;
+    const alreadyAdded = Number(s.already_added_grams || 0);
+    const recalculatedTarget = Number(s.recalculated_target_grams || target);
+    const remainingDelta = Number(s.delta_to_add_grams || target);
+    const reconcileLine = batch.reconcile_mode
+      ? `Reconcile mode · Added ${alreadyAdded.toFixed(2)}g · New target ${recalculatedTarget.toFixed(2)}g · Remaining ${remainingDelta.toFixed(2)}g`
+      : "";
+    document.getElementById('ingredient-brand').innerText = `${s.brand ? `Brand: ${s.brand}` : ""}${reconcileLine ? `${s.brand ? " · " : ""}${reconcileLine}` : ""}`;
+    document.getElementById('target-display').innerText = `${target.toFixed(2)}g`;
+    if (whyEl) whyEl.textContent = APP_TONE === "tvw"
+      ? "Why: this keeps your flavor balance aligned with your chosen recipe version."
+      : "Why: this is a controlled production pour against the defined target.";
+    if (nextEl) nextEl.textContent = next
+      ? `Next action: ${String(next.step_type || next.type || '') === "tare" ? "tare scale for the next pour." : "continue to next ingredient."}`
+      : "Next: final sign-off step.";
+
+    document.getElementById('tare-gate').style.display = 'none';
+    document.getElementById('pour-ui').style.display = 'block';
+
+    const input = document.getElementById('actual-input');
+    input.value = "";
+    const measuredLive = document.getElementById('measured-live-display');
+    if (measuredLive) measuredLive.textContent = "0.00g";
+    input.disabled = false;
+    document.getElementById('confirm-btn').disabled = false;
+    input.oninput = () => {
+        const v = parseFloat(input.value);
+        if (measuredLive) measuredLive.textContent = `${Number.isFinite(v) ? v.toFixed(2) : "0.00"}g`;
+    };
+    input.focus();
+    renderProgressList();
+}
+
+function nextStep() {
+    stepIdx += 1;
+    renderStep();
+}
+
+function confirmTare() {
+    const s = getStep();
+    if (!s || String(s.step_type || s.type || "") !== "tare") return;
+    nextStep();
+}
+
+function getIngredientContextForReconcile() {
+    const active = getStep() || {};
+    const activeTarget = Number(active.target_grams || 0);
+    const activeMeasured = Number((((batch.ingredients || []).find(i => String(i.ingredient_id) === String(active.ingredient_id)) || {}).actual_grams) || 0);
+    return {
+        ingredient_id: active.ingredient_id || null,
+        ingredient_name: active.name || "",
+        target_amount: activeTarget,
+        measured_amount: activeMeasured,
+    };
+}
+
+function buildReconcileRequestBody(vesselSizeMl, opts = {}) {
+    const previously_poured = (batch.ingredients || []).filter(i => (i.actual_grams || 0) > 0)
+        .map(i => ({ ingredient_id: i.ingredient_id, actual_grams: i.actual_grams || 0 }));
+    return {
+        vessel_size: Number(vesselSizeMl),
+        previously_poured,
+        unit_count: batch.num_units,
+        version_id: batch.version_id,
+        style: batch.style,
+        mix_mode: batch.mix_mode || "longfill",
+        nicotine: batch.nicotine || {},
+        formula_rows: (batch.conversion_preview && Array.isArray(batch.conversion_preview.rows)) ? batch.conversion_preview.rows : [],
+        guided_session_id: GUIDED_SESSION_ID || null,
+        ingredient_context: getIngredientContextForReconcile(),
+        allow_continue_with_drift: !!opts.allow_continue_with_drift,
+        no_bigger_container: !!opts.no_bigger_container,
+    };
+}
+
+async function postReconcileRequest(vesselSizeMl, opts = {}) {
+    const res = await fetch("/mix/reconcile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildReconcileRequestBody(vesselSizeMl, opts)),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { res, data };
+}
+
+function parsePositiveVesselMl(raw) {
+    const s = String(raw == null ? "" : raw).trim().replace(",", ".");
+    const v = parseFloat(s);
+    if (!Number.isFinite(v) || v <= 0) {
+        return { ok: false, message: "Enter a valid positive container size in ml (numbers only)." };
+    }
+    return { ok: true, ml: v };
+}
+
+function validateUserReconcileVesselMl(ml) {
+    const current = Number(batch.vessel_size || 0);
+    const parsed = parsePositiveVesselMl(ml);
+    if (!parsed.ok) return parsed;
+    if (parsed.ml <= current) {
+        return { ok: false, message: `The new container must be larger than your current ${current.toFixed(2)} ml vessel.` };
+    }
+    const minNeed = Number(batch.reconcile_required_volume_ml || 0);
+    if (minNeed > 0 && parsed.ml + 1e-6 < minNeed) {
+        return { ok: false, message: `This batch needs at least ${minNeed.toFixed(2)} ml internal capacity. Increase the size or pick a larger bottle.` };
+    }
+    return { ok: true, ml: parsed.ml };
+}
+
+window.setReconcileVesselPick = function (ml) {
+    const el = document.getElementById("new-vessel");
+    if (el) el.value = String(ml);
+};
+
+async function applyReconcileSuccessToBatch(data, newVesselMl) {
+    const ingredientContext = getIngredientContextForReconcile();
+    const tvwGuided = APP_TONE === "tvw" && GUIDED_SESSION_ID;
+    if (data.status === "continue_with_drift") {
+        window.PolicyFeedback.notice("#mix-policy-banner", data.message || "Continuing in drift mode; flavor outcome changed.", { tone: "tvw", severity: "warning" });
+    }
+    if (!tvwGuided) {
+        await autoInsertGuidedEvent("reconcile_required", {
+            message: data.status === "continue_with_drift"
+                ? "Continuing with drift-recovery targets."
+                : "Reconcile completed. Continue with adjusted targets.",
+            detail: data.status === "continue_with_drift"
+                ? "PG/balance was recalculated around the mistake. Taste profile will differ from intended recipe."
+                : "Proceed to next guided step using recalculated queue.",
+            severity: data.status === "continue_with_drift" ? "warning" : "info",
+            context: ingredientContext,
+        });
+    }
+
+    batch.vessel_size = Number(newVesselMl);
+    batch.total_volume = data.new_total_volume;
+    if (data.new_unit_count) batch.num_units = data.new_unit_count;
+    const volEl = document.getElementById("batch-vol-display");
+    if (volEl) volEl.innerText = batch.total_volume.toFixed(1);
+
+    batch.ingredients = (data.reconciled_steps || []).map(i => ({ ...i }));
+    batch.reconcile_mode = true;
+    batch.reconcile_required_volume_ml = null;
+
+    buildSteps();
+    stepIdx = 0;
+    renderStep();
+    renderMixSetupSummary();
+}
+
+async function beginOverpourReconcileAfterPour() {
+    const currentV = Number(batch.vessel_size || 0);
+    const { res, data } = await postReconcileRequest(currentV, {});
+    if (data.policy) {
+        renderPolicyBanner(data.policy, data.status === "policy_blocked" ? "danger" : "warning");
+    } else {
+        renderPolicyBanner(null);
+    }
+    const status = String(data.status || "").toLowerCase();
+    const tvwGuided = APP_TONE === "tvw" && GUIDED_SESSION_ID;
+
+    if (status === "policy_blocked") {
+        if (!tvwGuided) {
+            await autoInsertGuidedEvent("policy_block", {
+                message: data.message || "Reconcile blocked by policy.",
+                detail: "Resolve policy block before continuing guided flow.",
+                severity: "danger",
+                context: getIngredientContextForReconcile(),
+            });
+        }
+        showPolicyBlockedAction(data);
+        return;
+    }
+    if (status === "success" || status === "continue_with_drift") {
+        await applyReconcileSuccessToBatch(data, currentV);
+        return;
+    }
+    if (status === "capacity_exceeded") {
+        const minVol = Number(data.required_volume_ml || 0) || Number(data.required_vessel || 0);
+        batch.reconcile_required_volume_ml = minVol;
+        if (!tvwGuided) {
+            await autoInsertGuidedEvent("reconcile_required", {
+                message: `Capacity exceeded. Minimum required volume ${minVol.toFixed(2)} ml.`,
+                detail: "Enter your actual larger container size in ml, then recalculate.",
+                severity: "warning",
+                context: getIngredientContextForReconcile(),
+            });
+        }
+        showCapacityAlert(data);
+        return;
+    }
+    window.PolicyFeedback.notice("#mix-policy-banner", data.message || "Reconcile probe failed.", { tone: "tvw", severity: "danger" });
+}
+
+function scaledPourTolerance(targetGrams, direction) {
+    const target = Number(targetGrams || 0);
+    const vessel = Number(batch.vessel_size || 0);
+    const profile = (batch && batch.tolerance_profile) || {};
+    const tinyFactorCfg = Number(profile.tiny_vessel_tolerance_factor || 1.45);
+    const smallFactorCfg = Number(profile.small_vessel_tolerance_factor || 1.2);
+    const largeFactorCfg = Number(profile.large_vessel_tolerance_factor || 0.85);
+    const tinyFactor = vessel <= 30 ? tinyFactorCfg : vessel <= 60 ? smallFactorCfg : vessel >= 250 ? largeFactorCfg : 1.0;
+    const overPct = Number(profile.overpour_tolerance_pct || 0.018);
+    const underPct = Number(profile.underpour_tolerance_pct || 0.014);
+    const basePct = direction === "over" ? overPct : underPct;
+    const minTol = Number(profile.min_pour_tolerance_grams || 0.01);
+    return Math.max(minTol, target * basePct * tinyFactor);
+}
+
+async function reconcileWithNewVessel(_ignored, opts = {}) {
+    const tvwGuided = APP_TONE === "tvw" && GUIDED_SESSION_ID;
+    let newVessel;
+    if (opts.no_bigger_container) {
+        newVessel = Number(batch.vessel_size || 0);
+        if (!Number.isFinite(newVessel) || newVessel <= 0) {
+            window.PolicyFeedback.notice("#mix-policy-banner", "Invalid current vessel size.", { tone: "tvw", severity: "danger" });
+            return;
+        }
+    } else {
+        const input = document.getElementById("new-vessel");
+        const raw = input ? input.value : "";
+        const validated = validateUserReconcileVesselMl(raw);
+        if (!validated.ok) {
+            window.PolicyFeedback.notice("#mix-policy-banner", validated.message, { tone: "tvw", severity: "danger" });
+            return;
+        }
+        newVessel = validated.ml;
+    }
+
+    try {
+        const { data } = await postReconcileRequest(newVessel, opts);
+        if (data.policy) {
+            renderPolicyBanner(data.policy, data.status === "policy_blocked" ? "danger" : "warning");
+        } else {
+            renderPolicyBanner(null);
+        }
+        if (data.status === "capacity_exceeded") {
+            const minVol = Number(data.required_volume_ml || 0) || Number(data.required_vessel || 0);
+            batch.reconcile_required_volume_ml = Math.max(Number(batch.reconcile_required_volume_ml || 0), minVol);
+            if (!tvwGuided) {
+                await autoInsertGuidedEvent("reconcile_required", {
+                    message: `Still too small. Minimum required volume ${minVol.toFixed(2)} ml.`,
+                    detail: "Enter a larger actual container size in ml.",
+                    severity: "warning",
+                    context: getIngredientContextForReconcile(),
+                });
+            }
+            showCapacityAlert(data);
+            return;
+        }
+        if (data.status === "policy_blocked") {
+            if (!tvwGuided) {
+                await autoInsertGuidedEvent("policy_block", {
+                    message: data.message || "Reconcile blocked by policy.",
+                    detail: "Resolve policy block before continuing guided flow.",
+                    severity: "danger",
+                    context: getIngredientContextForReconcile(),
+                });
+            }
+            showPolicyBlockedAction(data);
+            return;
+        }
+        if (data.status !== "success" && data.status !== "continue_with_drift") {
+            window.PolicyFeedback.notice("#mix-policy-banner", data.message || "Reconcile failed.", { tone: "tvw", severity: "danger" });
+            return;
+        }
+        await applyReconcileSuccessToBatch(data, newVessel);
+    } catch (e) {
+        console.error(e);
+        window.PolicyFeedback.notice("#mix-policy-banner", "Network error during reconcile.", { tone: "tvw", severity: "danger" });
+    }
+}
+
+async function confirmPour() {
+    const s = getStep();
+    if (!s || String(s.step_type || s.type || "") !== "add_ingredient") return;
+
+    const inputField = document.getElementById('actual-input');
+    const inputVal = parseFloat(inputField.value);
+    if (isNaN(inputVal) || inputVal < 0) {
+        window.PolicyFeedback.notice('#mix-policy-banner', "Please enter a valid weight in grams.", { tone: "tvw", severity: "danger" });
+        return;
+    }
+
+    const target = Number(s.target_grams || 0);
+    if (target <= 0) {
+        window.PolicyFeedback.notice('#mix-policy-banner', "Invalid target grams.", { tone: "tvw", severity: "danger" });
+        return;
+    }
+
+    const msg = document.getElementById('overpour-msg');
+
+    if (inputVal === 0 && target > 0) {
+        msg.style.display = "block";
+        msg.style.color = "var(--warning)";
+        msg.style.background = "rgba(255,193,7,0.12)";
+        msg.innerText = `⛔ Weight cannot be 0.00g. Pour until the scale reads ${target.toFixed(2)}g.`;
+        return;
+    }
+
+    const underTolerance = scaledPourTolerance(target, "under");
+    if (inputVal < (target - underTolerance)) {
+        const remaining = (target - inputVal).toFixed(2);
+        msg.style.display = "block";
+        msg.style.color = "var(--warning)";
+        msg.style.background = "rgba(255,193,7,0.12)";
+        msg.innerText = `⛔ UNDERPOUR: Add ${remaining}g more until scale reads ${target.toFixed(2)}g.`;
+        return;
+    }
+
+    // Overpour
+    const overTolerance = scaledPourTolerance(target, "over");
+    const threshold = (target + overTolerance);
+    if (inputVal > threshold) {
+        const ing = (batch.ingredients || []).find(i => String(i.ingredient_id) === String(s.ingredient_id));
+        if (ing) { ing.actual_grams = inputVal; ing.status = 'complete'; }
+        autoInsertGuidedEvent("overpour", {
+            message: `Overpour on ${s.name || 'ingredient'}: target ${target.toFixed(2)}g, measured ${inputVal.toFixed(2)}g.`,
+            detail: "Reconcile will run automatically.",
+            severity: "danger",
+            context: {
+                ingredient_id: s.ingredient_id || null,
+                ingredient_name: s.name || "",
+                target_amount: target,
+                measured_amount: inputVal,
+            },
+        });
+        msg.style.display = "block";
+        msg.style.color = "var(--danger)";
+        msg.style.background = "rgba(255,0,0,0.1)";
+        msg.innerText = `⚠️ OVERPOUR: Target ${target.toFixed(2)}g, got ${inputVal.toFixed(2)}g (tol +${overTolerance.toFixed(2)}g). Checking reconcile capacity…`;
+        await beginOverpourReconcileAfterPour();
+        return;
+    }
+
+    // Accept
+    const ing = (batch.ingredients || []).find(i => String(i.ingredient_id) === String(s.ingredient_id));
+    if (ing) { ing.actual_grams = inputVal; ing.status = 'complete'; }
+    nextStep(); // goes to the next tare step
+}
+
+function showPolicyBlockedAction(data) {
+    const content = document.getElementById('step-ui-content');
+    const policy = data.policy || {};
+    const hardStops = Array.isArray(policy.hard_stops) ? policy.hard_stops : [];
+    content.innerHTML = `
+        <div style="border: 2px solid var(--danger); padding: 30px; border-radius: 12px; background: rgba(255,0,0,0.1);">
+            <h2 style="color: var(--danger); margin-top: 0;">Policy blocked reconcile</h2>
+            <p>${_escHtml(data.message || 'Reconcile is blocked by strict policy.')}</p>
+            ${hardStops.length ? `<div style="color:#f5b8bf; font-size:0.9rem; margin:8px 0;">${hardStops.map(x => `- ${_escHtml(x)}`).join('<br>')}</div>` : ''}
+            <div style="display:grid; grid-template-columns:1fr; gap:10px; margin-top:20px;">
+                <button onclick="location.reload()" class="btn-primary" style="background:var(--danger); border:none;">Abort & Restart</button>
+            </div>
+        </div>
+    `;
+}
+
+function showCapacityAlert(serverPayload) {
+    const content = document.getElementById("step-ui-content");
+    const currentV = Number(batch.vessel_size || 0);
+    const minExact = Math.max(
+        Number(batch.reconcile_required_volume_ml || 0),
+        Number((serverPayload && serverPayload.required_volume_ml) || 0),
+        Number((serverPayload && serverPayload.required_vessel) || 0)
+    );
+    const hintRounded = Number((serverPayload && serverPayload.required_vessel) || 0);
+    const minLine = minExact > 0
+        ? `Minimum capacity required by the recalculated batch: <strong>${minExact.toFixed(2)} ml</strong>.`
+        : "Enter the internal volume of the larger bottle you will use.";
+    const hintLine = hintRounded > 0
+        ? `<p style="font-size:0.85rem; color:#888; margin:0;">Suggested common size (rounded up): ≥ ${hintRounded.toFixed(0)} ml — your real bottle may differ; use the field below.</p>`
+        : "";
+    content.innerHTML = `
+        <div style="border: 2px solid var(--danger); padding: 30px; border-radius: 12px; background: rgba(255,0,0,0.1);">
+            <h2 style="color: var(--danger); margin-top: 0;">Larger container required</h2>
+            <p>${minLine}</p>
+            <p style="font-size: 0.85rem; color: #888;">Current vessel: <strong>${currentV.toFixed(2)} ml</strong>. The new size must be <strong>greater</strong> than this and <strong>at least</strong> the minimum above.</p>
+            ${hintLine}
+            <div style="font-size:0.85rem; color:#aaa; margin-top:12px; margin-bottom:4px;">Your available container — exact size (ml)</div>
+            <div style="display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 8px;">
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <input id="new-vessel" type="number" step="0.01" inputmode="decimal" placeholder="e.g. 57.5"
+                           style="flex:1; padding:12px; border-radius:8px; border:1px solid #444; background:#000; color:#fff; font-size:1rem;">
+                    <span style="color:#bbb;">ml</span>
+                </div>
+                <div class="small text-secondary">Quick fill (optional — edit the field above as needed):</div>
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <button type="button" onclick="setReconcileVesselPick(30)" style="padding:6px 12px; border-radius:6px; border:1px solid #666; background:#222; color:#fff; cursor:pointer;">30 ml</button>
+                    <button type="button" onclick="setReconcileVesselPick(60)" style="padding:6px 12px; border-radius:6px; border:1px solid #666; background:#222; color:#fff; cursor:pointer;">60 ml</button>
+                    <button type="button" onclick="setReconcileVesselPick(100)" style="padding:6px 12px; border-radius:6px; border:1px solid #666; background:#222; color:#fff; cursor:pointer;">100 ml</button>
+                    <button type="button" onclick="setReconcileVesselPick(120)" style="padding:6px 12px; border-radius:6px; border:1px solid #666; background:#222; color:#fff; cursor:pointer;">120 ml</button>
+                    <button type="button" onclick="setReconcileVesselPick(200)" style="padding:6px 12px; border-radius:6px; border:1px solid #666; background:#222; color:#fff; cursor:pointer;">200 ml</button>
+                </div>
+                <button onclick="reconcileWithNewVessel()" class="btn-primary" style="background:var(--primary-orange); border:none;">Recalculate using my container size</button>
+                <button onclick="reconcileWithNewVessel(null, { allow_continue_with_drift: true, no_bigger_container: true })" class="btn-primary" style="background:var(--warning); border:none; color:#111;">No Bigger Vessel - Continue With Drift</button>
+                <button onclick="location.reload()" class="btn-primary" style="background:var(--danger); border:none;">Abort & Restart</button>
+            </div>
+        </div>
+    `;
+}
+
+function showFinalizeUI() {
+    const ov = batch.stock_override_used;
+    const btnLabel = ov ? 'Complete test mix (no inventory deduction)' : 'Deduct Stock & Close';
+    document.getElementById('step-card').innerHTML = `
+        <div style="padding: 20px;">
+            <div style="font-size: 4rem; margin-bottom: 10px;">🏆</div>
+            <h2 style="color: var(--success); margin-top:0;">BATCH COMPLETE</h2>
+            ${ov ? `<p style="color: var(--warning); font-size:0.95rem; border:1px solid rgba(255,193,7,0.4); padding:10px; border-radius:8px; background:rgba(255,193,7,0.08);">Old Goat stock override — inventory will <strong>not</strong> be changed. This batch is flagged as a test run.</p>` : ''}
+            <p style="color: var(--text-muted); margin-bottom: 30px;">Total Volume Produced: <strong>${batch.total_volume.toFixed(1)}ml</strong></p>
+            <button onclick="finishBatch()" id="finish-btn" class="btn-primary" style="width:100%; padding:25px; background:var(--success); font-size:1.5rem; border:none; border-radius: 8px; cursor: pointer;">
+                ${btnLabel}
+            </button>
+        </div>
+    `;
+}
+
+function finishBatch() {
+    const btn = document.getElementById('finish-btn');
+    btn.disabled = true;
+    btn.innerText = batch.stock_override_used ? "Saving test batch..." : "UPDATING INVENTORY...";
+
+    const finalPayload = {
+        ...batch,
+        safety_checks: batch.safety_confirmed || {},
+        timestamp_completed: new Date().toISOString()
+    };
+
+    fetch('/mix/finalize', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(finalPayload)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(data.status === 'success') {
+            window.location.href = `/mix/history`;
+        } else {
+            window.PolicyFeedback.notice('#mix-policy-banner', "Error: " + (data.message || "Finalize failed."), { tone: "tvw", severity: "danger" });
+            btn.disabled = false;
+            btn.innerText = "Sign Off & Deduct Stock";
+        }
+    })
+    .catch(err => {
+        console.error("Finalize error:", err);
+        window.PolicyFeedback.notice('#mix-policy-banner', "Server connection lost. Batch saved locally but inventory not deducted.", { tone: "tvw", severity: "danger" });
+        btn.disabled = false;
+    });
+}
+
+// Init (Step 1 is always tare, Step 2 is first ingredient)
+document.addEventListener('DOMContentLoaded', () => {
+    if (!batch) {
+        return;
+    }
+    try {
+        renderMixSetupSummary();
+    } catch (e) {
+        console.error('renderMixSetupSummary failed:', e);
+        showMixInitError('Mix UI failed to start (setup summary). Check console for details.', e);
+        return;
+    }
+    const setupBtn = document.getElementById('setup-continue-btn');
+    if (setupBtn) {
+        setupBtn.addEventListener('click', () => {
+            try {
+                proceedFromSetup();
+            } catch (e) {
+                console.error('proceedFromSetup failed:', e);
+                window.PolicyFeedback.notice('#mix-policy-banner', 'Mix flow error: ' + (e && e.message ? e.message : e), { tone: "tvw", severity: "danger" });
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
