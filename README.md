@@ -93,6 +93,17 @@ Entry: `/lab/production-jobs` (requires Lab modules + production-jobs capability
 
 Helper accounts (e.g. Riku) use `user_capabilities` such as `lab.production_jobs.view` / `lab.production_jobs.produce` without Master Admin access.
 
+
+## Pauly / server handover
+
+Practical handover docs:
+
+- [Pauly deployment & server guide](docs/PAULY_DEPLOYMENT_GUIDE.md)
+- [Calculator user guide](docs/CALCULATOR_USER_GUIDE.md)
+- [Database handoff & backup guide](docs/DATABASE_HANDOFF.md)
+
+**Important:** the live SQLite database is deliberately **not stored in GitHub**. Git contains the application code, schema and migrations. If the deployed website must include Wynand's existing recipes, users, Production Jobs, scraper/pricing history and other live records, the confirmed active SQLite database must be transferred to the server separately and securely. Never commit the live DB to this repository.
+
 ## Deployment notes
 
 1. Set `SECRET_KEY` in the environment (do not rely on the development fallback in code).
