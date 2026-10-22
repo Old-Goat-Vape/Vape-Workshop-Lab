@@ -142,13 +142,17 @@ def init_on_start():
             ).fetchone()
 
             if not admin_exists:
-                hashed_pw = generate_password_hash("2580")
-                db.execute("""
-                    INSERT INTO users (username, password_hash, role, status) 
-                    VALUES (?, ?, ?, 'Active')
-                """, ("tvw_admin", hashed_pw, "admin"))
-                db.commit()
-                print("✅ Administrator user verified/created.")
+                admin_password = os.environ.get("TVW_ADMIN_PASSWORD", "").strip()
+                if admin_password:
+                    hashed_pw = generate_password_hash(admin_password)
+                    db.execute("""
+                        INSERT INTO users (username, password_hash, role, status)
+                        VALUES (?, ?, ?, 'Active')
+                    """, ("tvw_admin", hashed_pw, "admin"))
+                    db.commit()
+                    print("✅ Administrator user created from TVW_ADMIN_PASSWORD.")
+                else:
+                    print("⚠️ No administrator exists and TVW_ADMIN_PASSWORD is not set; bootstrap admin creation skipped.")
 
             # Ensure legacy owner login exists for continuity in TVW environments.
             old_goat_exists = db.execute(
@@ -156,17 +160,20 @@ def init_on_start():
                 ("Old Goat",),
             ).fetchone()
             if not old_goat_exists:
-                old_goat_password = os.environ.get("TVW_OLD_GOAT_PASSWORD", "123456789")
-                old_goat_hash = generate_password_hash(old_goat_password)
-                db.execute(
-                    """
-                    INSERT INTO users (username, password_hash, role, status)
-                    VALUES (?, ?, ?, 'Active')
-                    """,
-                    ("Old Goat", old_goat_hash, "Old Goat"),
-                )
-                db.commit()
-                print("✅ Legacy owner user 'Old Goat' verified/created.")
+                old_goat_password = os.environ.get("TVW_OLD_GOAT_PASSWORD", "").strip()
+                if old_goat_password:
+                    old_goat_hash = generate_password_hash(old_goat_password)
+                    db.execute(
+                        """
+                        INSERT INTO users (username, password_hash, role, status)
+                        VALUES (?, ?, ?, 'Active')
+                        """,
+                        ("Old Goat", old_goat_hash, "Old Goat"),
+                    )
+                    db.commit()
+                    print("✅ Legacy owner user 'Old Goat' created from TVW_OLD_GOAT_PASSWORD.")
+                else:
+                    print("ℹ️ TVW_OLD_GOAT_PASSWORD is not set; legacy owner bootstrap creation skipped.")
 
             # Optional startup catch-up is disabled by default to keep boot fast.
             if bool(app.config.get("TVW_ENABLE_LAB_MODULES")) and bool(app.config.get("RUN_STARTUP_MONTHLY_CATCHUP")):
