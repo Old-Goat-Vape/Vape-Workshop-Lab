@@ -1,4 +1,4 @@
-# Pauly — Server Installation & Handover Guide
+# Server Installation & Handover Guide
 
 This is the practical deployment guide for **The Vape Workshop Lab**.
 
@@ -7,7 +7,7 @@ The project is a Python/Flask application. It contains two related areas:
 - **Workshop** — recipes, recipe versions, recipe library, Guided Mix, personal mixes and community-facing recipe tools.
 - **Lab** — costing, inventory/reference data, scrapers, Production Jobs, production pay and job profitability.
 
-For Wynand's normal use, deploy with the Lab enabled.
+For a full Workshop + Lab deployment, enable the Lab modules.
 
 ---
 
@@ -24,9 +24,9 @@ The repository deliberately ignores:
 
 That is intentional. GitHub contains the **application code, schema and migrations**, not Wynand's live data.
 
-A clean server can create a fresh SQLite database automatically, but a fresh database will **not contain Wynand's existing recipes, users, Production Jobs, scraper results, pricing history or other live records**.
+A clean server can create a fresh SQLite database automatically, but a fresh database will **not contain existing recipes, users, Production Jobs, scraper results, pricing history or other live records**.
 
-If the website must start with Wynand's existing data, the active SQLite database must be transferred to the server separately and securely. See `docs/DATABASE_HANDOFF.md`.
+If the website must start with existing data, the active SQLite database must be transferred to the server separately and securely. See `docs/DATABASE_HANDOFF.md`.
 
 Do not add the live database to Git.
 
@@ -61,7 +61,7 @@ sudo chown -R $USER:$USER /opt/tvw
 cd /opt/tvw
 ```
 
-The repository is private, so GitHub authentication/collaborator access is required.
+The repository is public, so cloning over HTTPS does not require GitHub authentication.
 
 ---
 
@@ -115,7 +115,7 @@ sudo mkdir -p /var/lib/tvw
 sudo chown -R $USER:$USER /var/lib/tvw
 ```
 
-If Wynand supplies an existing live database, place it at the path used by `DATABASE_PATH` before starting the production service.
+If you supply an existing live database, place it at the path used by `DATABASE_PATH` before starting the production service.
 
 ---
 
@@ -204,7 +204,7 @@ Then enable HTTPS with the server's normal Certbot/Let's Encrypt setup.
 
 ---
 
-## 10. What Wynand means by "the calculator"
+## 10. What "the calculator" includes
 
 The calculator is not one isolated page. The application uses the recipe database and Lab pricing data together.
 
@@ -226,7 +226,7 @@ See `docs/CALCULATOR_USER_GUIDE.md` for the operator guide.
 
 ## 11. Production Jobs
 
-Examples are jobs such as **Trinidad** or **Poison Rally**.
+Production Jobs represent named manufacturing or fulfilment runs.
 
 A Production Job can track:
 
