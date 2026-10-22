@@ -1,120 +1,152 @@
 # The Vape Workshop Lab
 
-Flask application for **The Vape Workshop** (community recipes & Guided Mix) and **Old Goat Lab** (inventory, scrapers, costing, Production Jobs).
+Open-source Flask application for **The Vape Workshop** recipe/mixing tools and **Old Goat Lab** production, costing, inventory and scraper workflows.
 
-Private repository: [Old-Goat-Vape/Vape-Workshop-Lab](https://github.com/Old-Goat-Vape/Vape-Workshop-Lab)
+> **Important:** this repository contains application code, schema and migrations. It does **not** contain the live production database, real `.env` files, passwords or other deployment secrets.
 
-## Workshop vs Lab
+## What it does
+
+The project has two related areas:
 
 | Area | Responsibility |
-|------|----------------|
-| **Workshop (TVW)** | Recipes, recipe versions, Guided Mix, personal mixes, recipe privacy/visibility, community surfaces |
-| **Lab** | Inventory / reference library, scrapers, recipe costing, BLCK variant pricing, **Production Jobs**, production pay, job inventory & costs |
+|---|---|
+| **Workshop (TVW)** | Recipes, recipe versions, Guided Mix, personal mixes, recipe visibility and community-facing recipe tools |
+| **Lab** | Inventory/reference data, scraper integrations, recipe costing, Production Jobs, production pay and job profitability |
 
-Production Jobs are **Lab-only**. A batch affects a job only when launched with **Mix for this job**. Personal Workshop mixes stay isolated (`production_job_id` null).
+Production Jobs are Lab-only. A batch affects a Production Job only when it is launched through **Mix for this job**. Normal Workshop mixes remain separate.
 
-Lab modules are gated by `TVW_ENABLE_LAB_MODULES`.
+Lab modules are controlled by `TVW_ENABLE_LAB_MODULES`.
 
 ## Repository layout
 
+```text
+app/                 Flask application
+shared_mix_core/     Shared mixing calculations and Guided Mix logic
+docs/                User, database and deployment documentation
+requirements.txt     Root dependency entry point
+.env.example         Safe environment-variable template
 ```
-app/                 # Flask app (run from here)
-shared_mix_core/     # Shared mix math used by Guided Mix
-requirements.txt     # Points at app/requirements.txt
-.env.example         # Safe env placeholders (copy to app/.env)
-```
 
-Do **not** commit SQLite databases, `.env`, or `venv/`. Live data normally lives under `%LOCALAPPDATA%\TheVapeWorkshopCalculator\` on Windows.
+## Requirements
 
-## Python setup
+Recommended:
 
-Recommended: **Python 3.12 or 3.13** (3.14+ may fail some wheels).
+- Python 3.12 or 3.13
+- SQLite
+- A Python virtual environment
+- For production on Linux: Gunicorn + Nginx
+
+Python 3.14+ has not been the primary development target and may encounter dependency-wheel compatibility issues.
+
+## Quick start — Windows
+
+From the repository root:
 
 ```bat
 cd app
 py -3.13 -m venv venv
 venv\Scripts\pip install -r requirements.txt
+copy ..\.env.example .env
+python app.py
 ```
 
-Or use the Windows launchers (they create `venv` and install deps on first run):
+Or use one of the included launchers:
 
-- `app\Start_TVW_Calculator.bat` — Workshop + Lab bridge on (`TVW_ENABLE_LAB_MODULES=1`)
-- `app\Start_Old_Goat_Lab.bat` — same Lab-oriented start
-- `app\Start_TVW_Device_Testing.bat` — LAN testing (see `README_DEVICE_TESTING.txt`)
+- `app\Start_TVW_Calculator.bat`
+- `app\Start_Old_Goat_Lab.bat`
+- `app\Start_TVW_Device_Testing.bat`
 
-Default URL: `http://127.0.0.1:5000/recipes`
+Default local URL:
+
+```text
+http://127.0.0.1:5000/recipes
+```
+
+## Quick start — Linux
+
+```bash
+git clone https://github.com/Old-Goat-Vape/Vape-Workshop-Lab.git
+cd Vape-Workshop-Lab
+
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+
+cp .env.example app/.env
+cd app
+../venv/bin/python app.py
+```
+
+For an Internet-facing deployment, do not expose the Flask development server directly. See the deployment documentation below.
 
 ## Environment variables
 
-Copy `.env.example` to `app/.env` (or copy `app/ENV_TEMPLATE.txt`). Never commit real secrets.
+Copy `.env.example` to `app/.env`. Never commit the real file.
 
 | Variable | Purpose |
-|----------|---------|
-| `SECRET_KEY` | Flask session signing — set a long random value in production |
-| `DATABASE_PATH` | Optional absolute path to SQLite file; blank = local app data dir |
-| `TVW_LOCAL_DATA_DIR` | Optional parent directory for the DB |
-| `TVW_ENABLE_LAB_MODULES` | `1` Lab on, `0` Workshop-only |
-| `FLASK_USE_RELOADER` | Prefer `0` to avoid duplicate SQLite connections |
-| `TVW_OLD_GOAT_PASSWORD` | Optional first-boot Old Goat password override |
-| `PYTHONUTF8` | Prefer `1` on Windows consoles |
+|---|---|
+| `SECRET_KEY` | Flask session signing key. Use a long random value in production. |
+| `DATABASE_PATH` | Absolute path to the SQLite database. |
+| `TVW_LOCAL_DATA_DIR` | Optional parent directory for local database storage. |
+| `TVW_ENABLE_LAB_MODULES` | `1` enables Lab modules; `0` runs Workshop-only. |
+| `FLASK_USE_RELOADER` | Prefer `0` when using SQLite. |
+| `TVW_OLD_GOAT_PASSWORD` | Optional first-boot account password override. |
+| `PYTHONUTF8` | Enables UTF-8 mode where needed. |
 
-See `app/LAUNCH_QA_ENV.txt` for QA / TVW-only modes.
+## Database and privacy
 
-## Database & migrations
+SQLite is the datastore. Startup migrations are designed to create/update the schema when required.
 
-- SQLite is the datastore.
-- On startup, `migrations.py` runs idempotent `CREATE TABLE IF NOT EXISTS` / column adds.
-- Fresh installs also apply `schema.sql` when needed, then migrations.
-- **Never commit** `*.db`, WAL/SHM sidecars, or `instance/` DB copies.
+The live database is intentionally excluded from Git because it may contain user accounts, password hashes, recipes, Production Jobs, costing records, purchases and other operational data.
 
-## Scrapers
+The following must never be committed:
 
-Lab scrapers (BLCK Shopify `products.json`, Clyrolinx, VC flavours, etc.) use:
+- `*.db`, `*.sqlite*` and SQLite WAL/SHM sidecars
+- `.env` and real credentials
+- private keys/certificates
+- local backups and release archives containing data
 
-- `requests`
-- `beautifulsoup4`
+See [Database Handoff & Backup Guide](docs/DATABASE_HANDOFF.md).
 
-Declared in `app/requirements.txt`. Scrapers write into the local DB; temporary HTML/cache must stay out of git (see `.gitignore`).
+## Production deployment
 
-BLCK variant pricing feeds canonical VG/PG/nicotine costing — prices come from scrape, not hard-coded Rands.
+The intended first production deployment uses:
 
-## Production Jobs (Lab)
+- Ubuntu
+- one Gunicorn worker
+- Nginx as a reverse proxy
+- SQLite stored outside the Git working tree
+- a production `SECRET_KEY`
+- HTTPS
 
-Named manufacturing projects (e.g. Trinidad, Poison Rally):
+Start with one Gunicorn worker because the current application uses SQLite and Lab scheduling logic in the application process.
 
-- Job recipe requirements with **locked** recipe versions
-- **Mix for this job** → Guided Mix with explicit job linkage
-- Operator = logged-in user (no separate identity selector)
-- Job inventory (separate from personal stash)
-- Production pay credits + payment ledger
-- Job costs / profitability tab
+See:
 
-Entry: `/lab/production-jobs` (requires Lab modules + production-jobs capability/role).
-
-Helper accounts (e.g. Riku) use `user_capabilities` such as `lab.production_jobs.view` / `lab.production_jobs.produce` without Master Admin access.
-
-
-## Pauly / server handover
-
-Practical handover docs:
-
-- [Pauly deployment & server guide](docs/PAULY_DEPLOYMENT_GUIDE.md)
-- [Calculator user guide](docs/CALCULATOR_USER_GUIDE.md)
+- [Server deployment guide](docs/PAULY_DEPLOYMENT_GUIDE.md)
 - [Database handoff & backup guide](docs/DATABASE_HANDOFF.md)
+- [Calculator user guide](docs/CALCULATOR_USER_GUIDE.md)
+- [Detailed Ubuntu notes](app/README_UBUNTU_SERVER_DEPLOY.txt)
 
-**Important:** the live SQLite database is deliberately **not stored in GitHub**. Git contains the application code, schema and migrations. If the deployed website must include Wynand's existing recipes, users, Production Jobs, scraper/pricing history and other live records, the confirmed active SQLite database must be transferred to the server separately and securely. Never commit the live DB to this repository.
+## Scrapers and costing
 
-## Deployment notes
+The Lab contains scraper integrations for supplier/reference pricing and flavour data. Scraper results are written to SQLite and are therefore not part of the repository.
 
-1. Set `SECRET_KEY` in the environment (do not rely on the development fallback in code).
-2. Set `TVW_ENABLE_LAB_MODULES` appropriately for the host.
-3. Point `DATABASE_PATH` / `TVW_LOCAL_DATA_DIR` at a durable location outside OneDrive if possible.
-4. Install deps from `app/requirements.txt` into a venv.
-5. Prefer the documented start scripts or `python app.py` from the `app/` directory.
-6. Ubuntu notes: `app/README_UBUNTU_SERVER_DEPLOY.txt`.
-7. Release ZIP packaging is local-only (`release/` is gitignored).
+Supplier prices used by costing logic should come from stored/scraped data rather than hard-coded live prices.
 
-## Development docs
+## Contributing
 
-- `CURSOR_RULES.md`, `PROJECT_VISION.md`, `PRODUCT_ROADMAP.md`, `DESIGN_LANGUAGE.md`
-- Guided Mix: `app/docs/` (bench rules, QA notes)
+Bug fixes, improvements, documentation and sensible feature additions are welcome.
+
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes.
+
+## Security
+
+Do not post real passwords, session cookies, API keys, `.env` contents or production database files in issues, pull requests or screenshots.
+
+If you discover a security issue, contact the repository owner privately rather than publishing exploit details in an issue.
+
+## License
+
+This project is released under the [MIT License](LICENSE).
