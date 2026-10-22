@@ -104,9 +104,12 @@ TVW_ENABLE_LAB_MODULES=1
 FLASK_ENV=production
 FLASK_USE_RELOADER=0
 PYTHONUTF8=1
+# For a brand-new database, set at least one initial login password:
+TVW_ADMIN_PASSWORD=<strong-initial-password>
+# TVW_OLD_GOAT_PASSWORD=<optional-owner-password>
 ```
 
-Never commit the real `.env`.
+Never commit the real `.env`. Bootstrap passwords are read only from environment configuration; the application does not ship with public default passwords.
 
 Create the database directory:
 
