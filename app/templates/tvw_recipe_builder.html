@@ -107,7 +107,7 @@
           {% if form_errors.get('flavours') %}<div class="tvw-rb-field-error mb-2">{{ form_errors.flavours }}</div>{% endif %}
           <div class="tvw-rb-flavour-table-head" aria-hidden="true">
             <span>Flavour</span>
-            <span>Brand</span>
+            <span>Brand / carrier</span>
             <span>%</span>
             <span>ml</span>
             <span>g</span>
@@ -128,7 +128,7 @@
             <input id="calcTargetMl" type="number" min="1" step="1" class="tvw-rb-input" value="{{ fv.get('calc_target_ml', '60') }}">
           </div>
           <div class="col-6">
-            <label class="tvw-rb-label" for="calcTargetNic">Nicotine (mg/ml)</label>
+            <label class="tvw-rb-label" for="calcTargetNic">Target nicotine strength (mg/ml)</label>
             <input id="calcTargetNic" type="number" min="0" step="0.1" class="tvw-rb-input" value="{{ fv.get('calc_target_nic', '3') }}">
           </div>
           <div class="col-6">
@@ -162,12 +162,20 @@
             <span class="tvw-rb-stat-value" id="summaryFlvMl">0.00</span>
           </div>
           <div class="tvw-rb-stat">
-            <span class="tvw-rb-stat-label">Remaining PG</span>
+            <span class="tvw-rb-stat-label">Standalone PG</span>
             <span class="tvw-rb-stat-value" id="summaryPgMl">0.00 ml</span>
           </div>
           <div class="tvw-rb-stat">
-            <span class="tvw-rb-stat-label">Remaining VG</span>
+            <span class="tvw-rb-stat-label">Standalone VG</span>
             <span class="tvw-rb-stat-value" id="summaryVgMl">0.00 ml</span>
+          </div>
+          <div class="tvw-rb-stat tvw-rb-span-2" style="grid-column:1/-1;">
+            <span class="tvw-rb-stat-label">Estimated final PG/VG</span>
+            <span class="tvw-rb-stat-value" id="summaryFinalRatio">—</span>
+          </div>
+          <div class="tvw-rb-stat tvw-rb-span-2 d-none" style="grid-column:1/-1;" id="summaryCarrierNoteWrap">
+            <span class="tvw-rb-stat-label">Carrier note</span>
+            <span class="tvw-rb-stat-value small" id="summaryCarrierNote">—</span>
           </div>
           <div class="tvw-rb-stat tvw-rb-span-2" style="grid-column:1/-1;">
             <span class="tvw-rb-stat-label">Total batch</span>
@@ -219,7 +227,10 @@
       <input type="hidden" name="ingredient_name[]" class="ingredient-name" value="">
       <input type="hidden" name="ingredient_brand[]" class="ingredient-brand" value="">
     </div>
-    <div class="tvw-rb-brand-badge row-brand">—</div>
+    <div>
+      <div class="tvw-rb-brand-badge row-brand">—</div>
+      <div class="small text-secondary row-carrier mt-1">—</div>
+    </div>
     <div class="tvw-rb-col-num tvw-rb-pct-col">
       <input name="ingredient_percent[]" type="number" min="0" step="0.01" class="tvw-rb-input ingredient-pct" placeholder="0.00" inputmode="decimal">
     </div>

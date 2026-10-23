@@ -188,6 +188,7 @@
           <tr>
             <th scope="col">Flavour</th>
             <th scope="col">Brand</th>
+            <th scope="col">Carrier</th>
             <th scope="col" class="text-end">%</th>
           </tr>
         </thead>
@@ -206,6 +207,14 @@
               {% set row_class = 'is-low' %}
             {% elif item.get('is_imported_identity_row') and not item.get('is_matched_identity') %}
               {% set row_class = 'is-missing' %}
+            {% endif %}
+            {% set raw_carrier = (item.get('carrier') or item.get('base_carrier') or '')|string|trim|upper %}
+            {% if raw_carrier == 'VG' %}
+              {% set carrier_label = 'VG' %}
+            {% elif raw_carrier == 'PG' %}
+              {% set carrier_label = 'PG' %}
+            {% else %}
+              {% set carrier_label = 'PG (assumed)' %}
             {% endif %}
             <tr class="{{ row_class }}">
               <td>
@@ -229,10 +238,11 @@
                   <span class="text-secondary">—</span>
                 {% endif %}
               </td>
+              <td><span class="text-secondary small">{{ carrier_label }}</span></td>
               <td class="text-end">{{ "%.2f"|format(item.amount_percent|float) }}%</td>
             </tr>
           {% else %}
-            <tr><td colspan="3" class="text-secondary py-3">No ingredients in this version.</td></tr>
+            <tr><td colspan="4" class="text-secondary py-3">No ingredients in this version.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -283,7 +293,7 @@
             {% if mix_errors.get('target_ml') %}<div class="invalid-feedback d-block">{{ mix_errors.target_ml }}</div>{% endif %}
           </div>
           <div class="tvw-rd-mix-field">
-            <label for="target_nic">Nicotine strength</label>
+            <label for="target_nic">Target nicotine strength (mg/ml)</label>
             <input id="target_nic" name="target_nic_mg_ml" type="number" min="0" step="0.1" class="form-control{% if mix_errors.get('target_nic_mg_ml') %} is-invalid{% endif %}" value="{{ mix_nic }}">
             {% if mix_errors.get('target_nic_mg_ml') %}<div class="invalid-feedback d-block">{{ mix_errors.target_nic_mg_ml }}</div>{% endif %}
           </div>

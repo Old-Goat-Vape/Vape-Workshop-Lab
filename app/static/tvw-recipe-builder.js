@@ -254,15 +254,18 @@
     for (const r of rows) {
       const mlEl = r.row.querySelector(".row-out-ml");
       const gEl = r.row.querySelector(".row-out-g");
+      const carrierEl = r.row.querySelector(".row-carrier");
       const valid = r.ingredient_id > 0 && r.percent > 0;
       if (!valid) {
         mlEl.textContent = "0.00";
         gEl.textContent = "0.00";
+        if (carrierEl) carrierEl.textContent = "—";
         continue;
       }
       const li = lineItems[idx++];
       mlEl.textContent = fmt(li?.ml);
       gEl.textContent = fmt(li?.grams);
+      if (carrierEl) carrierEl.textContent = li?.carrier_label || "PG (assumed)";
     }
   };
 
@@ -312,11 +315,34 @@
 
   const setTotals = (res) => {
     const t = res?.totals || {};
+    const finished = res?.finished_composition || {};
     document.getElementById("summaryTotalPct").textContent = `${fmt(t.total_flavor_percent)}%`;
     document.getElementById("summaryFlvMl").textContent = fmt(t.flavor_ml);
     document.getElementById("summaryPgMl").textContent = `${fmt(t.pg_ml)} ml`;
     document.getElementById("summaryVgMl").textContent = `${fmt(t.vg_ml)} ml`;
     document.getElementById("summaryTotalMl").textContent = `${fmt(t.total_mix_ml)} ml`;
+    const finalEl = document.getElementById("summaryFinalRatio");
+    if (finalEl) {
+      const label = t.final_ratio_label || finished.final_ratio_label;
+      if (label) {
+        const warn = t.ratio_achievable === false || finished.ratio_achievable === false;
+        finalEl.textContent = warn ? `${label} (target not reachable)` : label;
+      } else {
+        finalEl.textContent = "—";
+      }
+    }
+    const noteWrap = document.getElementById("summaryCarrierNoteWrap");
+    const noteEl = document.getElementById("summaryCarrierNote");
+    const diag = res?.carrier_diagnostics || {};
+    if (noteWrap && noteEl) {
+      if (diag.note) {
+        noteEl.textContent = diag.note;
+        noteWrap.classList.remove("d-none");
+      } else {
+        noteEl.textContent = "—";
+        noteWrap.classList.add("d-none");
+      }
+    }
     setCompositionBar(res?.composition_pct || {});
   };
 

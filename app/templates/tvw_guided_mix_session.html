@@ -1976,6 +1976,10 @@
 
     const estRatio = escHtml(summary.estimated_final_ratio_label || `${Number(summary.estimated_final_pg_percent)}/${Number(summary.estimated_final_vg_percent)}`);
 
+    const targetNic = Number(summary.target_nic_mg_ml != null ? summary.target_nic_mg_ml : (sess.target_nic || sessionMeta.targetNic || 0));
+
+    const flavourPct = summary.total_flavor_percent != null ? Number(summary.total_flavor_percent).toFixed(1) : null;
+
     const status = escHtml(summary.completion_status || "Complete");
 
     const parts = [];
@@ -1984,11 +1988,11 @@
 
       <header class="tvw-ws-report-header">
 
-        <p class="tvw-ws-report-kicker">Batch complete</p>
+        <p class="tvw-ws-report-kicker">Finished batch</p>
 
         <h2 class="tvw-ws-report-title">${recipeName}</h2>
 
-        <p class="tvw-ws-report-meta">${batchMl.toFixed(0)} ml batch · Target ${targetRatio} PG/VG</p>
+        <p class="tvw-ws-report-meta">${batchMl.toFixed(0)} ml batch</p>
 
       </header>
 
@@ -1996,9 +2000,15 @@
 
         <dl class="tvw-ws-report-stats">
 
-          <div><dt>Estimated final volume</dt><dd>${estVol} ml</dd></div>
+          <div><dt>Target nicotine</dt><dd>${targetNic.toFixed(1)} mg/ml</dd></div>
 
-          <div><dt>Estimated final ratio</dt><dd>${estRatio} PG/VG</dd></div>
+          <div><dt>Target PG/VG</dt><dd>${targetRatio}</dd></div>
+
+          <div><dt>Estimated final PG/VG</dt><dd>${estRatio}</dd></div>
+
+          ${flavourPct != null ? `<div><dt>Total flavour</dt><dd>${flavourPct}%</dd></div>` : ""}
+
+          <div><dt>Final volume</dt><dd>${estVol} ml</dd></div>
 
           <div><dt>Status</dt><dd>${status}</dd></div>
 
@@ -2008,9 +2018,9 @@
 
     `);
 
-    if (summary.ratio_shift_explanation) {
+    if (summary.ratio_warning || summary.ratio_shift_explanation) {
 
-      parts.push(`<p class="tvw-ws-report-note">${escHtml(summary.ratio_shift_explanation)}</p>`);
+      parts.push(`<p class="tvw-ws-report-note">${escHtml(summary.ratio_warning || summary.ratio_shift_explanation)}</p>`);
 
     }
 

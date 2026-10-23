@@ -16,6 +16,7 @@ from utils.guided_mix_perf import (
     log_guided_mix_stage,
 )
 from core.calculator import (
+    ZERO_POUR_GRAMS_EPS,
     build_live_coach_summary,
     build_preemptive_coaching_for_step,
     build_runtime_narrative_step,
@@ -228,6 +229,9 @@ def _classify_under_pour(*, display_target: float, measured: float) -> tuple[str
 
     Message format: \"title\\nbody\" so the bench UI can render a two-line note.
     """
+    # Zero-requirement pours must never prompt underpour confirmation.
+    if float(display_target) <= ZERO_POUR_GRAMS_EPS:
+        return "within_tolerance", ""
     under_by = float(display_target) - float(measured)
     if under_by <= 0.0005:
         return "within_tolerance", ""
@@ -412,6 +416,8 @@ def _log_nicotine_over_decision(
 
 def _classify_nicotine_under_pour(*, display_target: float, measured: float) -> tuple[str, str]:
     """Nicotine under-pour copy stresses final strength impact."""
+    if float(display_target) <= ZERO_POUR_GRAMS_EPS:
+        return "within_tolerance", ""
     under_by = float(display_target) - float(measured)
     if under_by <= 0.0005:
         return "within_tolerance", ""
@@ -441,6 +447,8 @@ def _classify_under_pour_for_step(
     batch_size_ml: float = 0.0,
     policy=None,
 ) -> tuple[str, str]:
+    if float(display_target) <= ZERO_POUR_GRAMS_EPS:
+        return "within_tolerance", ""
     if _is_nicotine_payload(payload):
         return _classify_nicotine_under_pour(display_target=display_target, measured=measured)
     if policy is None:
@@ -670,14 +678,34 @@ def _append_mix_event_log(db, session_id: int, entry: dict[str, Any]) -> None:
     _write_session_meta(db, int(session_id), meta)
 
 
+def _pour_carrier_for_ratio(payload: dict[str, Any], *, default_nic_carrier: str = "PG") -> str | None:
+    """Return PG/VG carrier for a completed pour, or None if not a carrier contribution."""
+    cat = str(payload.get("category") or "").strip().lower()
+    explicit = str(payload.get("carrier") or "").strip().upper()
+    if explicit in {"PG", "VG"}:
+        return explicit
+    if cat == "pg" or _is_pg_payload(payload):
+        return "PG"
+    if cat == "vg" or _is_vg_payload(payload):
+        return "VG"
+    if cat == "nicotine" or _is_nicotine_payload(payload):
+        nic = str(default_nic_carrier or "PG").strip().upper()
+        return "VG" if nic == "VG" else "PG"
+    if cat in {"concentrate", "flavor", "flavour"}:
+        # Legacy steps without carrier: PG-based concentrates (industry default).
+        return "PG"
+    return None
+
+
 def _estimate_final_ratio_from_steps(
   db,
   session_id: int,
   *,
   target_pg_percent: float,
   target_vg_percent: float,
+  nicotine_carrier: str = "PG",
 ) -> tuple[float, float]:
-    """Rough PG/VG ratio estimate from completed pour targets (ml)."""
+    """Finished-liquid PG/VG estimate from completed pours (bases + flavour + nicotine carriers)."""
     rows = db.execute(
         """
         SELECT payload_json
@@ -702,9 +730,10 @@ def _estimate_final_ratio_from_steps(
                 ml = float(payload["measured_grams"]) / float(payload["density"])
         except (TypeError, ValueError):
             ml = 0.0
-        if _is_pg_payload(payload):
+        carrier = _pour_carrier_for_ratio(payload, default_nic_carrier=nicotine_carrier)
+        if carrier == "PG":
             pg_ml += ml
-        elif _is_vg_payload(payload):
+        elif carrier == "VG":
             vg_ml += ml
     total = pg_ml + vg_ml
     if total <= 0:
@@ -931,8 +960,13 @@ def _build_guided_mix_summary(
         if row["label"] not in seen_nicotine_labels:
             nicotine_events.append(row)
             seen_nicotine_labels.add(row["label"])
+    nic_carrier = str(meta.get("nicotine_carrier") or "PG")
     est_pg, est_vg = _estimate_final_ratio_from_steps(
-        db, int(session_id), target_pg_percent=pg_pct, target_vg_percent=vg_pct
+        db,
+        int(session_id),
+        target_pg_percent=pg_pct,
+        target_vg_percent=vg_pct,
+        nicotine_carrier=nic_carrier,
     )
     poured_ml = 0.0
     rows = db.execute(
@@ -958,22 +992,59 @@ def _build_guided_mix_summary(
     flavour_over_count = sum(1 for d in accepted_deviations if d.get("kind") == "flavour_over")
     has_adjustments = bool(pg_adjustments or accepted_deviations or nicotine_events)
     user_notes, user_notes_updated_at = _user_notes_from_meta(meta)
+    planned = meta.get("planned_composition") if isinstance(meta.get("planned_composition"), dict) else {}
+    ratio_achievable = bool(planned.get("ratio_achievable", True))
+    ratio_warning = str(planned.get("ratio_warning") or "").strip()
+    # Prefer poured estimate; fall back to planned finished composition when pours incomplete.
+    if poured_ml <= 0 and planned:
+        try:
+            est_pg = round(float(planned.get("final_pg_percent")))
+            est_vg = round(float(planned.get("final_vg_percent")))
+        except (TypeError, ValueError):
+            pass
     ratio_shift_explanation = None
-    if _ratio_shift_is_meaningful(pg_pct, vg_pct, est_pg, est_vg):
+    if not ratio_achievable and ratio_warning:
+        ratio_shift_explanation = ratio_warning
+    elif _ratio_shift_is_meaningful(pg_pct, vg_pct, est_pg, est_vg):
         ratio_shift_explanation = _ratio_shift_explanation(
             pg_adjustments=pg_adjustments,
             accepted_deviations=accepted_deviations,
         )
+    target_nic = 0.0
+    if session_row is not None and "target_nic" in session_row.keys():
+        try:
+            target_nic = float(session_row["target_nic"] or 0.0)
+        except (TypeError, ValueError):
+            target_nic = 0.0
+    elif meta.get("target_nic_mg_ml") is not None:
+        try:
+            target_nic = float(meta.get("target_nic_mg_ml") or 0.0)
+        except (TypeError, ValueError):
+            target_nic = 0.0
+    total_flavour_pct = planned.get("total_flavor_percent")
+    try:
+        total_flavour_pct = float(total_flavour_pct) if total_flavour_pct is not None else None
+    except (TypeError, ValueError):
+        total_flavour_pct = None
     summary = {
         "recipe_name": str(recipe_name or "").strip() or None,
+        "summary_title": "Finished batch",
         "batch_size_ml": batch_size_ml,
+        "target_nic_mg_ml": round(target_nic, 4),
+        "total_flavor_percent": total_flavour_pct,
         "target_pg_percent": pg_pct,
         "target_vg_percent": vg_pct,
         "target_ratio_label": f"{int(round(pg_pct))}/{int(round(vg_pct))}",
-        "estimated_final_volume_ml": round(poured_ml, 2),
+        "estimated_final_volume_ml": round(poured_ml if poured_ml > 0 else batch_size_ml, 2),
         "estimated_final_pg_percent": est_pg,
         "estimated_final_vg_percent": est_vg,
         "estimated_final_ratio_label": f"{int(est_pg)}/{int(est_vg)}",
+        "ratio_achievable": ratio_achievable,
+        "ratio_warning": ratio_warning or None,
+        "standalone_pg_ml": planned.get("standalone_pg_ml"),
+        "standalone_vg_ml": planned.get("standalone_vg_ml"),
+        "standalone_pg_g": planned.get("standalone_pg_g"),
+        "standalone_vg_g": planned.get("standalone_vg_g"),
         "completion_status": _completion_status_label(
             performance_summary=performance_summary,
             has_adjustments=has_adjustments,
@@ -1066,8 +1137,13 @@ def _adjust_pg_for_flavour_deviation(
         payload["base_adjusted_for_overpour"] = True
         payload["base_adjusted_cut_ml"] = round(cut_ml, 4)
         payload["pg_adjusted"] = True
+        meta_for_carrier = _read_session_meta(db, int(session_id))
         est_pg, est_vg = _estimate_final_ratio_from_steps(
-            db, int(session_id), target_pg_percent=target_pg_percent, target_vg_percent=target_vg_percent
+            db,
+            int(session_id),
+            target_pg_percent=target_pg_percent,
+            target_vg_percent=target_vg_percent,
+            nicotine_carrier=str(meta_for_carrier.get("nicotine_carrier") or "PG"),
         )
         payload["pg_adjustment_note"] = (
             "PG adjusted to protect final batch volume and ratio.\n"
@@ -1676,6 +1752,16 @@ def create_guided_mix_session(
                 vg_ratio=float(vg_ratio),
                 nicotine_carrier=str(nicotine_carrier or "PG"),
             )
+            planned_composition = tvw_mix_service.planned_finished_composition_for_recipe_version(
+                recipe_id=recipe_id,
+                version_id=resolved_version_id,
+                target_ml=float(target_ml),
+                target_nic_mg_ml=float(target_nic_mg_ml),
+                nic_base_mg_ml=float(nic_base_mg_ml),
+                pg_ratio=float(pg_ratio),
+                vg_ratio=float(vg_ratio),
+                nicotine_carrier=str(nicotine_carrier or "PG"),
+            )
         span["step_count"] = len(steps)
 
         # Minimal meta only — no steps[], no mix_summary, no raw_event_log.
@@ -1684,10 +1770,12 @@ def create_guided_mix_session(
             "tone_profile": "tvw",
             "nicotine_carrier": str(nicotine_carrier or "PG"),
             "nic_base_mg_ml": float(nic_base_mg_ml),
+            "target_nic_mg_ml": float(target_nic_mg_ml),
             "vessel_size_ml": float(target_ml),
             "batch_size_ml": float(target_ml),
             "target_pg_percent": float(pg_ratio),
             "target_vg_percent": float(vg_ratio),
+            "planned_composition": planned_composition,
             "performance": _default_performance_summary(),
             "nicotine_strictness_mode": normalize_nicotine_strictness(nicotine_strictness_mode),
             "mix_event_log": [],
@@ -2851,7 +2939,7 @@ def complete_guided_step_with_policy(
             "target_vg_percent": float(target_vg_percent),
             "classification": "within_tolerance",
         }
-        if target <= 0:
+        if target < 0:
             return {
                 "ok": False,
                 "message": "Invalid target grams for this guided step.",
@@ -2861,9 +2949,51 @@ def complete_guided_step_with_policy(
                     "allowed": False,
                     "decision": "invalid_target",
                     "warnings": [],
-                    "hard_stops": ["Target grams must be greater than zero for ingredient steps."],
+                    "hard_stops": ["Target grams cannot be negative for ingredient steps."],
                 },
                 "reading": reading_eval,
+            }
+
+        # Zero / near-zero required amount: auto-satisfy — never prompt underpour.
+        if display_target <= ZERO_POUR_GRAMS_EPS or target <= ZERO_POUR_GRAMS_EPS:
+            reading_eval["classification"] = "within_tolerance"
+            reading_eval["measured_grams"] = float(measured)
+            reading_eval["display_measured_grams"] = float(display_measured)
+            if step_payload is not None:
+                step_payload["measured_grams"] = float(measured)
+                step_payload["target_grams"] = float(target)
+                step_payload["display_target_grams"] = float(display_target)
+                step_payload["delta_grams"] = float(delta)
+                step_payload.pop("under_decision_pending", None)
+                step_payload.pop("under_pour_mode", None)
+                step_payload.pop("under_classification", None)
+                dens = _density_from_step_payload(step_payload)
+                if dens and dens > 0:
+                    step_payload["density"] = float(dens)
+                    step_payload["measured_ml"] = float(measured) / dens
+                    step_payload["actual_ml"] = float(measured) / dens
+                db.execute(
+                    """
+                    UPDATE mix_session_steps
+                    SET payload_json = ?, completed_at = datetime('now')
+                    WHERE id = ? AND mix_session_id = ?
+                    """,
+                    (json.dumps(step_payload), int(target_step_id), int(session_id)),
+                )
+                db.commit()
+            return {
+                "ok": True,
+                "message": "Zero-requirement step satisfied.",
+                "inserted_step_nos": inserted_step_nos,
+                "performance_summary": _session_performance_summary(db, int(session_id)),
+                "reading": reading_eval,
+                "policy": {
+                    "name": policy.name,
+                    "allowed": True,
+                    "decision": "within_tolerance",
+                    "warnings": [],
+                    "hard_stops": [],
+                },
             }
 
         if (

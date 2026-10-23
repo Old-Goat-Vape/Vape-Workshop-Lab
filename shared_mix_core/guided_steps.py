@@ -61,6 +61,8 @@ def build_guided_assistant_steps(
                 "ml": float(b.get("ml") or 0.0),
                 "pct": b.get("percent"),
                 "flavor_profile": b.get("flavor_profile"),
+                "carrier": b.get("carrier"),
+                "density": b.get("density"),
             }
         )
     ingredients.sort(key=_guided_pour_order_key)

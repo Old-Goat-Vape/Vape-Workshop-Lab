@@ -260,9 +260,14 @@ def build_guided_narrative_steps(
             target_ml = float(ing.get("ml") or ing.get("target_ml") or 0.0)
         except (TypeError, ValueError):
             target_ml = 0.0
+        # Skip zero-requirement pours — never ask the operator to confirm underpour of 0 g.
+        if grams <= 0.02 and target_ml < 0.008:
+            continue
         pct = ing.get("pct")
         pct_f = float(pct) if pct is not None else 0.0
         profile = str(ing.get("flavor_profile") or ing.get("flavour_profile") or "")
+        carrier = str(ing.get("carrier") or "").strip().upper() or None
+        density = ing.get("density")
         role = infer_ingredient_role(
             ingredient_name=name,
             ingredient_percent=pct,
@@ -432,6 +437,8 @@ def build_guided_narrative_steps(
             ingredient_role=role,
             ingredient_family=family,
             flavor_profile=profile or None,
+            carrier=carrier,
+            density=(round(float(density), 4) if density is not None else None),
         )
 
         push(

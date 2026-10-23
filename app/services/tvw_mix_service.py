@@ -6,11 +6,64 @@ from core.calculator import (
     build_guided_assistant_steps,
     compute_mix_with_policy,
     compute_mix_step_breakdown_with_policy,
+    format_carrier_display,
+    resolve_carrier,
     tvw_mix_policy,
 )
 from models import recipes_repo
 
 _TVW_POLICY = tvw_mix_policy()
+
+
+def _raw_carrier_from_row(row) -> str:
+    """Keep explicit PG/VG only; blank/unknown stays blank for assumed-default resolution."""
+    if not isinstance(row, dict):
+        return ""
+    text = str(row.get("carrier") or row.get("base_carrier") or "").strip().upper()
+    return text if text in {"PG", "VG"} else ""
+
+
+def _flavor_from_row(row) -> FlavorInput:
+    name = row.get("name") if isinstance(row, dict) else row["name"]
+    percent = row.get("amount_percent") if isinstance(row, dict) else row["amount_percent"]
+    density = row.get("density", 1.036) if isinstance(row, dict) else row["density"]
+    brand = str(row.get("brand") or "") if isinstance(row, dict) else ""
+    dens = float(density or 1.036)
+    return FlavorInput(
+        name=str(name),
+        percent=float(percent or 0.0),
+        density=dens,
+        brand=brand,
+        carrier=_raw_carrier_from_row(row),
+    )
+
+
+def _finished_composition_dict(result) -> dict:
+    return {
+        "final_pg_ml": float(result.final_pg_ml),
+        "final_vg_ml": float(result.final_vg_ml),
+        "final_pg_percent": float(result.final_pg_percent),
+        "final_vg_percent": float(result.final_vg_percent),
+        "target_pg_percent": float(result.target_pg_percent),
+        "target_vg_percent": float(result.target_vg_percent),
+        "flavor_pg_ml": float(result.flavor_pg_ml),
+        "flavor_vg_ml": float(result.flavor_vg_ml),
+        "nicotine_pg_ml": float(result.nicotine_pg_ml),
+        "nicotine_vg_ml": float(result.nicotine_vg_ml),
+        "standalone_pg_ml": float(result.pg_ml),
+        "standalone_vg_ml": float(result.vg_ml),
+        "standalone_pg_g": float(result.pg_g),
+        "standalone_vg_g": float(result.vg_g),
+        "total_flavor_percent": float(result.total_flavor_percent),
+        "ratio_achievable": bool(result.ratio_achievable),
+        "ratio_warning": str(result.ratio_warning or ""),
+        "final_ratio_label": (
+            f"{int(round(result.final_pg_percent))}/{int(round(result.final_vg_percent))}"
+        ),
+        "target_ratio_label": (
+            f"{int(round(result.target_pg_percent))}/{int(round(result.target_vg_percent))}"
+        ),
+    }
 
 
 def build_mix_input_from_recipe_version(
@@ -32,19 +85,7 @@ def build_mix_input_from_recipe_version(
     if not formula_rows:
         raise ValueError("Recipe version has no ingredients.")
 
-    flavors = []
-    for row in formula_rows:
-        name = row.get("name") if isinstance(row, dict) else row["name"]
-        percent = row.get("amount_percent") if isinstance(row, dict) else row["amount_percent"]
-        density = row.get("density", 1.036) if isinstance(row, dict) else row["density"]
-        flavors.append(
-            FlavorInput(
-                name=str(name),
-                percent=float(percent or 0.0),
-                density=float(density or 1.036),
-                brand=str(row.get("brand") or ""),
-            )
-        )
+    flavors = [_flavor_from_row(row) for row in formula_rows]
 
     # Keep recipe_id arg for future policy checks and audit linking.
     _ = recipe_id
@@ -59,6 +100,16 @@ def build_mix_input_from_recipe_version(
     )
 
 
+def planned_finished_composition_for_recipe_version(**kwargs) -> dict:
+    mix_input = build_mix_input_from_recipe_version(**kwargs)
+    result, _evaluation = compute_mix_with_policy(
+        mix_input,
+        policy=_TVW_POLICY,
+        hard_fail=False,
+    )
+    return _finished_composition_dict(result)
+
+
 def quick_mix_for_recipe_version(**kwargs) -> dict:
     mix_input = build_mix_input_from_recipe_version(**kwargs)
     result, evaluation = compute_mix_with_policy(
@@ -66,6 +117,10 @@ def quick_mix_for_recipe_version(**kwargs) -> dict:
         policy=_TVW_POLICY,
         hard_fail=False,
     )
+    finished = _finished_composition_dict(result)
+    warnings = list(evaluation.warnings)
+    if result.ratio_warning:
+        warnings.append(result.ratio_warning)
     return {
         "totals": {
             "target_ml": mix_input.target_ml,
@@ -73,18 +128,34 @@ def quick_mix_for_recipe_version(**kwargs) -> dict:
             "total_flavor_percent": result.total_flavor_percent,
             "flavor_ml": result.flavor_ml,
             "nicotine_ml": result.nicotine_ml,
+            # Standalone base pours (operator bottle additions).
             "pg_ml": result.pg_ml,
             "vg_ml": result.vg_ml,
+            "standalone_pg_ml": result.pg_ml,
+            "standalone_vg_ml": result.vg_ml,
+            # Finished e-liquid carrier composition.
+            "final_pg_ml": result.final_pg_ml,
+            "final_vg_ml": result.final_vg_ml,
+            "final_pg_percent": result.final_pg_percent,
+            "final_vg_percent": result.final_vg_percent,
+            "target_pg_percent": result.target_pg_percent,
+            "target_vg_percent": result.target_vg_percent,
+            "ratio_achievable": result.ratio_achievable,
+            "final_ratio_label": finished["final_ratio_label"],
+            "target_ratio_label": finished["target_ratio_label"],
         },
         "weights": {
             "flavor_g": result.flavor_g,
             "nicotine_g": result.nicotine_g,
             "pg_g": result.pg_g,
             "vg_g": result.vg_g,
+            "standalone_pg_g": result.pg_g,
+            "standalone_vg_g": result.vg_g,
         },
+        "finished_composition": finished,
         "policy": {
             "name": _TVW_POLICY.name,
-            "warnings": list(evaluation.warnings),
+            "warnings": warnings,
             "hard_stops": list(evaluation.hard_stops),
         },
     }
@@ -127,11 +198,16 @@ def live_mix_for_builder(
         ref = by_id.get(rid)
         if not ref:
             continue
+        dens = float(ref.get("density") or 1.036)
+        raw_carrier = _raw_carrier_from_row(
+            {"carrier": ref.get("carrier") or r.get("carrier") or ""}
+        )
         f = FlavorInput(
             name=str(ref.get("name") or f"Flavor #{rid}"),
             percent=float(pct),
-            density=float(ref.get("density") or 1.036),
+            density=dens,
             brand=str(ref.get("brand") or ""),
+            carrier=raw_carrier,
         )
         flavors.append(f)
     mix_input = MixInput(
@@ -148,8 +224,12 @@ def live_mix_for_builder(
         policy=_TVW_POLICY,
         hard_fail=False,
     )
+    assumed_pg_count = 0
     for f in mix_input.flavors:
         ml_i = float(mix_input.target_ml) * (float(f.percent) / 100.0)
+        carrier, carrier_source = resolve_carrier(f.carrier)
+        if carrier_source == "assumed_default":
+            assumed_pg_count += 1
         line_items.append(
             {
                 "name": f.name,
@@ -157,8 +237,12 @@ def live_mix_for_builder(
                 "percent": round(float(f.percent), 4),
                 "ml": round(float(ml_i), 4),
                 "grams": round(float(ml_i * f.density), 4),
+                "carrier": carrier,
+                "carrier_source": carrier_source,
+                "carrier_label": format_carrier_display(carrier=carrier, source=carrier_source),
             }
         )
+    # Composition bar: flavour / nicotine / standalone bases (pour view).
     composition_ml = {
         "flavor": float(result.flavor_ml),
         "nicotine": float(result.nicotine_ml),
@@ -172,6 +256,10 @@ def live_mix_for_builder(
         composition_pct = {
             k: round((v / total_mix_ml) * 100.0, 3) for k, v in composition_ml.items()
         }
+    finished = _finished_composition_dict(result)
+    warnings = list(evaluation.warnings)
+    if result.ratio_warning:
+        warnings.append(result.ratio_warning)
     return {
         "totals": {
             "target_ml": float(mix_input.target_ml),
@@ -182,6 +270,11 @@ def live_mix_for_builder(
             "pg_ml": float(result.pg_ml),
             "vg_ml": float(result.vg_ml),
             "total_mix_ml": round(total_mix_ml, 4),
+            "final_pg_percent": float(result.final_pg_percent),
+            "final_vg_percent": float(result.final_vg_percent),
+            "ratio_achievable": bool(result.ratio_achievable),
+            "final_ratio_label": finished["final_ratio_label"],
+            "target_ratio_label": finished["target_ratio_label"],
         },
         "weights": {
             "flavor_g": float(result.flavor_g),
@@ -192,10 +285,18 @@ def live_mix_for_builder(
         "line_items": line_items,
         "composition_ml": composition_ml,
         "composition_pct": composition_pct,
+        "finished_composition": finished,
+        "carrier_diagnostics": {
+            "assumed_pg_flavour_count": assumed_pg_count,
+            "note": (
+                f"{assumed_pg_count} flavour(s) use PG (assumed) — carrier not set on the concentrate."
+                if assumed_pg_count
+                else None
+            ),
+        },
         "policy": {
             "name": _TVW_POLICY.name,
-            "warnings": list(evaluation.warnings),
+            "warnings": warnings,
             "hard_stops": list(evaluation.hard_stops),
         },
     }
-
