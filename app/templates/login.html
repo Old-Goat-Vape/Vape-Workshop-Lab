@@ -25,10 +25,21 @@
                         <input type="password" id="password" name="password" class="form-control form-control-lg bg-black border-secondary" placeholder="••••••••" required autocomplete="current-password">
                     </div>
 
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" value="1" id="remember_me" name="remember_me">
+                        <label class="form-check-label small text-secondary" for="remember_me">
+                            Keep me signed in
+                        </label>
+                    </div>
+
                     <button type="submit" class="btn btn-warning btn-lg fw-bold text-uppercase og-btn-primary">Initialize Access</button>
                 </form>
 
-                <p class="text-center mt-4 mb-0 small text-secondary">
+                <p class="text-center mt-3 mb-0 small">
+                    <a href="{{ url_for('auth.forgot_password') }}" class="link-warning text-decoration-none">Forgot password?</a>
+                </p>
+
+                <p class="text-center mt-3 mb-0 small text-secondary">
                     New here?
                     <a href="{{ url_for('auth.signup') }}" class="link-warning text-decoration-none fw-semibold">Create an account</a>
                 </p>
@@ -41,6 +52,7 @@
                                 {% if category in ['danger','error'] %}{% set bs = 'danger' %}{% endif %}
                                 {% if category in ['warning'] %}{% set bs = 'warning' %}{% endif %}
                                 {% if category in ['success'] %}{% set bs = 'success' %}{% endif %}
+                                {% if category in ['info'] %}{% set bs = 'info' %}{% endif %}
                                 <div class="alert alert-{{ bs }} mb-2 py-2" role="alert">{{ message }}</div>
                             {% endfor %}
                         </div>

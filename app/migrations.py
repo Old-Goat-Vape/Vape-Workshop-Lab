@@ -690,6 +690,8 @@ def run_startup_migrations() -> dict:
         ("users", "is_banned", "INTEGER DEFAULT 0"),
         ("users", "is_muted", "INTEGER DEFAULT 0"),
         ("users", "moderation_note", "TEXT"),
+        ("users", "must_change_password", "INTEGER DEFAULT 0"),
+        ("users", "password_changed_at", "DATETIME"),
         # recipe moderation
         ("recipes", "is_hidden", "INTEGER DEFAULT 0"),
         ("recipes", "moderation_status", "TEXT DEFAULT 'active'"),
@@ -1180,6 +1182,19 @@ def run_startup_migrations() -> dict:
             added.append("riku_production_jobs_produce")
     except Exception:
         pass
+
+    # Recipe version mix defaults (batch / nicotine / base) persisted from builder.
+    for table, column, sql in (
+        ("recipe_versions", "default_batch_ml", "REAL"),
+        ("recipe_versions", "default_nic_mg_ml", "REAL"),
+        ("recipe_versions", "default_nic_base_mg_ml", "REAL"),
+        ("recipe_versions", "default_nicotine_carrier", "TEXT"),
+    ):
+        try:
+            if _add_column_if_missing(table, column, sql):
+                added.append(f"{table}.{column}")
+        except Exception:
+            pass
 
     db.commit()
     return {"added_columns": added, "count": len(added)}

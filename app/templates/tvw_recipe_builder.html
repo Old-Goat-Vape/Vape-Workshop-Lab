@@ -259,6 +259,7 @@
       {% endif %}
     ],
     savedRatio: {{ ratio_val|tojson }},
+    formValues: {{ fv|tojson }},
     hasErrors: {{ (form_errors|length > 0)|tojson }}
   };
 </script>

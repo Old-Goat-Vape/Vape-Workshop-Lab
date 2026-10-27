@@ -199,14 +199,43 @@
     });
   };
 
+  let pgVgSyncing = false;
+  const clampPct = (n) => Math.max(0, Math.min(100, Number.isFinite(n) ? n : 0));
+
   const setRatioFromCalcInputs = () => {
-    const pg = Math.max(0, num(document.getElementById("calcPgRatio").value, 30));
-    const vg = Math.max(0, num(document.getElementById("calcVgRatio").value, 70));
-    const sum = pg + vg;
-    const pgNorm = sum > 0 ? Math.round((pg / sum) * 100) : 30;
-    const vgNorm = sum > 0 ? Math.max(0, 100 - pgNorm) : 70;
+    const pg = clampPct(num(document.getElementById("calcPgRatio").value, 30));
+    const vg = clampPct(num(document.getElementById("calcVgRatio").value, 70));
+    // Prefer complementary pair already maintained by input handlers.
+    const pgNorm = Math.round(pg * 1000) / 1000;
+    const vgNorm = Math.round((100 - pgNorm) * 1000) / 1000;
     ratioField.value = `${vgNorm}/${pgNorm}`;
     syncHiddenCalc();
+  };
+
+  const wireComplementaryPgVg = () => {
+    const pgEl = document.getElementById("calcPgRatio");
+    const vgEl = document.getElementById("calcVgRatio");
+    if (!pgEl || !vgEl) return;
+    pgEl.addEventListener("input", () => {
+      if (pgVgSyncing) return;
+      pgVgSyncing = true;
+      const pg = clampPct(num(pgEl.value, 0));
+      pgEl.value = String(pg);
+      vgEl.value = String(Math.round((100 - pg) * 1000) / 1000);
+      pgVgSyncing = false;
+      setRatioFromCalcInputs();
+      queueCalc();
+    });
+    vgEl.addEventListener("input", () => {
+      if (pgVgSyncing) return;
+      pgVgSyncing = true;
+      const vg = clampPct(num(vgEl.value, 0));
+      vgEl.value = String(vg);
+      pgEl.value = String(Math.round((100 - vg) * 1000) / 1000);
+      pgVgSyncing = false;
+      setRatioFromCalcInputs();
+      queueCalc();
+    });
   };
 
   const initCalcInputsFromSavedRatio = () => {
@@ -420,13 +449,15 @@
     queueCalc();
   }, true);
 
-  ["calcTargetMl", "calcTargetNic", "calcPgRatio", "calcVgRatio", "calcNicBase", "calcNicCarrier"].forEach((id) => {
+  ["calcTargetMl", "calcTargetNic", "calcNicBase", "calcNicCarrier"].forEach((id) => {
     const el = document.getElementById(id);
     el.addEventListener("input", queueCalc);
     el.addEventListener("change", queueCalc);
   });
+  wireComplementaryPgVg();
 
   form.addEventListener("submit", (e) => {
+    setRatioFromCalcInputs();
     syncHiddenCalc();
     if (saveBtn.disabled || lastHardStops.length) {
       e.preventDefault();
@@ -447,7 +478,13 @@
   } else {
     buildRow();
   }
-  initCalcInputsFromSavedRatio();
+  // Prefer persisted calc_* from form_values when editing; else derive from saved VG/PG ratio.
+  const hasSavedCalc =
+    cfg.formValues &&
+    (cfg.formValues.calc_pg_ratio != null || cfg.formValues.calc_target_ml != null);
+  if (!hasSavedCalc) {
+    initCalcInputsFromSavedRatio();
+  }
   setRatioFromCalcInputs();
   queueCalc();
 

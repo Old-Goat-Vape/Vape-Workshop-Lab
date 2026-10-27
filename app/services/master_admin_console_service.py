@@ -994,7 +994,13 @@ def reset_user_password(*, actor_id: int, user_id: int, new_password: str) -> No
     if not target:
         raise ValueError("User not found.")
     pw_hash = generate_password_hash(new_password.strip())
-    db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (pw_hash, int(user_id)))
+    from models import users_repo
+
+    users_repo.update_user_password_hash(
+        user_id=int(user_id),
+        password_hash=pw_hash,
+        must_change_password=True,
+    )
     _log_admin_action(
         actor_id=actor_id,
         action="USER_PASSWORD_RESET",

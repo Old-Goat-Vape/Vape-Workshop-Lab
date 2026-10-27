@@ -632,6 +632,12 @@ def tvw_recipe_edit(slug: str):
         active_version = versions[0]
     items = recipes_repo.fetch_version_items_for_editor(int(active_version["id"])) if active_version else []
     flavour_options = _editor_flavour_seed(items)
+    form_values = recipe_builder_service.form_values_from_version(active_version, recipe=recipe)
+    form_values["name"] = str(recipe.get("name") or "")
+    form_values["visibility"] = str(recipe.get("visibility") or "private").lower()
+    form_values["status"] = str(recipe.get("status") or "wip").lower()
+    form_values["tags"] = ", ".join(recipes_repo.fetch_recipe_tags(int(recipe["id"])))
+    form_values["recipe_id"] = str(recipe.get("id") or "")
     return _render_recipe_builder(
         mode="edit",
         recipe=recipe,
@@ -639,6 +645,7 @@ def tvw_recipe_edit(slug: str):
         items=items,
         tags=recipes_repo.fetch_recipe_tags(int(recipe["id"])),
         flavour_options=flavour_options,
+        form_values=form_values,
     )
 
 
@@ -746,12 +753,17 @@ def tvw_recipe_save():
             stage = "insert-version"
             last_version = recipes_repo.fetch_last_version_number(saved_id)
             new_version = _next_version(last_version)
+            calc = payload.calc or {}
             version_id = recipes_repo.insert_recipe_version(
                 recipe_id=saved_id,
                 version_number=new_version,
                 target_vg_pg_ratio=ratio,
                 total_flavor_percent=round(total_pct, 2),
                 notes=notes,
+                default_batch_ml=float(calc.get("target_ml")) if calc.get("target_ml") is not None else None,
+                default_nic_mg_ml=float(calc.get("target_nic_mg_ml")) if calc.get("target_nic_mg_ml") is not None else None,
+                default_nic_base_mg_ml=float(calc.get("nic_base_mg_ml")) if calc.get("nic_base_mg_ml") is not None else None,
+                default_nicotine_carrier=str(calc.get("nicotine_carrier") or "PG"),
             )
             stage = "insert-items"
             recipes_repo.insert_recipe_items(version_id=version_id, items=items)

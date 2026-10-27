@@ -7,7 +7,9 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL, -- 'Master', 'Old Goat', 'Foreman', 'Mixer', 'Hand', 'Kid'
     status TEXT DEFAULT 'Active',
-    last_login DATETIME
+    last_login DATETIME,
+    must_change_password INTEGER DEFAULT 0,
+    password_changed_at DATETIME
 );
 
 CREATE TABLE IF NOT EXISTS audit_logs (
@@ -98,6 +100,10 @@ CREATE TABLE IF NOT EXISTS recipe_versions (
     total_flavor_percent REAL,
     notes TEXT,
     is_locked INTEGER DEFAULT 0,
+    default_batch_ml REAL,
+    default_nic_mg_ml REAL,
+    default_nic_base_mg_ml REAL,
+    default_nicotine_carrier TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
 );

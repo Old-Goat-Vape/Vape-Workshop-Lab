@@ -185,21 +185,66 @@ def tvw_enforce_account_before_request(*, for_api: bool = False):
     return redirect(url_for("auth.login"))
 
 
+def _wants_json_response() -> bool:
+    return (
+        request.path.startswith("/api/")
+        or (request.accept_mimetypes.best == "application/json")
+        or (request.headers.get("X-Requested-With") == "XMLHttpRequest")
+    )
+
+
 def login_required(f: F) -> F:
     """Require an authenticated session."""
 
     @wraps(f)
     def decorated_function(*args, **kwargs):  # type: ignore[no-untyped-def]
         if "user_id" not in session:
-            wants_json = (
-                request.path.startswith("/api/")
-                or (request.accept_mimetypes.best == "application/json")
-                or (request.headers.get("X-Requested-With") == "XMLHttpRequest")
-            )
-            if wants_json:
+            if _wants_json_response():
                 return jsonify({"status": "error", "message": "Not logged in."}), 401
             flash("Please log in to continue.", "warning")
             return redirect(url_for("auth.login"))
+
+        # Invalidate sessions after password reset/change (pwd_sig = hash prefix).
+        from models import users_repo
+
+        uid = int(session.get("user_id") or 0)
+        user = users_repo.fetch_user_by_id(uid)
+        if not user:
+            session.clear()
+            if _wants_json_response():
+                return jsonify({"status": "error", "message": "Not logged in."}), 401
+            flash("Please sign in again.", "warning")
+            return redirect(url_for("auth.login"))
+        expected_sig = users_repo.password_signature(user.get("password_hash"))
+        if session.get("pwd_sig") and session.get("pwd_sig") != expected_sig:
+            session.clear()
+            if _wants_json_response():
+                return jsonify({"status": "error", "message": "Session expired."}), 401
+            flash("Your password was changed. Please sign in again.", "warning")
+            return redirect(url_for("auth.login"))
+        if not session.get("pwd_sig"):
+            session["pwd_sig"] = expected_sig
+
+        # Forced password change after admin reset (allow the change-password page itself).
+        endpoint = str(request.endpoint or "")
+        if int(user.get("must_change_password") or 0) and endpoint not in {
+            "auth.change_password",
+            "auth.logout",
+        }:
+            if _wants_json_response():
+                return (
+                    jsonify(
+                        {
+                            "status": "error",
+                            "message": "Password change required.",
+                            "code": "must_change_password",
+                        }
+                    ),
+                    403,
+                )
+            flash("Please set a new password before continuing.", "warning")
+            return redirect(url_for("auth.change_password"))
+
         return f(*args, **kwargs)
 
     return decorated_function  # type: ignore[return-value]

@@ -93,7 +93,11 @@ def update_user_account():
         # 1. Handle Password Reset
         if new_password and len(new_password.strip()) > 0:
             hashed_pw = generate_password_hash(new_password)
-            users_repo.update_user_password_hash(user_id=int(user_id), password_hash=hashed_pw)
+            users_repo.update_user_password_hash(
+                user_id=int(user_id),
+                password_hash=hashed_pw,
+                must_change_password=True,
+            )
             users_repo.insert_audit_log(
                 actor_id=int(session["user_id"]),
                 action="Password Reset",

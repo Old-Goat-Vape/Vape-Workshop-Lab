@@ -18,12 +18,14 @@
 {%- endmacro %}
 
 {% set mf = mix_form or {} %}
-{% set mix_ml = mf.get('target_ml') or (detail.facts_batch_ml|int) %}
-{% set mix_nic = mf.get('target_nic_mg_ml') or '3' %}
-{% set mix_pg = mf.get('pg_ratio') or detail.facts_pg_pct %}
-{% set mix_vg = mf.get('vg_ratio') or detail.facts_vg_pct %}
-{% set mix_nic_base = mf.get('nic_base_mg_ml') or '100' %}
-{% set mix_carrier = (mf.get('nicotine_carrier') or 'PG')|upper %}
+{# Prefer explicit mix form / query values; fall back to persisted recipe version defaults.
+   Do not use Jinja `or` for nicotine — 0 mg/ml is a valid target. #}
+{% set mix_ml = mf['target_ml'] if mf.get('target_ml') not in (none, '') else detail.facts_batch_ml %}
+{% set mix_nic = mf['target_nic_mg_ml'] if mf.get('target_nic_mg_ml') not in (none, '') else detail.facts_nic_mg_ml %}
+{% set mix_pg = mf['pg_ratio'] if mf.get('pg_ratio') not in (none, '') else detail.facts_pg_pct %}
+{% set mix_vg = mf['vg_ratio'] if mf.get('vg_ratio') not in (none, '') else detail.facts_vg_pct %}
+{% set mix_nic_base = mf['nic_base_mg_ml'] if mf.get('nic_base_mg_ml') not in (none, '') else detail.facts_nic_base_mg_ml %}
+{% set mix_carrier = (mf.get('nicotine_carrier') or detail.facts_nicotine_carrier or 'PG')|upper %}
 {% set mix_version_id = mf.get('version_id') or active_version.id %}
 
 <div class="tvw-recipe-detail">
@@ -141,15 +143,15 @@
       <span class="tvw-rd-fact-label">Batch size</span>
     </div>
     <div class="tvw-rd-fact">
-      <span class="tvw-rd-fact-value">3 mg/ml</span>
-      <span class="tvw-rd-fact-label">Nicotine</span>
+      <span class="tvw-rd-fact-value">{{ detail.facts_nic_mg_ml }} mg/ml</span>
+      <span class="tvw-rd-fact-label">Target nicotine</span>
     </div>
     <div class="tvw-rd-fact">
       <span class="tvw-rd-fact-value">{{ detail.facts_pg_vg_label }}</span>
       <span class="tvw-rd-fact-label">PG / VG</span>
     </div>
     <div class="tvw-rd-fact">
-      <span class="tvw-rd-fact-value">100 mg/ml · PG</span>
+      <span class="tvw-rd-fact-value">{{ detail.facts_nic_base_mg_ml|int }} mg/ml · {{ detail.facts_nicotine_carrier }}</span>
       <span class="tvw-rd-fact-label">Nicotine base</span>
     </div>
   </div>
@@ -333,7 +335,7 @@
       <p class="small text-secondary mt-2 mb-0" id="mixHandoffHint" hidden>
         Want pours instead? <a class="link-info" href="#" id="mixHandoffLink">Start guided mix with these settings</a>.
       </p>
-      <pre id="mixOutput" class="tvw-output tvw-rd-output-hidden mb-0 small"></pre>
+      <div id="mixOutput" class="tvw-rd-quick-mix-result d-none mt-3" aria-live="polite"></div>
     </section>
 
     <aside class="tvw-rd-panel">
@@ -539,6 +541,7 @@
 <script>
 (() => {
   const recipeId = {{ recipe.id }};
+  const recipeName = {{ recipe.name|tojson }};
   const activeVersionId = {{ active_version.id }};
   const currentVersionId = () => {
     const raw = document.getElementById("guided_mix_version_id")?.value
@@ -555,11 +558,98 @@
   const avgRatingLabel = document.getElementById("recipeAvgRatingLabel");
   const selMyRating = document.getElementById("recipeMyRating");
 
-  const showMixOutput = (text) => {
+  const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[c]);
+  const fmtN = (v, d = 2) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n.toFixed(d) : "—";
+  };
+
+  let pgVgSyncing = false;
+  const wireComplementaryPgVg = (pgId, vgId) => {
+    const pgEl = document.getElementById(pgId);
+    const vgEl = document.getElementById(vgId);
+    if (!pgEl || !vgEl) return;
+    const clamp = (n) => Math.max(0, Math.min(100, Number.isFinite(n) ? n : 0));
+    pgEl.addEventListener("input", () => {
+      if (pgVgSyncing) return;
+      pgVgSyncing = true;
+      const pg = clamp(Number(pgEl.value));
+      pgEl.value = String(pg);
+      vgEl.value = String(Math.round((100 - pg) * 1000) / 1000);
+      pgVgSyncing = false;
+    });
+    vgEl.addEventListener("input", () => {
+      if (pgVgSyncing) return;
+      pgVgSyncing = true;
+      const vg = clamp(Number(vgEl.value));
+      vgEl.value = String(vg);
+      pgEl.value = String(Math.round((100 - vg) * 1000) / 1000);
+      pgVgSyncing = false;
+    });
+  };
+  wireComplementaryPgVg("mix_pg", "mix_vg");
+
+  const showMixError = (text) => {
     if (!mixOutput) return;
-    mixOutput.textContent = text;
-    mixOutput.classList.remove("tvw-rd-output-hidden");
-    mixOutput.classList.add("tvw-rd-output-visible");
+    mixOutput.classList.remove("d-none");
+    mixOutput.innerHTML = `<div class="alert alert-danger py-2 mb-0">${esc(text)}</div>`;
+  };
+
+  const renderQuickMixGui = (body, targets) => {
+    if (!mixOutput) return;
+    const result = body?.result || body || {};
+    const totals = result.totals || {};
+    const weights = result.weights || {};
+    const finished = result.finished_composition || {};
+    const lineItems = Array.isArray(result.line_items) ? result.line_items : [];
+    const warnings = (result.policy && result.policy.warnings) || [];
+    const pg = Number(totals.final_pg_percent != null ? totals.final_pg_percent : finished.final_pg_percent);
+    const vg = Number(totals.final_vg_percent != null ? totals.final_vg_percent : finished.final_vg_percent);
+    const ratioLabel = totals.final_ratio_label
+      || finished.final_ratio_label
+      || `${Math.round(pg || 0)}/${Math.round(vg || 0)}`;
+    const rowsHtml = lineItems.length
+      ? lineItems.map((li) => `
+          <tr>
+            <td>${esc(li.name || "Flavour")}</td>
+            <td class="text-secondary">${esc(li.carrier_label || li.carrier || "PG")}</td>
+            <td class="text-end">${fmtN(li.percent, 2)}%</td>
+            <td class="text-end">${fmtN(li.ml)} ml</td>
+            <td class="text-end">${fmtN(li.grams)} g</td>
+          </tr>`).join("")
+      : `<tr><td colspan="5" class="text-secondary">No flavour lines returned.</td></tr>`;
+
+    mixOutput.classList.remove("d-none");
+    mixOutput.innerHTML = `
+      <div class="border border-secondary rounded-3 p-3 bg-black">
+        <p class="small text-secondary text-uppercase mb-1">Quick mix</p>
+        <h3 class="h5 mb-3">${esc(recipeName)}</h3>
+        <dl class="row small mb-3">
+          <dt class="col-sm-5">Batch size</dt><dd class="col-sm-7">${fmtN(targets.target_ml, 0)} ml</dd>
+          <dt class="col-sm-5">Target nicotine strength</dt><dd class="col-sm-7">${fmtN(targets.target_nic_mg_ml, 1)} mg/ml</dd>
+          <dt class="col-sm-5">Target PG/VG</dt><dd class="col-sm-7">${fmtN(targets.pg_ratio, 0)}/${fmtN(targets.vg_ratio, 0)}</dd>
+          <dt class="col-sm-5">Estimated final PG/VG</dt><dd class="col-sm-7">${esc(ratioLabel)}</dd>
+          <dt class="col-sm-5">Nicotine base</dt><dd class="col-sm-7">${fmtN(targets.nic_base_mg_ml, 0)} mg/ml · ${esc(targets.nicotine_carrier)}</dd>
+        </dl>
+        <div class="table-responsive mb-3">
+          <table class="table table-sm table-dark align-middle mb-0">
+            <thead><tr><th>Ingredient</th><th>Carrier</th><th class="text-end">%</th><th class="text-end">ml</th><th class="text-end">g</th></tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>
+        <dl class="row small mb-0">
+          <dt class="col-sm-5">Standalone PG</dt><dd class="col-sm-7">${fmtN(totals.pg_ml)} ml · ${fmtN(weights.pg_g)} g</dd>
+          <dt class="col-sm-5">Standalone VG</dt><dd class="col-sm-7">${fmtN(totals.vg_ml)} ml · ${fmtN(weights.vg_g)} g</dd>
+          <dt class="col-sm-5">Nicotine pour</dt><dd class="col-sm-7">${fmtN(totals.nicotine_ml)} ml · ${fmtN(weights.nicotine_g)} g</dd>
+          <dt class="col-sm-5">Total flavour</dt><dd class="col-sm-7">${fmtN(totals.total_flavor_percent, 2)}% · ${fmtN(totals.flavor_ml)} ml</dd>
+        </dl>
+        ${warnings.length ? `<div class="alert alert-warning py-2 mt-3 mb-0 small">${warnings.map(esc).join("<br>")}</div>` : ""}
+        <div class="mt-3 d-flex flex-wrap gap-2">
+          <button type="submit" form="guidedMixForm" class="btn btn-sm btn-warning js-guided-mix-submit">Start guided mix with these settings</button>
+        </div>
+      </div>`;
   };
 
   document.getElementById("version_id")?.addEventListener("change", () => {
@@ -819,12 +909,12 @@
           nicotine_carrier: t.nicotine_carrier,
         }),
       });
-      showMixOutput(JSON.stringify(body, null, 2));
+      renderQuickMixGui(body, t);
       const mixHandoffHint = document.getElementById("mixHandoffHint");
       if (mixHandoffHint) mixHandoffHint.hidden = false;
       document.getElementById("mix-card")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     } catch (err) {
-      showMixOutput(err.message);
+      showMixError(err.message || "Quick mix failed.");
       const mixHandoffHint = document.getElementById("mixHandoffHint");
       if (mixHandoffHint) mixHandoffHint.hidden = true;
     }

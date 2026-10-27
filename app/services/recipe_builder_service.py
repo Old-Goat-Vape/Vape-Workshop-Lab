@@ -38,6 +38,33 @@ _ALLOWED_VISIBILITY = {"private", "public", "unlisted"}
 _ALLOWED_STATUS = {"wip", "help", "ready"}
 
 
+def _parse_float_field(raw: Any, default: float) -> float:
+    """Parse float; empty → default. Numeric 0 is kept (not treated as missing)."""
+    text = "" if raw is None else str(raw).strip()
+    if text == "":
+        return float(default)
+    return float(text)
+
+
+def _clamp_pct(value: float) -> float:
+    return max(0.0, min(100.0, float(value)))
+
+
+def normalize_complementary_pg_vg(pg: float, vg: float) -> tuple[float, float]:
+    """Ensure PG + VG = 100 with values in [0, 100]. Prefer PG as anchor when inconsistent."""
+    pg_c = _clamp_pct(pg)
+    vg_c = _clamp_pct(vg)
+    total = pg_c + vg_c
+    if abs(total - 100.0) <= 0.01:
+        # Snap tiny drift so VG complements PG exactly.
+        return round(pg_c, 4), round(100.0 - pg_c, 4)
+    if total <= 0:
+        return 30.0, 70.0
+    # Normalize proportionally, then snap VG to complement.
+    pg_n = round((pg_c / total) * 100.0, 4)
+    return pg_n, round(100.0 - pg_n, 4)
+
+
 def _parse_ratio(raw: str) -> tuple[float, float] | None:
     text = str(raw or "").strip()
     m = re.match(r"^(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)$", text)
@@ -80,17 +107,56 @@ def form_values_from_request(form) -> dict[str, Any]:
         "notes": (form.get("notes") or "").strip(),
         "target_ratio": (form.get("target_ratio") or "70/30").strip(),
         "recipe_id": (form.get("recipe_id") or "").strip(),
-        "calc_target_ml": (form.get("calc_target_ml") or "60").strip(),
-        "calc_target_nic": (form.get("calc_target_nic") or "3").strip(),
-        "calc_pg_ratio": (form.get("calc_pg_ratio") or "30").strip(),
-        "calc_vg_ratio": (form.get("calc_vg_ratio") or "70").strip(),
-        "calc_nic_base": (form.get("calc_nic_base") or "100").strip(),
+        "calc_target_ml": (form.get("calc_target_ml") if form.get("calc_target_ml") is not None else "60"),
+        "calc_target_nic": (form.get("calc_target_nic") if form.get("calc_target_nic") is not None else "3"),
+        "calc_pg_ratio": (form.get("calc_pg_ratio") if form.get("calc_pg_ratio") is not None else "30"),
+        "calc_vg_ratio": (form.get("calc_vg_ratio") if form.get("calc_vg_ratio") is not None else "70"),
+        "calc_nic_base": (form.get("calc_nic_base") if form.get("calc_nic_base") is not None else "100"),
         "calc_nicotine_carrier": (form.get("calc_nicotine_carrier") or "PG").strip(),
+    }
+
+
+def form_values_from_version(active_version: dict[str, Any] | None, *, recipe: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Populate builder fields from a saved version (edit mode)."""
+    _ = recipe
+    ver = active_version or {}
+    ratio = str(ver.get("target_vg_pg_ratio") or "70/30")
+    parsed = _parse_ratio(ratio)
+    if parsed:
+        # stored as VG/PG
+        pg, vg = normalize_complementary_pg_vg(parsed[1], parsed[0])
+    else:
+        pg, vg = 30.0, 70.0
+    batch = ver.get("default_batch_ml")
+    nic = ver.get("default_nic_mg_ml")
+    nic_base = ver.get("default_nic_base_mg_ml")
+    carrier = str(ver.get("default_nicotine_carrier") or "PG").strip().upper() or "PG"
+    return {
+        "name": "",
+        "visibility": "private",
+        "status": "wip",
+        "tags": "",
+        "notes": str(ver.get("notes") or ""),
+        "target_ratio": f"{vg:g}/{pg:g}",
+        "recipe_id": "",
+        "calc_target_ml": str(int(batch) if batch is not None and float(batch) == int(float(batch)) else (batch if batch is not None else 60)),
+        "calc_target_nic": str(nic if nic is not None else 3),
+        "calc_pg_ratio": str(int(pg) if float(pg) == int(pg) else pg),
+        "calc_vg_ratio": str(int(vg) if float(vg) == int(vg) else vg),
+        "calc_nic_base": str(int(nic_base) if nic_base is not None and float(nic_base) == int(float(nic_base)) else (nic_base if nic_base is not None else 100)),
+        "calc_nicotine_carrier": carrier if carrier in {"PG", "VG"} else "PG",
     }
 
 
 def parse_recipe_builder_form(form, *, is_edit: bool = False) -> RecipeBuilderPayload:
     values = form_values_from_request(form)
+    # Keep raw strings for redisplay; coerce empties to defaults without wiping 0.
+    values["calc_target_ml"] = str(values.get("calc_target_ml") if str(values.get("calc_target_ml") or "").strip() != "" else "60").strip()
+    values["calc_target_nic"] = str(values.get("calc_target_nic") if str(values.get("calc_target_nic") or "").strip() != "" else "3").strip()
+    values["calc_pg_ratio"] = str(values.get("calc_pg_ratio") if str(values.get("calc_pg_ratio") or "").strip() != "" else "30").strip()
+    values["calc_vg_ratio"] = str(values.get("calc_vg_ratio") if str(values.get("calc_vg_ratio") or "").strip() != "" else "70").strip()
+    values["calc_nic_base"] = str(values.get("calc_nic_base") if str(values.get("calc_nic_base") or "").strip() != "" else "100").strip()
+
     rows = parse_flavour_rows(form)
     errors: dict[str, str] = {}
 
@@ -106,10 +172,25 @@ def parse_recipe_builder_form(form, *, is_edit: bool = False) -> RecipeBuilderPa
     if status not in _ALLOWED_STATUS:
         errors["status"] = "Choose a valid recipe status."
 
-    ratio = values["target_ratio"]
-    parsed_ratio = _parse_ratio(ratio)
-    if not parsed_ratio:
-        errors["target_ratio"] = "Enter a valid PG/VG ratio such as 70/30 (VG/PG)."
+    try:
+        pg_ratio = _parse_float_field(values["calc_pg_ratio"], 30.0)
+        vg_ratio = _parse_float_field(values["calc_vg_ratio"], 70.0)
+    except (TypeError, ValueError):
+        pg_ratio = 30.0
+        vg_ratio = 70.0
+        errors["calc_ratio"] = "PG and VG must be numbers between 0 and 100."
+
+    pg_ratio, vg_ratio = normalize_complementary_pg_vg(pg_ratio, vg_ratio)
+    values["calc_pg_ratio"] = str(pg_ratio)
+    values["calc_vg_ratio"] = str(vg_ratio)
+    # Canonical stored ratio is VG/PG (legacy format).
+    ratio = f"{vg_ratio:g}/{pg_ratio:g}"
+    values["target_ratio"] = ratio
+
+    if pg_ratio < 0 or vg_ratio < 0 or pg_ratio > 100 or vg_ratio > 100:
+        errors["calc_ratio"] = "PG and VG must be between 0 and 100."
+    if abs((pg_ratio + vg_ratio) - 100.0) > 0.01:
+        errors["calc_ratio"] = "PG and VG must add up to 100%."
 
     items: list[tuple[int, float]] = []
     total_pct = 0.0
@@ -156,25 +237,28 @@ def parse_recipe_builder_form(form, *, is_edit: bool = False) -> RecipeBuilderPa
             break
 
     try:
-        pg_ratio = float(values["calc_pg_ratio"])
-        vg_ratio = float(values["calc_vg_ratio"])
+        target_ml = _parse_float_field(values["calc_target_ml"], 60.0)
+        target_nic = _parse_float_field(values["calc_target_nic"], 3.0)
+        nic_base = _parse_float_field(values["calc_nic_base"], 100.0)
     except (TypeError, ValueError):
-        pg_ratio = 30.0
-        vg_ratio = 70.0
+        target_ml, target_nic, nic_base = 60.0, 3.0, 100.0
+        errors["calc"] = "Batch size and nicotine values must be numbers."
 
-    if abs((pg_ratio + vg_ratio) - 100.0) > 0.01:
-        errors["calc_ratio"] = "PG and VG must add up to 100%."
+    if target_ml <= 0:
+        errors["calc"] = "Batch size must be greater than zero."
+    if target_nic < 0:
+        errors["calc"] = "Target nicotine cannot be negative."
 
     calc = {
-        "target_ml": float(values["calc_target_ml"] or 60),
-        "target_nic_mg_ml": float(values["calc_target_nic"] or 3),
-        "nic_base_mg_ml": float(values["calc_nic_base"] or 100),
-        "pg_ratio": pg_ratio,
-        "vg_ratio": vg_ratio,
+        "target_ml": float(target_ml),
+        "target_nic_mg_ml": float(target_nic),
+        "nic_base_mg_ml": float(nic_base),
+        "pg_ratio": float(pg_ratio),
+        "vg_ratio": float(vg_ratio),
         "nicotine_carrier": values["calc_nicotine_carrier"] or "PG",
     }
 
-    if items and not errors.get("flavours") and not errors.get("calc_ratio"):
+    if items and not errors.get("flavours") and not errors.get("calc_ratio") and not errors.get("calc"):
         try:
             mix_rows = [{"ingredient_id": i, "percent": p} for i, p in items]
             result = tvw_mix_service.live_mix_for_builder(rows=mix_rows, **calc)

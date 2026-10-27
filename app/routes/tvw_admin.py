@@ -545,3 +545,57 @@ def update_user_moderation_action(user_id: int):
         flash(str(exc), "warning")
     return redirect(url_for("tvw_admin.user_moderation_detail", user_id=user_id))
 
+
+@tvw_admin_bp.route("/users/<int:user_id>/reset-password", methods=["POST"])
+@login_required
+def reset_user_password(user_id: int):
+    """Admin-assisted password reset — stores hash only; forces change on next login."""
+    from datetime import datetime
+
+    from werkzeug.security import generate_password_hash
+
+    from db import get_db
+    from models import users_repo
+
+    role = _require_tvw_admin()
+    actor_id = int(session.get("user_id") or 0)
+    if int(user_id) == actor_id:
+        flash("Use Change password for your own account.", "warning")
+        return redirect(url_for("tvw_admin.user_moderation_detail", user_id=user_id))
+
+    new_password = (request.form.get("new_password") or "").strip()
+    confirm = (request.form.get("confirm_password") or "").strip()
+    reason = (request.form.get("reason") or "").strip()
+    if len(new_password) < 6:
+        flash("Temporary password must be at least 6 characters.", "warning")
+        return redirect(url_for("tvw_admin.user_moderation_detail", user_id=user_id))
+    if new_password != confirm:
+        flash("Passwords do not match.", "warning")
+        return redirect(url_for("tvw_admin.user_moderation_detail", user_id=user_id))
+    target = users_repo.fetch_user_by_id(int(user_id))
+    if not target:
+        abort(404)
+
+    hashed = generate_password_hash(new_password)
+    users_repo.update_user_password_hash(
+        user_id=int(user_id),
+        password_hash=hashed,
+        must_change_password=True,
+    )
+    try:
+        users_repo.insert_audit_log(
+            actor_id=actor_id,
+            action="admin_password_reset",
+            target_id=int(user_id),
+            details=reason or f"Password reset by {role}",
+            timestamp=datetime.utcnow().isoformat(timespec="seconds"),
+        )
+    except Exception:
+        pass
+    get_db().commit()
+    flash(
+        "Password reset. Share the temporary password securely; the user must change it on next login.",
+        "success",
+    )
+    return redirect(url_for("tvw_admin.user_moderation_detail", user_id=user_id))
+

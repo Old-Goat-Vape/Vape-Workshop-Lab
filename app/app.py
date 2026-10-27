@@ -68,8 +68,16 @@ def _bool_env(name: str, default: bool) -> bool:
     return str(raw).strip().lower() not in {"0", "false", "off", "no"}
 
 
+from datetime import timedelta
+
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "tvw_calculator_secret_key_9921")
+# Persistent "Keep me signed in" sessions (HttpOnly cookie; Secure when HTTPS).
+_remember_days = int(os.environ.get("TVW_REMEMBER_ME_DAYS", "365") or 365)
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=max(1, min(_remember_days, 730)))
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = os.environ.get("SESSION_COOKIE_SAMESITE", "Lax")
+app.config["SESSION_COOKIE_SECURE"] = _bool_env("SESSION_COOKIE_SECURE", False)
 app.config["RECIPE_UPLOAD_SUBDIR"] = os.path.join("uploads", "recipes")
 app.config["RECIPE_UPLOAD_FOLDER"] = os.path.join(app.root_path, "static", app.config["RECIPE_UPLOAD_SUBDIR"])
 _startup_phase("config loaded")

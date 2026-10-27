@@ -215,6 +215,14 @@ def _status_display_label(status: str | None) -> str:
     return labels.get(st, st.replace("_", " ").title())
 
 
+def _mix_default_number(raw: Any, fallback: float) -> float | int:
+    """Prefer persisted version default; emit int when the value is whole."""
+    value = fallback if raw is None else float(raw)
+    if float(value) == int(value):
+        return int(value)
+    return float(value)
+
+
 def build_recipe_detail_presentation(
     *,
     recipe: dict[str, Any],
@@ -270,7 +278,22 @@ def build_recipe_detail_presentation(
         "version_label": f"Version {active_version.get('version_number') or '1'}",
         "flavour_count": len(ingredients),
         "total_flavour_pct": total_flavour_pct,
-        "facts_batch_ml": stash_panel.get("batch_ml") or 60,
+        "facts_batch_ml": _mix_default_number(
+            active_version.get("default_batch_ml"),
+            stash_panel.get("batch_ml") or 60,
+        ),
+        "facts_nic_mg_ml": _mix_default_number(
+            active_version.get("default_nic_mg_ml"),
+            3.0,
+        ),
+        "facts_nic_base_mg_ml": _mix_default_number(
+            active_version.get("default_nic_base_mg_ml"),
+            100.0,
+        ),
+        "facts_nicotine_carrier": str(
+            active_version.get("default_nicotine_carrier") or "PG"
+        ).strip().upper()
+        or "PG",
         "facts_pg_pct": pg_pct,
         "facts_vg_pct": vg_pct,
         "facts_pg_vg_label": f"{pg_pct}/{vg_pct} PG/VG",

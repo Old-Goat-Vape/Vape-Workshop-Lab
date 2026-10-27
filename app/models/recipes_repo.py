@@ -360,11 +360,25 @@ def fetch_latest_version(recipe_id: int) -> Optional[Dict[str, Any]]:
     return dict(row) if row else None
 
 
+def _recipe_version_select_cols(alias: str = "") -> str:
+    prefix = f"{alias}." if alias else ""
+    cols = (
+        f"{prefix}id, {prefix}recipe_id, {prefix}version_number, {prefix}target_vg_pg_ratio, "
+        f"{prefix}total_flavor_percent, {prefix}notes, {prefix}created_at"
+    )
+    if _table_has_column("recipe_versions", "default_batch_ml"):
+        cols += (
+            f", {prefix}default_batch_ml, {prefix}default_nic_mg_ml, "
+            f"{prefix}default_nic_base_mg_ml, {prefix}default_nicotine_carrier"
+        )
+    return cols
+
+
 def fetch_version(version_id: int) -> Optional[Dict[str, Any]]:
     db = get_db()
     row = db.execute(
-        """
-        SELECT id, recipe_id, version_number, target_vg_pg_ratio, total_flavor_percent, created_at
+        f"""
+        SELECT {_recipe_version_select_cols()}
         FROM recipe_versions
         WHERE id = ?
         LIMIT 1
@@ -393,8 +407,8 @@ def resolve_recipe_version_id_for_mix(*, recipe_id: int, requested_version_id: i
 def fetch_current_version(recipe_id: int) -> Optional[Dict[str, Any]]:
     db = get_db()
     row = db.execute(
-        """
-        SELECT rv.id, rv.recipe_id, rv.version_number, rv.target_vg_pg_ratio, rv.total_flavor_percent, rv.created_at
+        f"""
+        SELECT {_recipe_version_select_cols('rv')}
         FROM recipes r
         JOIN recipe_versions rv ON rv.id = r.current_version_id
         WHERE r.id = ?
@@ -500,8 +514,8 @@ def fetch_recipe_version_notes(*, version_id: int) -> str:
 def fetch_recipe_versions(recipe_id: int) -> List[Dict[str, Any]]:
     db = get_db()
     rows = db.execute(
-        """
-        SELECT id, recipe_id, version_number, target_vg_pg_ratio, total_flavor_percent, notes, created_at
+        f"""
+        SELECT {_recipe_version_select_cols()}
         FROM recipe_versions
         WHERE recipe_id = ?
         ORDER BY id DESC
@@ -1469,15 +1483,42 @@ def insert_recipe_version(
     target_vg_pg_ratio: str,
     total_flavor_percent: float,
     notes: str | None = None,
+    default_batch_ml: float | None = None,
+    default_nic_mg_ml: float | None = None,
+    default_nic_base_mg_ml: float | None = None,
+    default_nicotine_carrier: str | None = None,
 ) -> int:
     db = get_db()
-    cur = db.execute(
-        """
-        INSERT INTO recipe_versions (recipe_id, version_number, target_vg_pg_ratio, total_flavor_percent, notes)
-        VALUES (?, ?, ?, ?, ?)
-        """,
-        (recipe_id, version_number, target_vg_pg_ratio, total_flavor_percent, notes),
-    )
+    has_defaults = _table_has_column("recipe_versions", "default_batch_ml")
+    if has_defaults:
+        cur = db.execute(
+            """
+            INSERT INTO recipe_versions (
+                recipe_id, version_number, target_vg_pg_ratio, total_flavor_percent, notes,
+                default_batch_ml, default_nic_mg_ml, default_nic_base_mg_ml, default_nicotine_carrier
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                recipe_id,
+                version_number,
+                target_vg_pg_ratio,
+                total_flavor_percent,
+                notes,
+                default_batch_ml,
+                default_nic_mg_ml,
+                default_nic_base_mg_ml,
+                default_nicotine_carrier,
+            ),
+        )
+    else:
+        cur = db.execute(
+            """
+            INSERT INTO recipe_versions (recipe_id, version_number, target_vg_pg_ratio, total_flavor_percent, notes)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (recipe_id, version_number, target_vg_pg_ratio, total_flavor_percent, notes),
+        )
     return int(cur.lastrowid)
 
 

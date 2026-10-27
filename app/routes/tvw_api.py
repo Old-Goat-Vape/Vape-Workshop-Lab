@@ -722,11 +722,14 @@ def quick_mix():
             recipe_id=recipe_id,
             requested_version_id=int(data.get("version_id") or 0) or None,
         )
-        target_ml = float(data.get("target_ml") or 30.0)
-        target_nic_mg_ml = float(data.get("target_nic_mg_ml") or 0.0)
-        nic_base_mg_ml = float(data.get("nic_base_mg_ml") or 100.0)
-        pg_ratio = float(data.get("pg_ratio") or 30.0)
-        vg_ratio = float(data.get("vg_ratio") or 70.0)
+        target_ml = float(data["target_ml"]) if data.get("target_ml") is not None else 30.0
+        # Preserve explicit 0 mg/ml (do not use `or` — 0 is falsy).
+        target_nic_mg_ml = (
+            float(data["target_nic_mg_ml"]) if data.get("target_nic_mg_ml") is not None else 0.0
+        )
+        nic_base_mg_ml = float(data["nic_base_mg_ml"]) if data.get("nic_base_mg_ml") is not None else 100.0
+        pg_ratio = float(data["pg_ratio"]) if data.get("pg_ratio") is not None else 30.0
+        vg_ratio = float(data["vg_ratio"]) if data.get("vg_ratio") is not None else 70.0
         nicotine_carrier = str(data.get("nicotine_carrier") or "PG")
         payload = tvw_mix_service.quick_mix_for_recipe_version(
             recipe_id=recipe_id,

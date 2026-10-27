@@ -121,7 +121,24 @@ def quick_mix_for_recipe_version(**kwargs) -> dict:
     warnings = list(evaluation.warnings)
     if result.ratio_warning:
         warnings.append(result.ratio_warning)
+    line_items = []
+    for f in mix_input.flavors:
+        ml_i = float(mix_input.target_ml) * (float(f.percent) / 100.0)
+        carrier, carrier_source = resolve_carrier(f.carrier)
+        line_items.append(
+            {
+                "name": f.name,
+                "brand": f.brand,
+                "percent": round(float(f.percent), 4),
+                "ml": round(float(ml_i), 4),
+                "grams": round(float(ml_i * f.density), 4),
+                "carrier": carrier,
+                "carrier_source": carrier_source,
+                "carrier_label": format_carrier_display(carrier=carrier, source=carrier_source),
+            }
+        )
     return {
+        "recipe_name": None,
         "totals": {
             "target_ml": mix_input.target_ml,
             "target_nic_mg_ml": mix_input.target_nic_mg_ml,
@@ -152,6 +169,7 @@ def quick_mix_for_recipe_version(**kwargs) -> dict:
             "standalone_pg_g": result.pg_g,
             "standalone_vg_g": result.vg_g,
         },
+        "line_items": line_items,
         "finished_composition": finished,
         "policy": {
             "name": _TVW_POLICY.name,

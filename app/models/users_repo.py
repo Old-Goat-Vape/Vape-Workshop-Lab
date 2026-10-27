@@ -5,14 +5,27 @@ from typing import Any, Dict, Optional
 from db import get_db
 
 
+def _table_has_column(table: str, column: str) -> bool:
+    db = get_db()
+    rows = db.execute(f"PRAGMA table_info({table})").fetchall()
+    return any(str(r["name"]) == column for r in rows)
+
+
 def fetch_user_by_username(username: str) -> Optional[Dict[str, Any]]:
     db = get_db()
+    cols = (
+        "id, username, password_hash, role, status, "
+        "COALESCE(is_banned, 0) AS is_banned, "
+        "COALESCE(is_suspended, 0) AS is_suspended, "
+        "COALESCE(moderation_status, 'active') AS moderation_status"
+    )
+    if _table_has_column("users", "must_change_password"):
+        cols += ", COALESCE(must_change_password, 0) AS must_change_password"
+    if _table_has_column("users", "password_changed_at"):
+        cols += ", password_changed_at"
     row = db.execute(
-        """
-        SELECT id, username, password_hash, role, status,
-               COALESCE(is_banned, 0) AS is_banned,
-               COALESCE(is_suspended, 0) AS is_suspended,
-               COALESCE(moderation_status, 'active') AS moderation_status
+        f"""
+        SELECT {cols}
         FROM users
         WHERE username = ? COLLATE NOCASE
         """,
@@ -23,8 +36,13 @@ def fetch_user_by_username(username: str) -> Optional[Dict[str, Any]]:
 
 def fetch_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
     db = get_db()
+    cols = "id, username, role, status, password_hash"
+    if _table_has_column("users", "must_change_password"):
+        cols += ", COALESCE(must_change_password, 0) AS must_change_password"
+    if _table_has_column("users", "password_changed_at"):
+        cols += ", password_changed_at"
     row = db.execute(
-        "SELECT id, username, role, status FROM users WHERE id = ?",
+        f"SELECT {cols} FROM users WHERE id = ?",
         (int(user_id),),
     ).fetchone()
     return dict(row) if row else None
@@ -32,14 +50,19 @@ def fetch_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
 
 def fetch_user_moderation_row(user_id: int) -> Optional[Dict[str, Any]]:
     db = get_db()
+    cols = (
+        "id, username, role, status, email, created_at, "
+        "COALESCE(is_banned, 0) AS is_banned, "
+        "COALESCE(is_suspended, 0) AS is_suspended, "
+        "COALESCE(is_muted, 0) AS is_muted, "
+        "COALESCE(moderation_status, 'active') AS moderation_status, "
+        "moderation_note"
+    )
+    if _table_has_column("users", "must_change_password"):
+        cols += ", COALESCE(must_change_password, 0) AS must_change_password"
     row = db.execute(
-        """
-        SELECT id, username, role, status, email, created_at,
-               COALESCE(is_banned, 0) AS is_banned,
-               COALESCE(is_suspended, 0) AS is_suspended,
-               COALESCE(is_muted, 0) AS is_muted,
-               COALESCE(moderation_status, 'active') AS moderation_status,
-               moderation_note
+        f"""
+        SELECT {cols}
         FROM users
         WHERE id = ?
         """,
@@ -97,9 +120,52 @@ def list_users_with_mix_stats() -> list[Dict[str, Any]]:
     return [dict(r) for r in rows]
 
 
-def update_user_password_hash(*, user_id: int, password_hash: str) -> None:
+def update_user_password_hash(
+    *,
+    user_id: int,
+    password_hash: str,
+    must_change_password: bool | None = None,
+) -> None:
     db = get_db()
-    db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, int(user_id)))
+    if _table_has_column("users", "password_changed_at") and _table_has_column(
+        "users", "must_change_password"
+    ):
+        force = 1 if must_change_password else (0 if must_change_password is False else None)
+        if force is None:
+            db.execute(
+                """
+                UPDATE users
+                SET password_hash = ?, password_changed_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (password_hash, int(user_id)),
+            )
+        else:
+            db.execute(
+                """
+                UPDATE users
+                SET password_hash = ?,
+                    password_changed_at = CURRENT_TIMESTAMP,
+                    must_change_password = ?
+                WHERE id = ?
+                """,
+                (password_hash, int(force), int(user_id)),
+            )
+    else:
+        db.execute(
+            "UPDATE users SET password_hash = ? WHERE id = ?",
+            (password_hash, int(user_id)),
+        )
+
+
+def clear_must_change_password(user_id: int) -> None:
+    if not _table_has_column("users", "must_change_password"):
+        return
+    db = get_db()
+    db.execute(
+        "UPDATE users SET must_change_password = 0 WHERE id = ?",
+        (int(user_id),),
+    )
 
 
 def update_user_role_status(*, user_id: int, role: str, status: str) -> None:
@@ -141,3 +207,11 @@ def update_last_login(user_id: int) -> None:
     db.execute("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?", (user_id,))
     db.commit()
 
+
+def password_signature(password_hash: str | None) -> str:
+    """Stable short token derived from the stored hash (not reversible to the password)."""
+    return str(password_hash or "")[:32]
+
+
+def username_exists(username: str) -> bool:
+    return fetch_user_by_username(username) is not None
