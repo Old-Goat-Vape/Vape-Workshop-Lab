@@ -1447,9 +1447,12 @@ def fetch_recipe_status(recipe_id: int) -> Optional[str]:
 
 def update_recipe(*, recipe_id: int, name: str, recipe_code: str, status: str) -> None:
     db = get_db()
+    # Match insert_recipe: code-less community recipes must remain NULL so
+    # unrelated legacy blank codes cannot collide with the UNIQUE constraint.
+    code = str(recipe_code or "").strip() or None
     db.execute(
         "UPDATE recipes SET name = ?, recipe_code = ?, status = ? WHERE id = ?",
-        (name, recipe_code, status, recipe_id),
+        (name, code, status, recipe_id),
     )
 
 
