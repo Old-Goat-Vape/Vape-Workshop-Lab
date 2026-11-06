@@ -151,6 +151,28 @@ class RecipeBuilderCreateTests(unittest.TestCase):
         self.assertIn("Builder Test Custard", html)
         self.assertIn("Vanilla", html)
 
+    def test_edit_preserves_null_code_when_legacy_blank_code_exists(self):
+        self._login(1, "member1", "member")
+        created = self.client.post("/recipes/save", data=_valid_create_form())
+        self.assertEqual(created.status_code, 302)
+        with flask_app.app_context():
+            db = get_db()
+            recipe = dict(db.execute("SELECT * FROM recipes ORDER BY id DESC LIMIT 1").fetchone())
+            db.execute("INSERT INTO recipes (name, recipe_code, status, created_by) VALUES ('Legacy', '', 'WIP', 1)")
+            db.commit()
+        edited = self.client.post("/recipes/save", data=_valid_create_form(
+            recipe_id=str(recipe["id"]), notes="Notes changed", calc_target_ml="10"
+        ))
+        self.assertEqual(edited.status_code, 302, edited.data.decode())
+        with flask_app.app_context():
+            db = get_db()
+            saved = db.execute("SELECT recipe_code, current_version_id FROM recipes WHERE id = ?", (recipe["id"],)).fetchone()
+            self.assertIsNone(saved["recipe_code"])
+            version = db.execute("SELECT * FROM recipe_versions WHERE id = ?", (saved["current_version_id"],)).fetchone()
+            self.assertEqual(version["version_number"], "1.1")
+            self.assertEqual(version["notes"], "Notes changed")
+            self.assertEqual(version["default_batch_ml"], 10)
+
     def test_private_recipe_not_visible_to_other_member(self):
         self._login(1, "member1", "member")
         post = self.client.post("/recipes/save", data=_valid_create_form(name="Private Only"), follow_redirects=False)
