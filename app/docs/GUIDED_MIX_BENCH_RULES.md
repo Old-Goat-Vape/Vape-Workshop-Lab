@@ -487,3 +487,11 @@ Before trusting a guided mix change, test:
 - no ingredient on LEFT SIDE before BOTTLE MOVED
 - no dead `— g` display on decision/recovery steps
 - no stale `Up next` repeating current ingredient
+
+## Live audit corrections — November 2026
+
+- Mathematical validation rejects non-finite values, negative ratios, non-positive batch/base values, target nicotine above base strength, and flavour plus nicotine volume above the bottle target. These are errors regardless of lenient policy. An unreachable PG/VG ratio keeps the chosen bottle volume by filling only the space remaining after fixed flavours/nicotine; it reports the achievable ratio. Explicit zero nicotine and zero PG/VG values remain valid.
+- A flavour overpour enters serious recovery only when it exceeds both the batch-scaled gram tolerance and the policy multiplier. Tiny bottle rounding differences within gram tolerance follow slight-over/PG-trim handling.
+- Serious overpour review does not silently correct a recipe. The first action persists and shows the review; explicit **Accept changed batch** then records a deviation with remaining pours unchanged. Strict policies block acceptance. No nicotine compensation is applied.
+- A dynamic overpour increments performance once when inserted, not again when retried. Underpour attempts corrected before acceptance do not become final underpour coaching.
+- The ordinary final step is **Final batch check**, distinct from recovery for a specific ingredient. Completed progress and status remain complete after reload.

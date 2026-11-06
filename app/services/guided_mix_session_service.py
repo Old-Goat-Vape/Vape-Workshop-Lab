@@ -767,6 +767,11 @@ def _format_pg_adjustment_row(entry: dict[str, Any]) -> dict[str, Any]:
 def _format_accepted_deviation_row(entry: dict[str, Any]) -> dict[str, Any] | None:
     event = str(entry.get("event") or "").strip().lower()
     ingredient = _short_ingredient_label(str(entry.get("ingredient") or entry.get("source_ingredient") or ""))
+    if event == "accepted_serious_overpour":
+        category = str(entry.get("ingredient_category") or "")
+        is_carrier = _is_pg_payload({"category": category, "name": ingredient}) or _is_vg_payload({"category": category, "name": ingredient})
+        return {"kind": "carrier_over" if is_carrier else "flavour_over", "ingredient": ingredient,
+                "label": f"{ingredient}: changed dose accepted; no automatic correction applied"}
     if event == "accepted_flavour_over":
         return {
             "kind": "flavour_over",
@@ -872,8 +877,7 @@ def _ratio_shift_explanation(
     pg_adjustments: list[dict[str, Any]],
     accepted_deviations: list[dict[str, Any]],
 ) -> str:
-    flavour_overs = [d for d in accepted_deviations if str(d.get("kind") or "") == "flavour_over"]
-    if pg_adjustments or flavour_overs:
+    if pg_adjustments:
         return "Final ratio shifted because PG was adjusted to compensate for accepted flavour overpours."
     if accepted_deviations:
         return "Final ratio shifted because accepted pour deviations changed the carrier balance in this batch."
@@ -890,10 +894,10 @@ def _build_notes_for_next_time(
     overs = int(perf.get("overshoot_count") or 0)
     recoveries = int(perf.get("recovery_count") or 0)
     notes: list[str] = []
-    if flavour_over_count >= 2 or overs >= 2:
-        notes.append(
-            "Several flavour pours were over target. Use shorter pulse pours near the final margin."
-        )
+    if flavour_over_count >= 2:
+        notes.append("Several flavour pours were over target. Use shorter pulse pours near the final margin.")
+    elif overs >= 2:
+        notes.append("Several pours were over target. Use shorter pulse pours near the final margin.")
     elif flavour_over_count == 1 or overs == 1:
         notes.append("One pour ran over target. Pause briefly before the final gram on your next mix.")
     if recoveries >= 1:
@@ -2373,6 +2377,7 @@ def complete_guided_step_with_policy(
     accept_under: bool = False,
     under_action: str | None = None,
     nicotine_action: str | None = None,
+    recovery_action: str | None = None,
 ) -> dict[str, Any]:
     db = get_db()
     if policy is None:
@@ -2456,6 +2461,8 @@ def complete_guided_step_with_policy(
                 "hard_stops": ["Guided step not found."],
             },
         }
+    if step_row["completed_at"] and not undo:
+        return {"ok": True, "message": "Step already completed."}
     target_step_id = int(step_row["id"])
     step_payload: dict[str, Any] = {}
     if step_row and step_row["payload_json"]:
@@ -2464,6 +2471,38 @@ def complete_guided_step_with_policy(
         except (json.JSONDecodeError, TypeError):
             step_payload = {}
     reading_eval: dict[str, Any] | None = None
+    is_overpour_review = (
+        str(step_row["step_type"] or step_payload.get("step_type") or "").lower() == "recovery"
+        and str(step_payload.get("source_event") or "").lower() == "overpour"
+    )
+    if not undo and is_overpour_review:
+        reviewed = bool(step_payload.get("recovery_reviewed"))
+        if not reviewed or recovery_action != "accept_deviation" or bool(policy.overpour_hard_stop):
+            step_payload["recovery_reviewed"] = True
+            step_payload["action_label"] = "Accept changed batch"
+            step_payload["recovery_plan"] = (
+                "Accept the measured dose as a recipe deviation. Remaining pour targets stay unchanged. "
+                "Ingredient balance, final volume and nicotine strength may differ from the recipe. "
+                "No automatic correction has been applied. Go back to re-weigh if this reading is wrong."
+            )
+            db.execute("UPDATE mix_session_steps SET payload_json = ? WHERE id = ?",
+                       (json.dumps(step_payload), target_step_id))
+            db.commit()
+            blocked = bool(policy.overpour_hard_stop)
+            return {
+                "ok": not blocked,
+                "message": "Review the changed batch before accepting this dose.",
+                "policy": {"name": policy.name, "allowed": False,
+                           "decision": "overpour_review_required", "warnings": [],
+                           "hard_stops": ["Strict policy requires a corrected batch before continuing."] if blocked else []},
+            }
+        _append_mix_event_log(db, int(session_id), {
+            "event": "accepted_serious_overpour", "ingredient": step_payload.get("ingredient_name") or "",
+            "ingredient_category": step_payload.get("ingredient_category") or "",
+            "target_grams": step_payload.get("target_amount"),
+            "measured_grams": step_payload.get("measured_amount"),
+            "automatic_correction_applied": False,
+        })
     if not undo and str((step_payload or {}).get("step_type") or "").lower() == "add_ingredient":
         action = str(under_action or "").strip().lower()
         if action and bool((step_payload or {}).get("under_decision_pending")):
@@ -3285,11 +3324,8 @@ def complete_guided_step_with_policy(
                         note_kind="slight_over",
                     )
             else:
-                perf_inc = {"overshoot_count": 1}
-                if over_by <= float(over_tolerance) * 1.5:
-                    perf_inc["near_miss_count"] = 1
-                _bump_session_performance(db, int(session_id), **perf_inc)
                 context = {
+                    "ingredient_category": ingredient_kind,
                     "ingredient_id": step_payload.get("ingredient_id"),
                     "ingredient_name": str(step_payload.get("name") or ""),
                     "target_amount": float(display_target),
@@ -3390,8 +3426,7 @@ def complete_guided_step_with_policy(
             reading_eval["classification"] = classification
             reading_eval["remaining_grams"] = float(max(0.0, under_by))
             reading_eval["needed_grams"] = float(max(0.0, under_by))
-            already_pending = bool((step_payload or {}).get("under_decision_pending"))
-            if classification != "within_tolerance" and not already_pending:
+            if classification != "within_tolerance" and (accept_under or ingredient_kind in {"pg", "vg"}):
                 _bump_session_performance(db, int(session_id), undershoot_count=1)
             if under_msg:
                 progression = type(progression)(
@@ -3728,6 +3763,7 @@ def insert_dynamic_guided_event_step(
         else:
             payload_obj = {}
         payload_obj["ingredient_id"] = ingredient_id
+        payload_obj["ingredient_category"] = str(ctx.get("ingredient_category") or "")
         payload_obj["ingredient_name"] = ingredient_name
         payload_obj["target_amount"] = float(target_amount)
         payload_obj["measured_amount"] = float(measured_amount)
@@ -3747,7 +3783,7 @@ def insert_dynamic_guided_event_step(
         perf_inc["near_miss_count"] = 1
     if event in {"policy_block", "reconcile_required", "restart_guidance", "recovery_continue", "overpour"}:
         perf_inc["recovery_count"] = 1
-    performance_after = _bump_session_performance(db, int(session_id), **perf_inc) if perf_inc else perf_summary
+    performance_after = _bump_session_performance(db, int(session_id), **perf_inc) if perf_inc and pos is not None else perf_summary
     db.commit()
     return {
         "ok": True,

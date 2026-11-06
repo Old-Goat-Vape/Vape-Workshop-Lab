@@ -29,7 +29,7 @@
           <label class="form-label small text-secondary mb-0">Target batch size (ml)</label>
           <select class="form-select form-select-sm" name="batch_ml">
             {% set bm = wcm.target_batch_ml|float %}
-            {% set presets = [15, 30, 50, 60, 100, 120] %}
+            {% set presets = [10, 15, 30, 50, 60, 100, 120] %}
             {% for n in presets %}
               <option value="{{ n }}" {% if bm == n %}selected{% endif %}>{{ n }} ml</option>
             {% endfor %}

@@ -167,7 +167,7 @@
     </select>
     <label for="batch_ml_sel">Batch for stash hint</label>
     <select id="batch_ml_sel" name="batch_ml" class="form-select form-select-sm">
-      {% for n in [15, 30, 50, 60, 100] %}
+      {% for n in ([10, 15, 30, 50, 60, 100, stash_panel.batch_ml|float]|unique|sort) %}
         <option value="{{ n }}" {% if (stash_panel.batch_ml|float) == (n|float) %}selected{% endif %}>{{ n }} ml</option>
       {% endfor %}
     </select>
@@ -972,7 +972,7 @@
             reason: document.getElementById("statusReason").value || "",
           }),
         });
-        await renderStatusHistory();
+        window.location.reload();
       } catch (err) {
         if (engagementHint) engagementHint.textContent = err.message;
       }

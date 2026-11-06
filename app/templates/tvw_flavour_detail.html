@@ -29,7 +29,7 @@
             {% else %}
               · Personal stash
             {% endif %}
-            · <strong class="text-light">{{ '%.2f'|format(stash_binding.quantity_ml|float) }} ml</strong>
+            · <strong class="text-light" id="stashSummaryQty">{{ '%.2f'|format(stash_binding.quantity_ml|float) }} ml</strong>
             · <a class="link-info" href="#stash-actions">Adjust quantity</a>
             · <a class="link-info text-decoration-none" href="{{ url_for('tvw_recipes.tvw_stash') }}">Open My Stash</a>
           </div>
@@ -249,6 +249,7 @@
         method: "PATCH",
         body: JSON.stringify(body),
       });
+      document.getElementById("stashSummaryQty").textContent = `${qty.toFixed(2)} ml`;
       stashStatus.textContent = "Saved";
     } catch (e) {
       stashStatus.textContent = e.message || "Could not save stash entry.";
@@ -263,6 +264,7 @@
     try {
       await apiJson(url, { method: "DELETE" });
       stashQtyInput.value = "0.00";
+      document.getElementById("stashSummaryQty").textContent = "0.00 ml";
       stashStatus.textContent = "Removed";
     } catch (e) {
       stashStatus.textContent = e.message || "Could not remove stash entry.";

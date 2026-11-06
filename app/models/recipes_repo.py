@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from html import unescape
 from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -685,8 +686,10 @@ def search_flavour_reference_for_builder(*, query: str, limit: int = 100) -> Lis
     out: list[dict[str, Any]] = []
     for row in rows:
         d = dict(row)
-        brand = str(d.get("brand") or "Unknown")
-        name = str(d.get("name") or f"Flavor #{d.get('id')}")
+        brand = unescape(str(d.get("brand") or "Unknown"))
+        name = unescape(str(d.get("name") or f"Flavor #{d.get('id')}"))
+        d["brand"] = brand
+        d["name"] = name
         ref_id = int(d["id"])
         d["display_label"] = f"{brand} - {name} (#{ref_id})"
         out.append(d)

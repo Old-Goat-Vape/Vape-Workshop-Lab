@@ -1268,9 +1268,10 @@
     }
 
     if (stepType === "recovery") {
-
+      if (p.source_event === "final_batch_check") {
+        return { action: "Check the finished batch.", ingredient: "Final batch check", role: "Review", phase: p.what || "" };
+      }
       return {
-
         action: "Slow down and re-weigh.",
 
         ingredient: name || "This pour",
@@ -2291,7 +2292,9 @@
 
 
     if (!current) {
-
+      focusStepBadge.textContent = `${total} / ${total}`;
+      progLabel.textContent = `${done}/${total}`;
+      roleChip.textContent = "Done";
       focusCard.classList.add("d-none");
 
       if (usedPanel) usedPanel.classList.add("d-none");
@@ -3014,7 +3017,7 @@
 
       focusActions.innerHTML = `
 
-        <button type="button" class="tvw-ws-commit js-done-step" data-step-no="${current.step_no}">${actionLabelFor("recovery", p)}</button>
+        <button type="button" class="tvw-ws-commit js-done-step" data-step-no="${current.step_no}">${p.recovery_reviewed ? "Accept changed batch" : "Review recovery plan"}</button>
 
         ${undoVisible ? `<button type="button" class="tvw-ws-undo js-undo-step" data-step-no="${current.step_no}">${undoLabelFor(stepType)}</button>` : ""}
 
@@ -3122,7 +3125,7 @@
 
 
 
-    if (stepType === "recovery") {
+    if (stepType === "recovery" && p.source_event !== "final_batch_check") {
 
       const resolveName = cleanDisplayName(
 
@@ -3398,9 +3401,7 @@
 
         `Actual: ${actual.toFixed(2)} g`,
 
-        "This is too much to ignore.",
-
-        "The bench needs to adjust the remaining recipe before you continue.",
+        p.recovery_plan || "Review the measured dose before continuing. No correction has been applied.",
 
       ].join("\n"),
 
@@ -3967,6 +3968,8 @@
 
       const payload = { undo: !!undoBtn, measured_grams: measuredGrams != null ? measuredGrams : measuredRaw };
 
+      const activeStep = ((window.__guidedSessionLast || {}).steps || []).find((s) => Number(s.step_no) === stepNo);
+      if (doneBtn && activeStep?.payload?.recovery_reviewed) payload.recovery_action = "accept_deviation";
       if (acceptBtn || confirmAcceptBtn) payload.accept_under = true;
 
       if (nicotineConfirmAcceptBtn) payload.nicotine_action = "confirm_accept_over";

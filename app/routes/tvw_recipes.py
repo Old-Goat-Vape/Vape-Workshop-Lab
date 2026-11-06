@@ -943,7 +943,7 @@ def tvw_stash():
         sort_by=sort_by,
         sort_dir=sort_dir,
     )
-    quick_add_options = stash_service.fetch_stash_quick_add_options(limit=1000)
+    quick_add_options = []  # Search the full catalogue on demand; do not cap an embedded seed.
     return render_template(
         "tvw_stash.html",
         stash_rows=rows,

@@ -902,6 +902,18 @@ class TVWApiTests(unittest.TestCase):
             json={},
         )
         self.assertEqual(ack.status_code, 200)
+        reviewed = ack.get_json()["session"]
+        review_step = next(s for s in reviewed["steps"] if int(s["step_no"]) == recovery_no)
+        self.assertIsNone(review_step["completed_at"])
+        self.assertTrue(review_step["payload"]["recovery_reviewed"])
+        self.assertIn("No automatic correction", review_step["payload"]["recovery_plan"])
+        self.assertEqual(reviewed["performance_summary"]["overshoot_count"], 1)
+        # A repeated normal completion still cannot accept the changed batch.
+        repeated = self.client.post(f"/api/mix/guided/session/{sid}/steps/{recovery_no}/complete", json={})
+        self.assertEqual(int(repeated.get_json()["session"]["progress"]["current_step_no"]), recovery_no)
+        ack = self.client.post(f"/api/mix/guided/session/{sid}/steps/{recovery_no}/complete",
+                               json={"recovery_action": "accept_deviation"})
+        self.assertEqual(ack.status_code, 200)
         after_ack = self.client.get(f"/api/mix/guided/session/{sid}").get_json()["session"]
         resolved = [
             s for s in (after_ack.get("steps") or [])
@@ -910,6 +922,34 @@ class TVWApiTests(unittest.TestCase):
         ]
         self.assertEqual(len(resolved), 1)
         self.assertIsNotNone(resolved[0].get("completed_at"))
+
+    def test_live_audit_small_biscuit_overpour_trims_pg_without_recovery(self):
+        with flask_app.app_context():
+            db=get_db()
+            db.execute("UPDATE recipe_items SET amount_percent=2 WHERE version_id=1")
+            db.commit()
+        created=self.client.post('/api/mix/guided/session',json={'recipe_id':1,'target_ml':10,'target_nic_mg_ml':0})
+        sid=created.get_json()['mix_session_id']
+        step=self._guided_first_add_step(sid)
+        result=self.client.post(f"/api/mix/guided/session/{sid}/steps/{step['step_no']}/complete",json={'measured_grams':.23})
+        body=result.get_json()
+        self.assertEqual(result.status_code,200)
+        self.assertFalse(body.get('awaiting_overpour_recovery'))
+        self.assertTrue(body['reading']['base_adjusted'])
+        session=body['session']
+        pg=next(s for s in session['steps'] if s['payload'].get('step_type')=='add_ingredient' and s['payload'].get('category')=='pg')
+        self.assertLess(pg['payload']['target_grams'],2.8*1.036)
+        self.assertEqual(session['performance_summary']['overshoot_count'],1)
+
+    def test_live_audit_corrected_zero_reading_does_not_count_as_accepted_underpour(self):
+        created=self.client.post('/api/mix/guided/session',json={'recipe_id':1,'target_ml':10,'target_nic_mg_ml':0})
+        sid=created.get_json()['mix_session_id']
+        step=self._guided_first_add_step(sid)
+        url=f"/api/mix/guided/session/{sid}/steps/{step['step_no']}/complete"
+        self.client.post(url,json={'measured_grams':0})
+        result=self.client.post(url,json={'measured_grams':round(step['payload']['target_grams'],2)})
+        self.assertEqual(result.status_code,200)
+        self.assertEqual(result.get_json()['session']['performance_summary']['undershoot_count'],0)
 
     def test_guided_serious_overpour_recovery_step_action_label(self):
         create = self.client.post(
@@ -1374,6 +1414,8 @@ class TVWApiTests(unittest.TestCase):
                 pour = self._linked_pour_before_transition(sess, int(current["step_no"]))
                 return pour, current
             json_body: dict = {}
+            if step_type == "recovery" and payload.get("recovery_reviewed"):
+                json_body = {"recovery_action": "accept_deviation"}
             if step_type == "add_ingredient":
                 tg = float(payload.get("display_target_grams") or payload.get("target_grams") or 0.0)
                 json_body = {"measured_grams": round(tg, 2)}
@@ -1463,6 +1505,8 @@ class TVWApiTests(unittest.TestCase):
             json={},
         )
         self.assertEqual(ack.status_code, 200)
+        self.client.post(f"/api/mix/guided/session/{sid}/steps/{recovery_no}/complete",
+                         json={"recovery_action": "accept_deviation"})
         sess = self._guided_session_steps(sid)
         transition = next(
             s
@@ -1636,6 +1680,8 @@ class TVWApiTests(unittest.TestCase):
             if step_type == "add_ingredient" and str(payload.get("category") or "").lower() == want:
                 return int(current["step_no"]), current
             json_body: dict = {}
+            if step_type == "recovery" and payload.get("recovery_reviewed"):
+                json_body = {"recovery_action": "accept_deviation"}
             if step_type == "add_ingredient":
                 tg = float(payload.get("display_target_grams") or payload.get("target_grams") or 0.0)
                 if tg > 0:
@@ -1657,6 +1703,8 @@ class TVWApiTests(unittest.TestCase):
             payload = current.get("payload") or {}
             step_type = str(payload.get("step_type") or "").lower()
             json_body: dict = {}
+            if step_type == "recovery" and payload.get("recovery_reviewed"):
+                json_body = {"recovery_action": "accept_deviation"}
             if step_type == "add_ingredient":
                 if payload.get("under_decision_pending"):
                     tg = float(payload.get("target_grams") or payload.get("display_target_grams") or 0.0)
@@ -3526,6 +3574,8 @@ class TVWApiTests(unittest.TestCase):
             payload = current.get("payload") or {}
             step_type = str(payload.get("step_type") or "").lower()
             json_body: dict = {}
+            if step_type == "recovery" and payload.get("recovery_reviewed"):
+                json_body = {"recovery_action": "accept_deviation"}
             if step_type == "add_ingredient":
                 if payload.get("under_decision_pending"):
                     tg = float(payload.get("target_grams") or payload.get("display_target_grams") or 0.0)

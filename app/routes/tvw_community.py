@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, session, url_for
+from flask import abort, request, Blueprint, current_app, flash, jsonify, redirect, render_template, session, url_for
 
 from services import community_discovery_service, guided_mix_session_service
+from db import get_db
+from models import recipes_repo
 from utils.auth import (
     can_access_lab_bridge,
     is_old_goat_role,
@@ -51,8 +53,19 @@ def community_feed():
 
 
 @tvw_community_bp.route("/profile/<username>")
+@login_required
 def profile(username: str):
-    return jsonify({"status": "success", "username": username})
+    user = get_db().execute("SELECT id, username FROM users WHERE username = ? COLLATE NOCASE", (username,)).fetchone()
+    if not user:
+        abort(404)
+    page = request.args.get("page", 1, type=int) or 1
+    page = max(1, page)
+    recipes, total = recipes_repo.fetch_tvw_library(
+        owner_user_id=int(user["id"]), viewer_user_id=int(session["user_id"]),
+        page=page, page_size=20,
+    )
+    return render_template("tvw_profile.html", profile_user=dict(user), recipes=recipes,
+                           total=total, page=page, has_next=page * 20 < total)
 
 
 @tvw_community_bp.route("/bridge/lab")

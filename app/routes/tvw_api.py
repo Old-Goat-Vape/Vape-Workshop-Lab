@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from math import isfinite
 import sqlite3
 from datetime import UTC, datetime
 from typing import Tuple
@@ -773,11 +774,11 @@ def guided_mix_session():
             user_id=user_id,
             recipe_id=recipe_id,
             requested_version_id=int(data.get("version_id") or 0) or None,
-            target_ml=float(data.get("target_ml") or 30.0),
-            target_nic_mg_ml=float(data.get("target_nic_mg_ml") or 0.0),
-            nic_base_mg_ml=float(data.get("nic_base_mg_ml") or 100.0),
-            pg_ratio=float(data.get("pg_ratio") or 30.0),
-            vg_ratio=float(data.get("vg_ratio") or 70.0),
+            target_ml=float(data["target_ml"]) if data.get("target_ml") is not None else 30.0,
+            target_nic_mg_ml=float(data["target_nic_mg_ml"]) if data.get("target_nic_mg_ml") is not None else 0.0,
+            nic_base_mg_ml=float(data["nic_base_mg_ml"]) if data.get("nic_base_mg_ml") is not None else 100.0,
+            pg_ratio=float(data["pg_ratio"]) if data.get("pg_ratio") is not None else 30.0,
+            vg_ratio=float(data["vg_ratio"]) if data.get("vg_ratio") is not None else 70.0,
             nicotine_carrier=str(data.get("nicotine_carrier") or "PG"),
             nicotine_strictness_mode=str(data.get("nicotine_strictness_mode") or data.get("strictness_mode") or "personal"),
         )
@@ -827,6 +828,14 @@ def list_mix_history():
     return jsonify({"status": "success", "items": items, "total": total}), 200
 
 
+@tvw_api_bp.route("/stash/flavour-search", methods=["GET"])
+@login_required
+def stash_flavour_search():
+    query = (request.args.get("q") or "").strip()[:200]
+    items = stash_service.fetch_stash_quick_add_options(query=query, limit=50) if len(query) >= 2 else []
+    return jsonify({"status": "success", "items": items}), 200
+
+
 @tvw_api_bp.route("/recipes/flavour-search", methods=["GET"])
 @login_required
 def recipe_builder_flavour_search():
@@ -849,11 +858,11 @@ def recipe_builder_live_calc():
         rows = []
     try:
         payload = tvw_mix_service.live_mix_for_builder(
-            target_ml=float(data.get("target_ml") or 60.0),
-            target_nic_mg_ml=float(data.get("target_nic_mg_ml") or 3.0),
-            nic_base_mg_ml=float(data.get("nic_base_mg_ml") or 100.0),
-            pg_ratio=float(data.get("pg_ratio") or 30.0),
-            vg_ratio=float(data.get("vg_ratio") or 70.0),
+            target_ml=float(data["target_ml"]) if data.get("target_ml") is not None else 60.0,
+            target_nic_mg_ml=float(data["target_nic_mg_ml"]) if data.get("target_nic_mg_ml") is not None else 3.0,
+            nic_base_mg_ml=float(data["nic_base_mg_ml"]) if data.get("nic_base_mg_ml") is not None else 100.0,
+            pg_ratio=float(data["pg_ratio"]) if data.get("pg_ratio") is not None else 30.0,
+            vg_ratio=float(data["vg_ratio"]) if data.get("vg_ratio") is not None else 70.0,
             nicotine_carrier=str(data.get("nicotine_carrier") or "PG"),
             rows=rows,
         )
@@ -964,6 +973,9 @@ def complete_guided_mix_step(session_id: int, step_no: int):
     except (TypeError, ValueError):
         return jsonify({"status": "error", "message": "measured_grams must be a number."}), 400
 
+    if measured_grams_value is not None and (not isfinite(measured_grams_value) or measured_grams_value < 0):
+        return jsonify({"status": "error", "message": "Scale reading must be a finite, non-negative number."}), 400
+
     outcome: dict
     perf: dict
     bundle = None
@@ -985,6 +997,7 @@ def complete_guided_mix_step(session_id: int, step_no: int):
                     accept_under=accept_under,
                     under_action=under_action,
                     nicotine_action=nicotine_action,
+                    recovery_action=str(data.get("recovery_action") or "").strip().lower() or None,
                 )
         except sqlite3.OperationalError as exc:
             if is_sqlite_busy_error(exc):
