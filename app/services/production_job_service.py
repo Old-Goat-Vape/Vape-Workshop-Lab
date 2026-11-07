@@ -907,6 +907,7 @@ def production_context_for_session(mix_session_id: int) -> dict[str, Any] | None
                b.target_bottles,
                b.operator_user_id,
                j.name AS job_name,
+               j.status AS job_status,
                r.name AS recipe_name,
                rv.version_number
         FROM production_job_batches b

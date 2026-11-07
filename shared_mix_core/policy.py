@@ -174,7 +174,7 @@ def ingredient_over_requires_recovery(
     )
     ratio = (float(measured) / float(display_target)) if display_target > 0 else 999.0
     if kind == "flavor":
-        return ratio > float(policy.overpour_threshold_multiplier)
+        return over_by > tol + 0.0005 and ratio > float(policy.overpour_threshold_multiplier)
     if kind == "pg":
         return over_by > tol * 4.0 or ratio > 1.20
     if kind == "vg":

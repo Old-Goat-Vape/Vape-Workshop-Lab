@@ -468,48 +468,16 @@ def build_guided_narrative_steps(
             category=category,
         )
 
-    recovery_severity = "danger" if hard_stops else "warning"
-    policy_context = ""
-    if hard_stops:
-        policy_context = hard_stops[0]
-    elif warnings:
-        policy_context = warnings[0]
-    elif policy_name:
-        policy_context = f"Policy context: {policy_name}."
-
     push(
         STEP_RECOVERY,
-        title="Recovery guidance",
-        what=(
-            f"If a deviation occurs, run reconcile before sign-off. {policy_context}".strip()
-            if policy_context
-            else "If a deviation occurs, run reconcile before sign-off."
-        ),
-        why=(
-            "Recovery protects the recipe trajectory after mistakes."
-            if not tone.strict
-            else "Recovery is required to restore controlled process state."
-        ),
-        tip=_stable_pick(
-            [
-                "Reconcile immediately after an overpour; do not guess-correct.",
-                "If drift appears, pause and recover before the next pour.",
-                "Use recovery early to avoid larger downstream corrections.",
-            ]
-            if not tone.strict
-            else [
-                "No continuation on unresolved deviations.",
-                "Execute recovery protocol before any additional dispense.",
-                "Recovery is a mandatory process gate when drift is detected.",
-            ],
-            tone.profile,
-            "planned_recovery",
-            recovery_severity,
-            policy_name,
-            session_seed,
-        ),
-        action_label=("Recovery acknowledged" if tone.strict else "Recovery checked"),
-        severity=recovery_severity,
+        title="Final batch check",
+        source_event="final_batch_check",
+        name="Final batch check",
+        what="Check the final bottle level and the batch label before saving.",
+        why="Confirm the finished batch details, including any accepted deviations.",
+        tip="Let bubbles settle before judging the final level.",
+        action_label="Batch checked",
+        severity="info",
     )
 
     push(

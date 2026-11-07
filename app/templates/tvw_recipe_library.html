@@ -179,7 +179,7 @@
           <label class="form-label" for="filterBatchMl">Stash batch (ml)</label>
           <select class="form-select" name="batch_ml" id="filterBatchMl">
             {% set bm = (filters.batch_ml or '30') %}
-            {% for n in [15, 30, 50, 60, 100] %}
+            {% for n in [10, 15, 30, 50, 60, 100] %}
               <option value="{{ n }}" {% if bm == (n|string) %}selected{% endif %}>{{ n }} ml</option>
             {% endfor %}
           </select>
