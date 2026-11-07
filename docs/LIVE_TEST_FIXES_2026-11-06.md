@@ -34,3 +34,22 @@ Six affected pages render through Flask test clients; 12 rendered inline JavaScr
 6. Search Vanilla Swirl in My Stash, add it, then verify the private recipe appears in What Can I Make. Check author profiles and completed-session reload.
 
 No complete-app sign-off: imported catalogue hardware/aliases/product variants need a separate data review. No records are deleted or bulk-merged by this patch. Initial session loss remains unconfirmed. Mobile, live multi-account privacy, admin/Lab and remaining edge cases still require testing.
+
+## Master-access follow-up — 7 November 2026
+
+The live Master pass covered the admin console, users, flavour intelligence, Lab dashboard, production jobs, empty sales/decanting pages, earnings and moderation of our own QA feedback. No real production, sales, payments, user role changes, scraper runs or bulk classification changes were performed.
+
+Additional fixes:
+
+- Cancelled production batches and cancelled jobs reject guided progression and undo before any step writes. Their mixing screens display cancellation and their sessions disappear from the Continue mix list. Production context now includes job status.
+- Master user-editor options come from the canonical role hierarchy, including member, moderator and admin, so the current role remains selected.
+- Single-flavour classification no longer crashes on the misspelled brand-alias constant. Preview remains read-only. The UI handles HTML responses, expired-session redirects and network failures without leaving “Previewing…” indefinitely.
+- Sidebar active-link code selects actual navigation anchors and safely parses relative or malformed URLs.
+- Manual stock addition and reference reclassification use the canonical Foreman threshold rather than unreachable legacy rank 6. Member access remains denied. Existing merge/archive/edit policy has not been widened.
+- Owner-only pricing/costing shortcuts are shown only to the account allowed by their existing gate.
+
+New isolated regression checks: 4 Python tests fail on the previous branch revision (4 failures and one error across subtests), and pass with these changes. The combined Master/member audit run passes all 13 tests. All 10 production service tests also pass with Lab modules enabled at startup. Node regressions cover successful classification preview, HTML error responses, redirects, network failure and sidebar URLs. Python compilation and whitespace checks pass. These are focused results; the earlier 20 baseline failures remain documented above.
+
+Live QA job #2, “SLH QA - Production Workflow - DO NOT PRODUCE”, was left cancelled, with batch #1 cancelled and zero completed production, stock usage, earnings or payments. Guided session #62 was used to reproduce the cancellation defect: Ready to pour advanced despite cancellation; no weight was entered. Recipe #114 / version #116 was attached as 2 × 10 ml. Bottle/label overrides were R5/R4. QA feedback #1 was hidden and then restored active. An attempted zero-stock manual inventory item was rejected by the old rank gate, so it was not created live.
+
+After deployment, retest the cancelled session #62 and job #2: no progression or undo should be accepted, and Continue mix must not offer that session. Verify the user role editor without changing another person's role; preview INW Biscuit reference #626; confirm errors clear rather than spin; check Master manual inventory addition with an explicitly disposable test record. Catalogue classification accuracy and duplicate/priced variants still require a separate review. Mobile, reset/login and live cross-account checks remain outstanding. No complete-app sign-off or live deployment is claimed.

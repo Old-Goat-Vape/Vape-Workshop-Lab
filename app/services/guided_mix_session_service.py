@@ -2100,6 +2100,12 @@ def list_user_guided_sessions(*, user_id: int, limit: int = 30) -> list[dict[str
         JOIN recipe_versions rv ON rv.id = ms.recipe_version_id
         JOIN recipes r ON r.id = rv.recipe_id
         WHERE ms.user_id = ? AND LOWER(COALESCE(ms.mode, '')) = 'guided'
+          AND NOT EXISTS (
+              SELECT 1 FROM production_job_batches pb
+              JOIN production_jobs pj ON pj.id = pb.production_job_id
+              WHERE pb.guided_mix_session_id = ms.id
+                AND (pb.status = 'cancelled' OR pj.status = 'cancelled')
+          )
         ORDER BY ms.created_at DESC
         LIMIT ?
         """,
@@ -2398,6 +2404,14 @@ def complete_guided_step_with_policy(
                 "hard_stops": ["Mix session not found."],
             },
         }
+    from services.production_job_service import production_context_for_session
+    production = production_context_for_session(int(session_id))
+    if production and (production["batch_status"] == "cancelled" or production["job_status"] == "cancelled"):
+        message = "This production batch or job was cancelled. Mixing cannot continue."
+        return {"ok": False, "message": message, "policy": {
+            "name": policy.name, "allowed": False, "decision": "production_cancelled",
+            "warnings": [], "hard_stops": [message],
+        }}
     next_open = db.execute(
         """
         SELECT step_no

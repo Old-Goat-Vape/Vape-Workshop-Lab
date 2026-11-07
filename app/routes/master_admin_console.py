@@ -61,7 +61,7 @@ def console():
 
     ctx: Dict[str, Any] = {
         "tab": tab,
-        "roles": ["Kid", "Hand", "Mixer", "Ram", "Foreman", "Old Goat", "Master"],
+        "roles": sorted(ROLE_HIERARCHY, key=lambda role: (ROLE_HIERARCHY[role], role)),
         "role_filter": role_filter,
         "search": search,
         "audit_user": audit_user,

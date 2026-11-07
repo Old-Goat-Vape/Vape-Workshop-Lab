@@ -916,50 +916,34 @@ async function runFlavorClassifyApply() {
   }
 }
 
-async function previewSingleFlavorClassification() {
+async function classifySingleFlavor(apply) {
   const id = parseInt(document.getElementById('singleFlavorId').value || '0', 10);
   const box = classificationResultBox();
   if (!box) return;
-  if (!id) { box.className = 'mt-3 small text-danger'; box.textContent = 'Enter flavor ID'; return; }
+  if (!id || id < 0) { box.className = 'mt-3 small text-danger'; box.textContent = 'Enter a positive flavor ID'; return; }
+  if (apply && !confirm(`Apply classification to flavor #${id}?`)) return;
   box.className = 'mt-3 small text-secondary';
-  box.textContent = `Previewing flavor ${id}...`;
-  const res = await fetch(`/master-admin/flavors/classify/${id}`, {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ apply: false })
-  });
-  const data = await res.json();
-  if (!res.ok || data.status !== 'success') {
+  box.textContent = `${apply ? 'Applying' : 'Previewing'} flavor ${id}...`;
+  try {
+    const res = await fetch(`/master-admin/flavors/classify/${id}`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({apply})
+    });
+    if (res.redirected) throw new Error('Your session may have expired. Reload the page and sign in again.');
+    if (!(res.headers.get('content-type') || '').includes('application/json')) {
+      throw new Error(`The server returned an unexpected response (HTTP ${res.status}). Reload the page or check the server logs.`);
+    }
+    const data = await res.json();
+    if (!res.ok || data.status !== 'success') throw new Error(data.message || 'Classification failed');
+    box.className = 'mt-3 small text-success';
+    box.textContent = `Flavor #${id}${apply ? ' updated' : ' preview'}: profile=${data.result.resolved_profile}, confidence=${data.result.confidence}`;
+  } catch (error) {
     box.className = 'mt-3 small text-danger';
-    box.textContent = data.message || 'Preview failed';
-    return;
+    box.textContent = error.message || 'Classification request failed. Please try again.';
   }
-  box.className = 'mt-3 small text-info';
-  box.textContent = `Flavor #${id}: profile=${data.result.resolved_profile}, primary=${data.result.keyword_primary || '-'}, confidence=${data.result.confidence}`;
 }
-
-async function applySingleFlavorClassification() {
-  const id = parseInt(document.getElementById('singleFlavorId').value || '0', 10);
-  const box = classificationResultBox();
-  if (!box) return;
-  if (!id) { box.className = 'mt-3 small text-danger'; box.textContent = 'Enter flavor ID'; return; }
-  if (!confirm(`Apply classification to flavor #${id}?`)) return;
-  box.className = 'mt-3 small text-secondary';
-  box.textContent = `Applying flavor ${id}...`;
-  const res = await fetch(`/master-admin/flavors/classify/${id}`, {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ apply: true })
-  });
-  const data = await res.json();
-  if (!res.ok || data.status !== 'success') {
-    box.className = 'mt-3 small text-danger';
-    box.textContent = data.message || 'Apply failed';
-    return;
-  }
-  box.className = 'mt-3 small text-success';
-  box.textContent = `Flavor #${id} updated: profile=${data.result.resolved_profile}, confidence=${data.result.confidence}`;
-}
+function previewSingleFlavorClassification() { return classifySingleFlavor(false); }
+function applySingleFlavorClassification() { return classifySingleFlavor(true); }
 
 function recipeAnalyticsBox() {
   return document.getElementById('recipeAnalyticsResult');

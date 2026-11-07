@@ -3224,6 +3224,16 @@
 
 
   const applySession = (sess) => {
+    const production = sess.production_job;
+    if (production && (production.batch_status === "cancelled" || production.job_status === "cancelled")) {
+      focusCard.className = "tvw-ws-panel tvw-ws-face";
+      focusCard.textContent = "Production cancelled. This batch cannot continue. Open the job above to review it.";
+      if (usedPanel) usedPanel.classList.add("d-none");
+      if (todoPanel) todoPanel.classList.add("d-none");
+      if (completionSummary) completionSummary.classList.add("d-none");
+      return;
+    }
+
 
     const prog = sess.progress || {};
 

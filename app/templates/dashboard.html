@@ -48,8 +48,10 @@
         </div>
         <div class="row g-2">
             <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('recipes.library') }}" class="btn btn-outline-warning">Start Mix</a></div>
+            {% if (session.get('username') or '')|lower == 'old goat' %}
             <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('recipes.pricing_sheet') }}" class="btn btn-outline-warning">Price List Worksheet</a></div>
             <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('recipes.cost_calculator') }}" class="btn btn-outline-warning">Recipe Cost Calculator</a></div>
+            {% endif %}
             <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('recipes.create_recipe') }}" class="btn btn-outline-light">Recipe Creator</a></div>
             <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('library.index') }}" class="btn btn-outline-light">Inventory / Library</a></div>
             <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('mix.history') }}" class="btn btn-outline-light">Batch Logs</a></div>

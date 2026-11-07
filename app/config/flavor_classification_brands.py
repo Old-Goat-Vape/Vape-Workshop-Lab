@@ -71,7 +71,7 @@ def resolve_canonical_brand(brand: str) -> str:
     if short in LIBRARY_SHORT_TO_TRAIT_FAMILY:
         return LIBRARY_SHORT_TO_TRAIT_FAMILY[short]
     key = _normalize_key(raw)
-    if key in BRAND_ALIAS_TO_CANONonical:
+    if key in BRAND_ALIAS_TO_CANONICAL:
         return BRAND_ALIAS_TO_CANONICAL[key]
     for canon in CANONICAL_BRAND_FLAVOR_DEFAULTS:
         if _normalize_key(canon) == key:
