@@ -333,56 +333,15 @@ def evaluate_nicotine_overpour_policy(*, strictness: str, over_by: float) -> dic
     """Return tier + whether accept/fix/recovery paths are allowed for nicotine over."""
     over = max(0.0, float(over_by or 0.0))
     mode = normalize_nicotine_strictness(strictness)
-    if mode == NICOTINE_STRICTNESS_LAB_CLIENT:
-        if over <= 0.05:
-            return {
-                "tier": "minor",
-                "accept_allowed": True,
-                "recovery_required": False,
-                "strong_recommend_recovery": False,
-                "warning": (
-                    f"Nicotine over by {over:.2f} g\n"
-                    "Client/lab mode: only slight overages may be accepted with confirmation."
-                ),
-            }
-        return {
-            "tier": "severe",
-            "accept_allowed": False,
-            "recovery_required": True,
-            "strong_recommend_recovery": True,
-            "warning": "Client/lab mode: nicotine over tolerance must be corrected.",
-        }
-    if over <= 0.05:
-        return {
-            "tier": "minor",
-            "accept_allowed": True,
-            "recovery_required": False,
-            "strong_recommend_recovery": False,
-            "warning": (
-                f"Nicotine over by {over:.2f} g\n"
-                "Personal mix: slight over may be acceptable by judgement, or you can fix the dose."
-            ),
-        }
-    if over < 0.10:
-        return {
-            "tier": "moderate",
-            "accept_allowed": True,
-            "recovery_required": False,
-            "strong_recommend_recovery": True,
-            "warning": (
-                f"Nicotine over by {over:.2f} g\n"
-                "Correction strongly recommended. Accept only if you deliberately confirm."
-            ),
-        }
+    tier = "minor" if over <= 0.05 else "moderate" if over < 0.10 else "severe"
+    if mode == NICOTINE_STRICTNESS_LAB_CLIENT and over > 0.05:
+        tier = "severe"
     return {
-        "tier": "severe",
+        "tier": tier,
         "accept_allowed": False,
         "recovery_required": True,
         "strong_recommend_recovery": True,
-        "warning": (
-            f"Nicotine over by {over:.2f} g\n"
-            "Correction required before continuing."
-        ),
+        "warning": "Nicotine over target. Correct the dose before adding any other ingredient. Do not tare.",
     }
 
 
@@ -2627,244 +2586,26 @@ def complete_guided_step_with_policy(
                 ],
             )
 
-        if (
-            not undo
-            and _is_nicotine_payload(step_payload or {})
-            and nic_action == "cancel_accept"
-            and bool((step_payload or {}).get("nicotine_accept_confirm_pending"))
+        # Resume old sessions without retaining the retired accept-over escape path.
+        if _is_nicotine_payload(step_payload or {}) and (
+            step_payload.get("nicotine_over_decision_pending")
+            or step_payload.get("nicotine_accept_confirm_pending")
         ):
-            display_target = float(
-                (step_payload or {}).get("display_target_grams")
-                or _display_target_grams(
-                    float((step_payload or {}).get("target_grams") or (step_payload or {}).get("grams") or 0.0)
-                )
-            )
-            measured_stored = float((step_payload or {}).get("measured_grams") or 0.0)
-            over_by = max(0.0, round(measured_stored, 2) - display_target)
+            step_payload.pop("nicotine_over_decision_pending", None)
             step_payload.pop("nicotine_accept_confirm_pending", None)
-            step_payload["nicotine_over_decision_pending"] = True
-            _persist_step_payload()
-            reading_eval = {
-                "display_target_grams": float(display_target),
-                "measured_grams": float(measured_stored),
-                "display_measured_grams": round(measured_stored, 2),
-                "over_by_grams": float(over_by),
-                "classification": "nicotine_over_decision",
-                "nicotine_strictness_mode": nic_strictness,
-                "nicotine_accept_allowed": bool((step_payload or {}).get("nicotine_accept_allowed")),
-                "nicotine_over_tier": str((step_payload or {}).get("nicotine_over_tier") or ""),
-            }
-            return _nicotine_recovery_response(
-                policy=policy,
-                session_id=int(session_id),
-                inserted_step_nos=inserted_step_nos,
-                reading_eval=reading_eval,
-                message="Choose to accept the overpour or fix the nicotine dose.",
-                decision="nicotine_over_decision",
-                warnings=[str((step_payload or {}).get("nicotine_over_warning") or "")],
-                awaiting_over_decision=True,
-            )
-
-        if (
-            not undo
-            and _is_nicotine_payload(step_payload or {})
-            and nic_action == "accept_over"
-            and bool((step_payload or {}).get("nicotine_over_decision_pending"))
-        ):
-            if not bool((step_payload or {}).get("nicotine_accept_allowed")):
-                return {
-                    "ok": False,
-                    "message": "Nicotine accept is not allowed for this overpour in the current strictness mode.",
-                    "inserted_step_nos": inserted_step_nos,
-                    "policy": {
-                        "name": policy.name,
-                        "allowed": False,
-                        "decision": "nicotine_accept_blocked",
-                        "warnings": [],
-                        "hard_stops": ["Client/lab mode: nicotine over tolerance must be corrected."],
-                    },
-                }
-            display_target = float(
-                (step_payload or {}).get("display_target_grams")
-                or _display_target_grams(
-                    float((step_payload or {}).get("target_grams") or (step_payload or {}).get("grams") or 0.0)
-                )
-            )
-            measured_stored = float((step_payload or {}).get("measured_grams") or 0.0)
-            over_by = max(0.0, round(measured_stored, 2) - display_target)
-            step_payload.pop("nicotine_over_decision_pending", None)
-            step_payload["nicotine_accept_confirm_pending"] = True
-            _persist_step_payload()
-            reading_eval = {
-                "display_target_grams": float(display_target),
-                "measured_grams": float(measured_stored),
-                "display_measured_grams": round(measured_stored, 2),
-                "over_by_grams": float(over_by),
-                "classification": "nicotine_accept_confirm",
-                "nicotine_strictness_mode": nic_strictness,
-            }
-            return _nicotine_recovery_response(
-                policy=policy,
-                session_id=int(session_id),
-                inserted_step_nos=inserted_step_nos,
-                reading_eval=reading_eval,
-                message="Confirm accept nicotine over target.",
-                decision="nicotine_accept_confirm",
-                warnings=[
-                    "Accept nicotine over target?",
-                    f"Target: {display_target:.2f} g",
-                    f"Actual: {round(measured_stored, 2):.2f} g",
-                    f"Over by: {over_by:.2f} g",
-                    "Final nicotine strength may be higher than the recipe target.",
-                    "This will be saved in the batch log.",
-                ],
-            )
-
-        if (
-            not undo
-            and _is_nicotine_payload(step_payload or {})
-            and nic_action == "fix_dose"
-            and bool((step_payload or {}).get("nicotine_over_decision_pending"))
-        ):
-            display_target = float(
-                (step_payload or {}).get("display_target_grams")
-                or _display_target_grams(
-                    float((step_payload or {}).get("target_grams") or (step_payload or {}).get("grams") or 0.0)
-                )
-            )
-            measured_stored = float((step_payload or {}).get("measured_grams") or 0.0)
-            over_by = max(0.0, round(measured_stored, 2) - display_target)
-            step_payload.pop("nicotine_over_decision_pending", None)
+            step_payload["nicotine_accept_allowed"] = False
             step_payload["nicotine_overpour_pending"] = True
-            _log_nicotine_over_decision(
-                db,
-                int(session_id),
-                strictness=nic_strictness,
-                target_grams=display_target,
-                actual_grams=measured_stored,
-                over_by_grams=over_by,
-                action="nicotine_recovery_started",
-                warning=str((step_payload or {}).get("nicotine_over_warning") or ""),
-                accept_allowed=bool((step_payload or {}).get("nicotine_accept_allowed")),
-            )
             _persist_step_payload()
-            reading_eval = {
-                "display_target_grams": float(display_target),
-                "measured_grams": float(measured_stored),
-                "over_by_grams": float(over_by),
-                "classification": "nicotine_over_target",
-                "nicotine_strictness_mode": nic_strictness,
-            }
+        if _is_nicotine_payload(step_payload or {}) and nic_action in {
+            "accept_over", "confirm_accept_over", "cancel_accept", "fix_dose"
+        }:
             return _nicotine_pour_back_response(
-                reading=reading_eval,
-                message="Fix nicotine dose — pour back required.",
+                reading={"classification": "nicotine_over_target",
+                         "display_target_grams": step_payload.get("display_target_grams"),
+                         "measured_grams": step_payload.get("measured_grams"),
+                         "nicotine_accept_allowed": False},
+                message="Correct the nicotine dose before continuing. Do not tare.",
             )
-
-        if (
-            not undo
-            and _is_nicotine_payload(step_payload or {})
-            and nic_action == "confirm_accept_over"
-            and bool((step_payload or {}).get("nicotine_accept_confirm_pending"))
-        ):
-            display_target = float(
-                (step_payload or {}).get("display_target_grams")
-                or _display_target_grams(
-                    float((step_payload or {}).get("target_grams") or (step_payload or {}).get("grams") or 0.0)
-                )
-            )
-            measured_stored = float((step_payload or {}).get("measured_grams") or 0.0)
-            display_measured = round(measured_stored, 2)
-            over_by = max(0.0, display_measured - display_target)
-            target = float((step_payload or {}).get("target_grams") or (step_payload or {}).get("grams") or 0.0)
-            _log_nicotine_over_decision(
-                db,
-                int(session_id),
-                strictness=nic_strictness,
-                target_grams=display_target,
-                actual_grams=measured_stored,
-                over_by_grams=over_by,
-                action="accepted_nicotine_over",
-                warning=str((step_payload or {}).get("nicotine_over_warning") or ""),
-                accept_allowed=bool((step_payload or {}).get("nicotine_accept_allowed")),
-            )
-            for key in (
-                "nicotine_accept_confirm_pending",
-                "nicotine_over_decision_pending",
-                "nicotine_overpour_pending",
-                "nicotine_recovery_mode",
-                "nicotine_poured_back",
-                "nicotine_overpour_detected_at_grams",
-                "recovery_current_scale_grams",
-                "nicotine_over_tier",
-                "nicotine_accept_allowed",
-                "nicotine_over_warning",
-            ):
-                step_payload.pop(key, None)
-            step_payload["measured_grams"] = float(measured_stored)
-            step_payload["display_target_grams"] = float(display_target)
-            step_payload["target_grams"] = float(target)
-            step_payload["delta_grams"] = float(measured_stored - display_target)
-            dens = _density_from_step_payload(step_payload)
-            if dens and dens > 0:
-                step_payload["density"] = float(dens)
-                step_payload["measured_ml"] = float(measured_stored) / dens
-                step_payload["actual_ml"] = float(measured_stored) / dens
-            _stamp_pour_pending_bottle_move(step_payload)
-            _persist_step_payload()
-            db.execute(
-                """
-                UPDATE mix_session_steps
-                SET completed_at = datetime('now')
-                WHERE id = ? AND mix_session_id = ?
-                """,
-                (int(target_step_id), int(session_id)),
-            )
-            open_row = db.execute(
-                """
-                SELECT COUNT(1) AS c
-                FROM mix_session_steps
-                WHERE mix_session_id = ? AND completed_at IS NULL
-                """,
-                (session_id,),
-            ).fetchone()
-            if int(open_row["c"] or 0) <= 0:
-                db.execute(
-                    "UPDATE mix_sessions SET completed_at = datetime('now') WHERE id = ? AND user_id = ?",
-                    (session_id, user_id),
-                )
-                session_just_completed = True
-            else:
-                db.execute(
-                    "UPDATE mix_sessions SET completed_at = NULL WHERE id = ? AND user_id = ?",
-                    (session_id, user_id),
-                )
-                session_just_completed = False
-            db.commit()
-            if session_just_completed:
-                _notify_production_job_session_completed(int(session_id))
-            reading_eval = {
-                "target_grams": float(target),
-                "display_target_grams": float(display_target),
-                "measured_grams": float(measured_stored),
-                "display_measured_grams": float(display_measured),
-                "over_by_grams": float(over_by),
-                "classification": "nicotine_over_accepted",
-                "nicotine_strictness_mode": nic_strictness,
-            }
-            return {
-                "ok": True,
-                "message": "Nicotine over accepted and logged.",
-                "inserted_step_nos": inserted_step_nos,
-                "performance_summary": _session_performance_summary(db, int(session_id)),
-                "reading": reading_eval,
-                "policy": {
-                    "name": policy.name,
-                    "allowed": True,
-                    "decision": "nicotine_over_accepted",
-                    "warnings": ["Nicotine over accepted. Final strength may be higher than target."],
-                    "hard_stops": [],
-                },
-            }
 
         if (
             not undo
@@ -2881,6 +2622,11 @@ def complete_guided_step_with_policy(
             step_payload["nicotine_overpour_pending"] = False
             step_payload["nicotine_recovery_mode"] = True
             step_payload["nicotine_poured_back"] = True
+            # The overpour reading describes liquid that has now been removed.
+            # Do not invent a zero residue or reuse that old measurement.
+            step_payload.pop("measured_grams", None)
+            step_payload.pop("recovery_current_scale_grams", None)
+            step_payload["nicotine_residue_reading_required"] = True
             step_payload.pop("under_decision_pending", None)
             step_payload.pop("under_pour_mode", None)
             step_payload.pop("under_classification", None)
@@ -2893,7 +2639,6 @@ def complete_guided_step_with_policy(
                     "display_target_grams": float(display_target),
                 },
             )
-            _bump_session_performance(db, int(session_id), recovery_count=1)
             db.execute(
                 """
                 UPDATE mix_session_steps
@@ -2908,7 +2653,9 @@ def complete_guided_step_with_policy(
                 "target_grams": float((step_payload or {}).get("target_grams") or 0.0),
                 "classification": "nicotine_recovery_active",
                 "nicotine_recovery_mode": True,
-                "needed_grams": float(display_target),
+                "needed_grams": None,
+                "recovery_current_scale_grams": None,
+                "nicotine_residue_reading_required": True,
             }
             return _nicotine_recovery_response(
                 policy=policy,
@@ -2921,6 +2668,14 @@ def complete_guided_step_with_policy(
                     "Do not tare.",
                     "Some nicotine may remain in the mixing bottle. If you tare now, the next pour can make the dose too strong.",
                 ],
+            )
+
+        if _is_nicotine_payload(step_payload or {}) and step_payload.get("nicotine_overpour_pending"):
+            return _nicotine_pour_back_response(
+                reading={"classification": "nicotine_over_target",
+                         "display_target_grams": step_payload.get("display_target_grams"),
+                         "measured_grams": step_payload.get("measured_grams")},
+                message="Confirm pour-back before entering the residue reading. Do not tare.",
             )
 
         if measured_grams is None:
@@ -3054,6 +2809,7 @@ def complete_guided_step_with_policy(
             and _is_nicotine_payload(step_payload or {})
             and bool((step_payload or {}).get("nicotine_recovery_mode"))
         ):
+            step_payload.pop("nicotine_residue_reading_required", None)
             step_payload["recovery_current_scale_grams"] = float(measured)
             step_payload["measured_grams"] = float(measured)
             step_payload["display_target_grams"] = float(display_target)
@@ -3094,35 +2850,19 @@ def complete_guided_step_with_policy(
                         "Do not tare.",
                     ],
                 )
-            if under_by > 0.0005 and not accept_under:
-                classification, under_msg = _classify_nicotine_under_pour(
-                    display_target=display_target,
-                    measured=measured,
-                )
-                reading_eval["classification"] = classification
-                step_payload["under_decision_pending"] = True
-                step_payload["under_classification"] = classification
-                step_payload["under_pour_mode"] = (
-                    "decision" if classification == "slight_under_target" else "continue"
-                )
-                db.execute(
-                    """
-                    UPDATE mix_session_steps
-                    SET payload_json = ?
-                    WHERE id = ? AND mix_session_id = ?
-                    """,
-                    (json.dumps(step_payload), int(target_step_id), int(session_id)),
-                )
-                db.commit()
+            if under_by > 0.0005:
+                # Residue is a current total on the original tare, never an added dose.
+                step_payload.pop("under_decision_pending", None)
+                step_payload.pop("under_pour_mode", None)
+                step_payload.pop("under_classification", None)
+                _persist_step_payload()
+                reading_eval["classification"] = "nicotine_recovery_active"
                 return _nicotine_recovery_response(
-                    policy=policy,
-                    session_id=int(session_id),
-                    inserted_step_nos=inserted_step_nos,
-                    reading_eval=reading_eval,
-                    message="Nicotine under target — add more from the current scale reading or accept the lower dose.",
-                    decision=classification,
-                    warnings=[under_msg] if under_msg else [],
-                    awaiting_under=True,
+                    policy=policy, session_id=int(session_id),
+                    inserted_step_nos=inserted_step_nos, reading_eval=reading_eval,
+                    message="Continue from the current scale reading to the original nicotine target.",
+                    decision="nicotine_recovery_active",
+                    warnings=["Do not tare.", "The residue counts toward the original target. Do not add the full target again."],
                 )
             _append_nicotine_recovery_log(
                 db,
@@ -3145,7 +2885,6 @@ def complete_guided_step_with_policy(
             step_payload.pop("under_classification", None)
             nicotine_skip_classification = True
             reading_eval["classification"] = "within_tolerance"
-            _bump_session_performance(db, int(session_id), recovery_count=1)
 
         if not nicotine_skip_classification and over_by > 0.0005:
             reading_eval["classification"] = "over_target"
@@ -3173,34 +2912,6 @@ def complete_guided_step_with_policy(
                     target_ml = float(display_target) / dens
 
             if _is_nicotine_payload(step_payload or {}):
-                if bool((step_payload or {}).get("nicotine_accept_confirm_pending")):
-                    return _nicotine_recovery_response(
-                        policy=policy,
-                        session_id=int(session_id),
-                        inserted_step_nos=inserted_step_nos,
-                        reading_eval=reading_eval,
-                        message="Confirm accept nicotine over target.",
-                        decision="nicotine_accept_confirm",
-                        warnings=[
-                            "Accept nicotine over target?",
-                            f"Target: {display_target:.2f} g",
-                            f"Actual: {display_measured:.2f} g",
-                            f"Over by: {over_by:.2f} g",
-                            "Final nicotine strength may be higher than the recipe target.",
-                            "This will be saved in the batch log.",
-                        ],
-                    )
-                if bool((step_payload or {}).get("nicotine_over_decision_pending")):
-                    return _nicotine_recovery_response(
-                        policy=policy,
-                        session_id=int(session_id),
-                        inserted_step_nos=inserted_step_nos,
-                        reading_eval=reading_eval,
-                        message="Choose to accept the overpour or fix the nicotine dose.",
-                        decision="nicotine_over_decision",
-                        warnings=[str((step_payload or {}).get("nicotine_over_warning") or "")],
-                        awaiting_over_decision=True,
-                    )
                 if bool((step_payload or {}).get("nicotine_overpour_pending")):
                     _persist_step_payload()
                     return _nicotine_pour_back_response(
@@ -3237,46 +2948,30 @@ def complete_guided_step_with_policy(
                 reading_eval["nicotine_over_tier"] = str(over_policy.get("tier") or "")
                 reading_eval["nicotine_accept_allowed"] = bool(over_policy.get("accept_allowed"))
 
-                if bool(over_policy.get("recovery_required")):
-                    step_payload["nicotine_overpour_pending"] = True
-                    step_payload["nicotine_overpour_detected_at_grams"] = float(measured)
-                    _bump_session_performance(db, int(session_id), recovery_count=1)
-                    _persist_step_payload()
-                    warnings = [str(over_policy.get("warning") or "")]
-                    if (
-                        not bool(over_policy.get("accept_allowed"))
-                        and nic_strictness == NICOTINE_STRICTNESS_LAB_CLIENT
-                    ):
-                        warnings.append("Client/lab mode: nicotine over tolerance must be corrected.")
-                    warnings.extend([
-                        "Stop pouring.",
-                        "Pour the nicotine back into its original bottle.",
-                        "Put the mixing bottle back on the scale.",
-                        "Do not tare the scale.",
-                    ])
-                    return _nicotine_recovery_response(
-                        policy=policy,
-                        session_id=int(session_id),
-                        inserted_step_nos=inserted_step_nos,
-                        reading_eval=reading_eval,
-                        message="Nicotine over target — correction required.",
-                        decision="nicotine_overpour_pending",
-                        warnings=warnings,
-                    )
-
-                step_payload["nicotine_over_decision_pending"] = True
+                step_payload["nicotine_overpour_pending"] = True
+                step_payload["nicotine_overpour_detected_at_grams"] = float(measured)
+                _bump_session_performance(db, int(session_id), recovery_count=1)
                 _persist_step_payload()
-                reading_eval["classification"] = "nicotine_over_decision"
-                warn_lines = [ln for ln in str(over_policy.get("warning") or "").split("\n") if ln.strip()]
+                warnings = [str(over_policy.get("warning") or "")]
+                if (
+                    not bool(over_policy.get("accept_allowed"))
+                    and nic_strictness == NICOTINE_STRICTNESS_LAB_CLIENT
+                ):
+                    warnings.append("Client/lab mode: nicotine over tolerance must be corrected.")
+                warnings.extend([
+                    "Stop pouring.",
+                    "Pour the nicotine back into its original bottle.",
+                    "Put the mixing bottle back on the scale.",
+                    "Do not tare the scale.",
+                ])
                 return _nicotine_recovery_response(
                     policy=policy,
                     session_id=int(session_id),
                     inserted_step_nos=inserted_step_nos,
                     reading_eval=reading_eval,
-                    message="Nicotine over target — accept or fix the dose.",
-                    decision="nicotine_over_decision",
-                    warnings=warn_lines,
-                    awaiting_over_decision=True,
+                    message="Nicotine over target — correction required.",
+                    decision="nicotine_overpour_pending",
+                    warnings=warnings,
                 )
 
             if not over_limit:

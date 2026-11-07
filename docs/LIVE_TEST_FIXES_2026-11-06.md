@@ -53,3 +53,21 @@ New isolated regression checks: 4 Python tests fail on the previous branch revis
 Live QA job #2, “SLH QA - Production Workflow - DO NOT PRODUCE”, was left cancelled, with batch #1 cancelled and zero completed production, stock usage, earnings or payments. Guided session #62 was used to reproduce the cancellation defect: Ready to pour advanced despite cancellation; no weight was entered. Recipe #114 / version #116 was attached as 2 × 10 ml. Bottle/label overrides were R5/R4. QA feedback #1 was hidden and then restored active. An attempted zero-stock manual inventory item was rejected by the old rank gate, so it was not created live.
 
 After deployment, retest the cancelled session #62 and job #2: no progression or undo should be accepted, and Continue mix must not offer that session. Verify the user role editor without changing another person's role; preview INW Biscuit reference #626; confirm errors clear rather than spin; check Master manual inventory addition with an explicitly disposable test record. Catalogue classification accuracy and duplicate/priced variants still require a separate review. Mobile, reset/login and live cross-account checks remain outstanding. No complete-app sign-off or live deployment is claimed.
+
+## Nicotine pour-back correction — 7 November 2026
+
+User-confirmed rule: nicotine is always first. On overpour, return nicotine before adding any other ingredient, retain the original tare, weigh the residue and continue to the original target. Batch enlargement/splitting is a separate proposed flavour-recovery feature and is not implemented by this change.
+
+The existing server already implemented nicotine-first ordering, pour-back guidance and residue subtraction, but small overages could still be accepted. The client reused the removed overpour weight after pour-back, treated zero readings as absent through truthy fallbacks, and preserved stale scale input on the same step. Recovery also permitted accepting a lower dose and counted one episode multiple times.
+
+Changes:
+
+- Every nicotine reading above the displayed target requires correction in both Personal and Lab/Client modes. Retired accept-over requests and legacy pending acceptance states cannot bypass correction.
+- Confirm pour-back before entering the residue reading. Clear the removed measurement; current/needed remain unknown until a fresh reading is entered. Keep the original target and original tare.
+- Preserve a genuine zero residue across state updates and reloads. Show “Do not tare”, current total and remaining amount. Do not add the full target on top of residue.
+- Keep the nicotine step open while below or above target during correction; only reaching the displayed target completes it. Ordinary underpour handling outside correction remains separate. Subsequent ingredient progression remains locked.
+- Do not resize the batch or alter carrier targets. Count a recovery episode once. Bench rules and former accept-over tests now reflect the confirmed workflow.
+
+Validation: 22 focused nicotine/order checks pass; new three-test regression set fails on the prior revision and passes here. The broader API/doc run passes 138/139 tests; the community-route login failure also reproduces on the prior revision. Node recovery UI regressions cover unknown reading, zero replacing a positive reading, reload state and legacy acceptance screens; the existing Master UI regressions still pass. The nicotine recovery page renders and all three executable inline scripts pass syntax checks. Python compilation and whitespace checks pass.
+
+Live test limitation: secure sign-in visibly reached Home as Santa's Little Helper (Master), but opening the private QA recipe immediately redirected to login; a root-page check also showed login. No live recovery/session/pour changes were made in this attempt, and none of this patch has been deployed. After deployment, retest a labelled simulated nicotine overpour with pour-back, zero/nonzero residue, reload, repeated overage and final original-target weight. Do not treat local test results as a live sign-off.

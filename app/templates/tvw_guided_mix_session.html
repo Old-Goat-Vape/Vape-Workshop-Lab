@@ -401,7 +401,7 @@
     const extra = extraLine ? `<br>${escHtml(extraLine)}` : "";
     guidedPolicyBox.innerHTML = `
       <p class="tvw-ws-bench-note-title">${escHtml(title)}</p>
-      <p class="tvw-ws-bench-note-body">Do not tare.<br>Target: ${target.toFixed(2)} g<br>Current scale: ${current.toFixed(2)} g<br>Needed: ${needed.toFixed(2)} g${extra}</p>
+      <p class="tvw-ws-bench-note-body">Do not tare.<br>Target: ${target.toFixed(2)} g<br>Current scale: ${current == null ? "—" : current.toFixed(2) + " g"}<br>Needed: ${needed == null ? "—" : needed.toFixed(2) + " g"}${extra}</p>
     `;
     guidedPolicyBox.className = "tvw-ws-alarm tvw-ws-bench-note is-stop";
     guidedPolicyBox.classList.remove("d-none", "alert", "alert-warning", "alert-danger", "alert-info", "alert-secondary");
@@ -413,17 +413,15 @@
       || (payload && (payload.display_target_grams || payload.target_grams || payload.grams))
       || 0,
     );
-    const measured = Number(
-      (reading && (reading.recovery_current_scale_grams || reading.measured_grams))
-      || (payload && (payload.recovery_current_scale_grams || payload.measured_grams))
-      || 0,
-    );
+    const measuredValue = reading?.recovery_current_scale_grams ?? reading?.measured_grams
+      ?? payload?.recovery_current_scale_grams ?? payload?.measured_grams;
+    const measured = payload?.nicotine_residue_reading_required || measuredValue == null ? null : Number(measuredValue);
     const classification = String((reading && reading.classification) || (policy && policy.decision) || "").toLowerCase();
     let mode = "recovery_check";
-    if (payload && payload.nicotine_overpour_pending) mode = "pour_back";
-    else if (payload && payload.nicotine_accept_confirm_pending) mode = "accept_confirm";
-    else if (payload && payload.nicotine_over_decision_pending) mode = "over_decision";
+    if (payload && (payload.nicotine_overpour_pending || payload.nicotine_accept_confirm_pending || payload.nicotine_over_decision_pending)) mode = "pour_back";
+    else if (payload?.nicotine_residue_reading_required) mode = "recovery_check";
     else if (classification.includes("still_over")) mode = "still_over";
+    else if (payload?.nicotine_recovery_mode) mode = "continue_pour";
     else if (payload && payload.under_decision_pending) mode = "under_decision";
     else if (measured > 0) mode = "continue_pour";
     nicotineRecoveryUi = {
@@ -442,21 +440,20 @@
     const sess = body.session || {};
     const step = ((sess.steps) || []).find((s) => Number(s.step_no) === Number(stepNo));
     const payload = (step && step.payload) || {};
-    nicotineRecoveryUi.measured = Number(
-      reading.recovery_current_scale_grams || reading.measured_grams || nicotineRecoveryUi.measured || 0,
-    );
+    const measuredValue = reading.recovery_current_scale_grams ?? reading.measured_grams
+      ?? payload.recovery_current_scale_grams ?? payload.measured_grams;
+    nicotineRecoveryUi.measured = payload.nicotine_residue_reading_required || measuredValue == null ? null : Number(measuredValue);
     nicotineRecoveryUi.displayTarget = Number(
       reading.display_target_grams || nicotineRecoveryUi.displayTarget || 0,
     );
     nicotineRecoveryUi.policy = body.policy || nicotineRecoveryUi.policy;
     nicotineRecoveryUi.reading = reading || nicotineRecoveryUi.reading;
     const classification = String((reading && reading.classification) || "").toLowerCase();
-    if (payload.nicotine_overpour_pending) nicotineRecoveryUi.mode = "pour_back";
-    else if (payload.nicotine_accept_confirm_pending) nicotineRecoveryUi.mode = "accept_confirm";
-    else if (payload.nicotine_over_decision_pending) nicotineRecoveryUi.mode = "over_decision";
+    if (payload.nicotine_overpour_pending || payload.nicotine_accept_confirm_pending || payload.nicotine_over_decision_pending) nicotineRecoveryUi.mode = "pour_back";
+    else if (payload.nicotine_residue_reading_required) nicotineRecoveryUi.mode = "recovery_check";
     else if (classification.includes("still_over")) nicotineRecoveryUi.mode = "still_over";
-    else if (payload.under_decision_pending || body.awaiting_under_decision) nicotineRecoveryUi.mode = "under_decision";
     else if (payload.nicotine_recovery_mode) nicotineRecoveryUi.mode = "continue_pour";
+    else if (payload.under_decision_pending || body.awaiting_under_decision) nicotineRecoveryUi.mode = "under_decision";
     nicotineRecoveryUi.reading = reading || nicotineRecoveryUi.reading || {};
     if (reading && reading.nicotine_accept_allowed != null) {
       nicotineRecoveryUi.reading.nicotine_accept_allowed = reading.nicotine_accept_allowed;
@@ -1790,6 +1787,7 @@
       && Number(nicotineRecoveryUi.stepNo) === Number(stepNo)
       && nicotineRecoveryUi.mode !== "pour_back"
     ) {
+      if (nicotineRecoveryUi.measured == null) return null;
       const m = Number(nicotineRecoveryUi.measured);
       if (Number.isFinite(m) && m >= 0) return m;
     }
@@ -1803,7 +1801,7 @@
     const p = payload || {};
 
     if (p.nicotine_recovery_mode) {
-      const m = Number(p.recovery_current_scale_grams || p.measured_grams);
+      const m = Number(p.recovery_current_scale_grams ?? p.measured_grams);
       return Number.isFinite(m) ? m : 0;
     }
 
@@ -2360,7 +2358,7 @@
       && (!nicotineRecoveryUi || Number(nicotineRecoveryUi.stepNo) !== Number(current.step_no))
     ) {
       enterNicotineRecovery(current.step_no, {}, {
-        measured_grams: Number(p.recovery_current_scale_grams || p.measured_grams || 0),
+        measured_grams: p.recovery_current_scale_grams ?? p.measured_grams ?? null,
         display_target_grams: Number(p.display_target_grams || p.target_grams || p.grams || 0),
         classification: String(p.under_classification || "nicotine_recovery_active"),
       }, p);
@@ -2555,7 +2553,7 @@
 
       const scaleSeed = activePourScaleGrams(p, underPourUi, underActiveEarly, current.step_no);
 
-      const scaleSeedText = (window.GuidedScaleInput && window.GuidedScaleInput.formatScaleGrams)
+      const scaleSeedText = scaleSeed == null ? "" : (window.GuidedScaleInput && window.GuidedScaleInput.formatScaleGrams)
 
         ? window.GuidedScaleInput.formatScaleGrams(Number.isFinite(scaleSeed) ? scaleSeed : 0)
 
@@ -2567,7 +2565,7 @@
 
       const samePourStep = scaleInputUi.stepNo === pourStepNo;
 
-      const preserveScaleInput = samePourStep
+      const preserveScaleInput = !p.nicotine_residue_reading_required && samePourStep
 
         && existingInput
 
@@ -2721,62 +2719,7 @@
 
       : cleanDisplayName(displayP.name || displayP.ingredient_name || ingredientLabel(displayP));
 
-    if (nicRecoveryActive && nicotineRecoveryUi.mode === "over_decision") {
-
-      const dispT = Number(nicotineRecoveryUi.displayTarget) || targetG;
-      const curM = Number(nicotineRecoveryUi.measured) || 0;
-      const overBy = Math.max(0, curM - dispT);
-      const acceptAllowed = nicotineRecoveryUi.reading && nicotineRecoveryUi.reading.nicotine_accept_allowed !== false
-        && (p.nicotine_accept_allowed !== false);
-      const strictMode = String((p.nicotine_strictness_mode || nicotineRecoveryUi.reading && nicotineRecoveryUi.reading.nicotine_strictness_mode) || "personal");
-
-      renderBenchNote({
-        title: "Nicotine over target",
-        body: `Over by ${overBy.toFixed(2)} g. ${strictMode === "lab_client" ? "Client/lab mode: only slight overages may be accepted with confirmation." : "You may accept this slight over or fix the dose."}`,
-        caution: true,
-        stop: false,
-      });
-
-      goatLine.textContent = strictMode === "lab_client"
-        ? "Client/lab mode: correct the dose if you are unsure."
-        : "Accept only if you are comfortable with the final strength.";
-
-      goatLine.className = "tvw-ws-goat-inline is-warn";
-
-      focusActions.innerHTML = `
-
-        ${acceptAllowed ? `<button type="button" class="tvw-ws-commit tvw-ws-commit-secondary js-nicotine-accept-over" data-step-no="${current.step_no}">Accept Nicotine Over</button>` : ""}
-
-        <button type="button" class="tvw-ws-commit js-nicotine-fix-dose" data-step-no="${current.step_no}">Fix Nicotine Dose</button>
-
-      `;
-
-      if (!acceptAllowed && guidedPolicyBox) {
-        guidedPolicyBox.innerHTML += `<p class="tvw-ws-bench-note-body">Client/lab mode: nicotine over tolerance must be corrected.</p>`;
-      }
-
-    } else if (nicRecoveryActive && nicotineRecoveryUi.mode === "accept_confirm") {
-
-      const dispT = Number(nicotineRecoveryUi.displayTarget) || targetG;
-      const curM = Number(nicotineRecoveryUi.measured) || 0;
-      const overBy = Math.max(0, curM - dispT);
-
-      renderBenchNote({
-        title: "Accept nicotine over target?",
-        body: `Target: ${dispT.toFixed(2)} g\nActual: ${curM.toFixed(2)} g\nOver by: ${overBy.toFixed(2)} g\nFinal nicotine strength may be higher than the recipe target.\nThis will be saved in the batch log.`,
-        caution: true,
-        stop: false,
-      });
-
-      focusActions.innerHTML = `
-
-        <button type="button" class="tvw-ws-commit js-nicotine-confirm-accept" data-step-no="${current.step_no}">Yes, Accept &amp; Log</button>
-
-        <button type="button" class="tvw-ws-commit tvw-ws-commit-secondary js-nicotine-cancel-accept" data-step-no="${current.step_no}">Go Back</button>
-
-      `;
-
-    } else if (nicRecoveryActive && nicotineRecoveryUi.mode === "pour_back") {
+    if (nicRecoveryActive && nicotineRecoveryUi.mode === "pour_back") {
 
       renderBenchNote({
         title: "Nicotine over target",
@@ -2799,15 +2742,17 @@
 
       const dispT = Number(nicotineRecoveryUi.displayTarget) || targetG;
 
-      const curM = Number(nicotineRecoveryUi.measured) || 0;
+      const curM = nicotineRecoveryUi.measured == null ? null : Number(nicotineRecoveryUi.measured);
 
-      const need = Math.max(0, dispT - curM);
+      const need = curM == null ? null : Math.max(0, dispT - curM);
 
       const title = nicotineRecoveryUi.mode === "still_over" ? "Still over target." : "Nicotine recovery";
 
       const extra = nicotineRecoveryUi.mode === "still_over"
         ? "Pour a little more back into the nicotine bottle, then place the mixing bottle back on the scale."
-        : "Pour nicotine toward the remaining amount from the current scale reading.";
+        : curM == null
+          ? "Enter the current scale reading before adding more. The residue counts toward the original target."
+          : "Continue until the scale shows the original target. Do not add the full target again.";
 
       renderNicotineRecoveryProgressNote(title, dispT, curM, need, extra);
 

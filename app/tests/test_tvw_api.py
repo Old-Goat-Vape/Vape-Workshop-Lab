@@ -1553,7 +1553,7 @@ class TVWApiTests(unittest.TestCase):
         self.assertIn("isBottlePhysicallyLeft", html)
         self.assertIn("physicallyLeft", html)
 
-    def test_guided_personal_nicotine_slight_over_allows_accept_or_fix(self):
+    def test_guided_personal_nicotine_slight_over_requires_correction(self):
         sid = self._create_guided_session_with_nicotine(strictness="personal")
         nic_no, nic_step = self._advance_to_nicotine_add_step(sid)
         target = float((nic_step.get("payload") or {}).get("target_grams") or 0.0)
@@ -1563,12 +1563,12 @@ class TVWApiTests(unittest.TestCase):
             json={"measured_grams": round(display + 0.04, 2)},
         )
         body = over.get_json() or {}
-        self.assertTrue(bool(body.get("awaiting_nicotine_over_decision")))
-        self.assertEqual(str((body.get("reading") or {}).get("classification") or ""), "nicotine_over_decision")
-        self.assertTrue(bool((body.get("reading") or {}).get("nicotine_accept_allowed")))
+        self.assertTrue(bool(body.get("awaiting_nicotine_recovery")))
+        self.assertEqual(str((body.get("reading") or {}).get("classification") or ""), "nicotine_over_target")
+        self.assertFalse(bool((body.get("reading") or {}).get("nicotine_accept_allowed")))
         payload = next(s for s in body["session"]["steps"] if int(s["step_no"]) == nic_no)["payload"]
-        self.assertTrue(bool(payload.get("nicotine_over_decision_pending")))
-        self.assertFalse(bool(payload.get("nicotine_overpour_pending")))
+        self.assertFalse(bool(payload.get("nicotine_over_decision_pending")))
+        self.assertTrue(bool(payload.get("nicotine_overpour_pending")))
 
     def test_guided_personal_nicotine_010_over_requires_recovery(self):
         sid = self._create_guided_session_with_nicotine(strictness="personal")
@@ -1618,7 +1618,7 @@ class TVWApiTests(unittest.TestCase):
         self.assertTrue(bool(payload.get("nicotine_overpour_pending")))
         self.assertEqual(str(payload.get("nicotine_over_tier") or ""), "severe")
 
-    def test_guided_accept_nicotine_over_logs_decision(self):
+    def test_guided_accept_nicotine_over_cannot_bypass_recovery(self):
         sid = self._create_guided_session_with_nicotine(strictness="personal")
         nic_no, nic_step = self._advance_to_nicotine_add_step(sid)
         target = float((nic_step.get("payload") or {}).get("target_grams") or 0.0)
@@ -1638,7 +1638,9 @@ class TVWApiTests(unittest.TestCase):
         )
         self.assertEqual(accepted.status_code, 200)
         actions = [str(e.get("action") or "") for e in self._nicotine_recovery_log(sid)]
-        self.assertIn("accepted_nicotine_over", actions)
+        self.assertNotIn("accepted_nicotine_over", actions)
+        nic_row = next(row for row in self._guided_session_steps(sid) if row["step_no"] == nic_no)
+        self.assertIsNone(nic_row.get("completed_at"))
 
     def test_guided_fix_nicotine_dose_enters_pour_back_recovery(self):
         sid = self._create_guided_session_with_nicotine(strictness="personal")
@@ -1658,7 +1660,7 @@ class TVWApiTests(unittest.TestCase):
         payload = next(s for s in body["session"]["steps"] if int(s["step_no"]) == nic_no)["payload"]
         self.assertTrue(bool(payload.get("nicotine_overpour_pending")))
         actions = [str(e.get("action") or "") for e in self._nicotine_recovery_log(sid)]
-        self.assertIn("nicotine_recovery_started", actions)
+        self.assertIn("nicotine_overpour_detected", actions)
 
     def _guided_first_add_step(self, sid: int) -> dict:
         sess = self.client.get(f"/api/mix/guided/session/{sid}").get_json()["session"]
