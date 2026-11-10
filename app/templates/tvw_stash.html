@@ -227,6 +227,37 @@
   const quickRef = document.getElementById("stashQuickAddRef");
   const datalist = document.getElementById("stashQuickAddOptions");
 
+  let searchTimer;
+  let searchVersion = 0;
+  quickInput?.addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    const version = ++searchVersion;
+    const query = quickInput.value.trim();
+    // A selected full label must keep its identity until the user changes it.
+    if ([...datalist.options].some((o) => o.value === query)) return;
+    datalist.replaceChildren();
+    if (query.length < 2) { quickHint.textContent = "Type at least two characters."; return; }
+    quickHint.textContent = "Searching…";
+    searchTimer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/stash/flavour-search?q=${encodeURIComponent(query)}`);
+        const body = await parseJson(res);
+        if (version !== searchVersion) return;
+        if (!res.ok) throw new Error(body.message || "Search failed.");
+        for (const item of body.items || []) {
+          const option = document.createElement("option");
+          option.value = `${item.brand || "Unknown"} — ${item.canonical_name} (#${item.id})`;
+          option.dataset.flavourId = item.id;
+          option.dataset.referenceId = item.source_flavor_ref_id || "";
+          datalist.append(option);
+        }
+        quickHint.textContent = datalist.options.length ? "Choose a flavour from the suggestions." : "No matching flavours.";
+      } catch (error) {
+        if (version === searchVersion) quickHint.textContent = error.message;
+      }
+    }, 200);
+  });
+
   async function parseJson(res) {
     try { return await res.json(); } catch (_) { return {}; }
   }

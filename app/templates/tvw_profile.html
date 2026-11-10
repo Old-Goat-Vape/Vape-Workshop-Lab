@@ -1,0 +1,19 @@
+{% extends "base_public.html" %}
+{% block title %}{{ profile_user.username }} | The Vape Workshop{% endblock %}
+{% block content %}
+<div class="tvw-page">
+  <h1>{{ profile_user.username }}</h1>
+  <h2 class="h4">Recipes</h2>
+  <p class="text-secondary">{{ total }} recipe(s) visible to you.</p>
+  {% for recipe in recipes %}
+  <article class="card card-body mb-3">
+    <h3 class="h5"><a href="{{ url_for('tvw_recipes.tvw_recipe_detail', slug=recipe.slug or recipe.id) }}">{{ recipe.name }}</a></h3>
+    <p class="mb-0 text-secondary">{{ recipe.visibility|capitalize }} · {{ recipe.status|replace('_', ' ') }}</p>
+  </article>
+  {% else %}<p>No recipes to show yet.</p>{% endfor %}
+  <nav aria-label="Profile pagination">
+    {% if page > 1 %}<a class="btn btn-outline-light" href="{{ url_for('tvw_community.profile', username=profile_user.username, page=page-1) }}">Previous</a>{% endif %}
+    {% if has_next %}<a class="btn btn-outline-light" href="{{ url_for('tvw_community.profile', username=profile_user.username, page=page+1) }}">Next</a>{% endif %}
+  </nav>
+</div>
+{% endblock %}

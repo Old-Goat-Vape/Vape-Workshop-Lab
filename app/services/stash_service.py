@@ -176,7 +176,7 @@ def build_stash_page_rows(
     return rows, source, is_old_goat
 
 
-def fetch_stash_quick_add_options(*, limit: int = 800) -> list[dict[str, Any]]:
+def fetch_stash_quick_add_options(*, limit: int = 50, query: str = "") -> list[dict[str, Any]]:
     """Lightweight flavour picker rows for stash quick-add UX."""
     db = get_db()
     rows = db.execute(
@@ -186,10 +186,12 @@ def fetch_stash_quick_add_options(*, limit: int = 800) -> list[dict[str, Any]]:
         WHERE COALESCE(merged_into_flavour_id, 0) = 0
           AND COALESCE(is_hidden, 0) = 0
           AND COALESCE(is_invalid, 0) = 0
-        ORDER BY brand COLLATE NOCASE ASC, canonical_name COLLATE NOCASE ASC
+          AND (canonical_name LIKE ? ESCAPE '!' OR brand LIKE ? ESCAPE '!')
+        ORDER BY brand COLLATE NOCASE ASC, canonical_name COLLATE NOCASE ASC, id ASC
         LIMIT ?
         """,
-        (max(50, min(int(limit or 800), 2000)),),
+        (*(["%" + str(query or "").replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%"] * 2),
+         max(1, min(int(limit or 50), 100))),
     ).fetchall()
     return [dict(r) for r in rows]
 

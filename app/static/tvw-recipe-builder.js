@@ -14,6 +14,7 @@
   let searchTimer = null;
   let searchSeq = 0;
   let calcTimer = null;
+  let calcSeq = 0;
   let lastHardStops = [];
   let submitting = false;
 
@@ -42,6 +43,8 @@
   };
 
   const queueCalc = () => {
+    ++calcSeq;
+    saveBtn.disabled = true;
     if (calcTimer) clearTimeout(calcTimer);
     calcTimer = setTimeout(runCalc, 120);
   };
@@ -389,6 +392,7 @@
       nicotine_carrier: document.getElementById("calcNicCarrier").value || "PG",
       rows: rows.map((r) => ({ ingredient_id: r.ingredient_id, percent: r.percent })),
     };
+    const requestSeq = ++calcSeq;
     calcStatus.textContent = "Calculating…";
     try {
       const response = await fetch("/api/recipes/live-calc", {
@@ -397,6 +401,7 @@
         body: JSON.stringify(payload),
       });
       const body = await response.json();
+      if (requestSeq !== calcSeq) return;
       if (!response.ok) throw new Error(body.message || "Calculation failed");
       const result = body.result || {};
       setTotals(result);
@@ -409,6 +414,7 @@
       calcStatus.textContent = "Recipe summary updated";
       updateSaveState(hardStops, validRows);
     } catch (e) {
+      if (requestSeq !== calcSeq) return;
       window.PolicyFeedback.clear(policyBox);
       calcStatus.textContent = e.message || "Calculation error";
       updateSaveState([e.message || "Calculation error"], validRows);

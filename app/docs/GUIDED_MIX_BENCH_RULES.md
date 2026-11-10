@@ -234,22 +234,15 @@ If still over after pour-back, tell the mixer to pour a little more back and do 
 
 ---
 
-## 12. Nicotine overpour policy: Personal vs Lab/Client
+## 12. Nicotine overpour recovery — all modes
 
-Nicotine overpour tolerance depends on mixing mode.
+Nicotine always comes before every flavour and carrier. Any reading above the displayed target requires pour-back correction, in Personal and Lab/Client modes. No accept-over action is offered or honoured, including old pending acceptance sessions.
 
-### Personal mode
+After `I POURED IT BACK`, keep the original target and original tare. Clear the removed overpour reading and ask for a fresh current scale reading. Until it is entered, current and needed are unknown, not zero. A genuine `0.00 g` residue reading is valid and must survive reload.
 
-- `<= 0.05 g` over: amber decision, allow `ACCEPT NICOTINE OVER` or `FIX NICOTINE DOSE`.
-- `> 0.05 g` and `< 0.10 g` over: stronger warning, correction recommended, accept only with deliberate confirmation if allowed.
-- `>= 0.10 g` over: recovery required, no accept.
+Show **DO NOT TARE**, original target, current scale reading and `needed = max(0, target - current)`. Below target, guide the mixer to the original target; do not accept an under-dose during this correction. Above target, repeat pour-back guidance. Do not complete the nicotine pour or unlock the next ingredient until the displayed target is reached. Do not resize the batch or rebalance PG/VG for nicotine recovery.
 
-### Lab/Client mode
-
-- `<= 0.05 g` over: amber decision, accept only with deliberate confirmation if policy allows.
-- `> 0.05 g` over: recovery required, accept disabled, show “Client/lab mode: nicotine over tolerance must be corrected.”
-
-All nicotine over decisions must be logged with mode, target grams, actual grams, over-by grams, action, accept policy, and warning.
+Persist recovery state across reloads, log detection/pour-back/current readings/completion, and count one recovery episode rather than every button press. Ordinary nicotine underpour handling outside recovery remains separate.
 
 ---
 
@@ -487,3 +480,11 @@ Before trusting a guided mix change, test:
 - no ingredient on LEFT SIDE before BOTTLE MOVED
 - no dead `— g` display on decision/recovery steps
 - no stale `Up next` repeating current ingredient
+
+## Live audit corrections — November 2026
+
+- Mathematical validation rejects non-finite values, negative ratios, non-positive batch/base values, target nicotine above base strength, and flavour plus nicotine volume above the bottle target. These are errors regardless of lenient policy. An unreachable PG/VG ratio keeps the chosen bottle volume by filling only the space remaining after fixed flavours/nicotine; it reports the achievable ratio. Explicit zero nicotine and zero PG/VG values remain valid.
+- A flavour overpour enters serious recovery only when it exceeds both the batch-scaled gram tolerance and the policy multiplier. Tiny bottle rounding differences within gram tolerance follow slight-over/PG-trim handling.
+- Serious overpour review does not silently correct a recipe. The first action persists and shows the review; explicit **Accept changed batch** then records a deviation with remaining pours unchanged. Strict policies block acceptance. No nicotine compensation is applied.
+- A dynamic overpour increments performance once when inserted, not again when retried. Underpour attempts corrected before acceptance do not become final underpour coaching.
+- The ordinary final step is **Final batch check**, distinct from recovery for a specific ingredient. Completed progress and status remain complete after reload.

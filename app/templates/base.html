@@ -194,9 +194,12 @@
 
     // Sidebar active state logic
     // IMPROVED: Handles query parameters so the correct tab stays highlighted
-    document.querySelectorAll('.nav-item').forEach(link => {
+    document.querySelectorAll('a.goat-nav[href]').forEach(link => {
         const currentPath = window.location.pathname + window.location.search;
-        const linkPath = new URL(link.href).pathname + new URL(link.href).search;
+        let target;
+        try { target = new URL(link.getAttribute('href'), document.baseURI); }
+        catch (_) { return; }
+        const linkPath = target.pathname + target.search;
         
         if(currentPath === linkPath || window.location.href === link.href) {
             link.classList.add('active');

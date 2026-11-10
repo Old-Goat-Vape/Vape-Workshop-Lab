@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, session, jsonify, redirect, url_for, flash
 
-from utils.auth import login_required
+from utils.auth import login_required, ROLE_HIERARCHY
 from services.inventory_service import (
     effective_user_level,
     rank_required,
@@ -58,7 +58,7 @@ def flavor_detail(reference_id: int):
 
 @library_bp.route("/library/reclassify-all", methods=["POST"])
 @login_required
-@rank_required(6) # Foreman or higher
+@rank_required(ROLE_HIERARCHY["Foreman"]) # Foreman or higher
 def reclassify_all():
     body, status = reclassify_all_references(actor_id=session.get("user_id"))
     return jsonify(body), status
@@ -83,7 +83,7 @@ def adjust_stock():
 
 @library_bp.route("/library/manual-add", methods=["POST"])
 @login_required
-@rank_required(6) 
+@rank_required(ROLE_HIERARCHY["Foreman"])
 def manual_add():
     brand = request.form.get("brand", "Unknown").strip()
     name = request.form.get("name", "").strip()

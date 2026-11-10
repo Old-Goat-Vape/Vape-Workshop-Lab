@@ -125,9 +125,11 @@ def fetch_stash_reference_qty_ml(
     return dict(qty), "user_stash_items"
 
 
-def _fetch_public_recipes_for_scan(*, limit: int) -> list[dict[str, Any]]:
+def _fetch_public_recipes_for_scan(*, limit: int, viewer_user_id: int | None = None) -> list[dict[str, Any]]:
     db = get_db()
     pub = recipes_repo.tvw_recipe_public_list_predicate_sql("r")
+    visibility = f"(({pub}) OR r.created_by = ?)" if viewer_user_id is not None else f"({pub})"
+    visibility_params = [int(viewer_user_id)] if viewer_user_id is not None else []
     lim = max(1, min(int(limit or DEFAULT_MAX_RECIPES), 20_000))
     rows = db.execute(
         f"""
@@ -141,11 +143,11 @@ def _fetch_public_recipes_for_scan(*, limit: int) -> list[dict[str, Any]]:
         INNER JOIN recipe_versions rv ON rv.id = r.current_version_id
         WHERE r.active = 1
           AND r.current_version_id IS NOT NULL
-          AND {pub}
+          AND {visibility}
         ORDER BY r.updated_at DESC, r.id DESC
         LIMIT ?
         """,
-        (lim,),
+        (*visibility_params, lim),
     ).fetchall()
     return [dict(r) for r in rows]
 
@@ -380,7 +382,7 @@ def build_what_can_i_make_bundle(
     stash_qty, stash_source = fetch_stash_reference_qty_ml(user_id=user_id, role=role, username=username)
     stash_set = set(stash_qty.keys())
 
-    recipes = _fetch_public_recipes_for_scan(limit=max_recipes)
+    recipes = _fetch_public_recipes_for_scan(limit=max_recipes, viewer_user_id=user_id)
     vids = [int(r["current_version_id"]) for r in recipes if r.get("current_version_id")]
     ving = fetch_version_ingredients_map(vids)
 

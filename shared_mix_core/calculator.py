@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
 
 PG_DENSITY = 1.036
 VG_DENSITY = 1.26
@@ -117,6 +118,13 @@ def format_carrier_display(
 
 
 def _validate_mix_request(request: MixInput) -> None:
+    numeric = [request.target_ml, request.target_nic_mg_ml, request.nic_base_mg_ml,
+               request.pg_ratio, request.vg_ratio]
+    numeric.extend(v for f in request.flavors for v in (f.percent, f.density))
+    if not all(isfinite(v) for v in numeric):
+        raise ValueError("Mix values must be finite numbers.")
+    if request.pg_ratio < 0 or request.vg_ratio < 0:
+        raise ValueError("PG and VG ratios cannot be negative.")
     if request.target_ml <= 0:
         raise ValueError("target_ml must be greater than zero.")
     if request.nic_base_mg_ml <= 0:
@@ -128,6 +136,12 @@ def _validate_mix_request(request: MixInput) -> None:
             raise ValueError("Flavor percentages cannot be negative.")
         if flv.density <= 0:
             raise ValueError("Flavor density must be greater than zero.")
+    if request.target_nic_mg_ml > request.nic_base_mg_ml:
+        raise ValueError("Target nicotine cannot exceed the nicotine base strength.")
+    ingredient_fraction = sum(f.percent for f in request.flavors) / 100.0
+    ingredient_fraction += request.target_nic_mg_ml / request.nic_base_mg_ml
+    if ingredient_fraction > 1.0 + 1e-9:
+        raise ValueError("Flavours and nicotine exceed the batch volume. Reduce the flavour percentage or target nicotine strength.")
 
 
 def compute_mix(request: MixInput) -> MixResult:
@@ -197,6 +211,12 @@ def compute_mix(request: MixInput) -> MixResult:
             + "; ".join(parts)
             + "."
         )
+
+    # Preserve the selected bottle volume even when its requested ratio is unreachable.
+    # The fixed flavour/nicotine contribution takes priority; fill only the remaining space.
+    remaining_base_ml = max(0.0, request.target_ml - flavor_ml - nicotine_ml)
+    pg_ml = min(max(0.0, pg_ml), remaining_base_ml)
+    vg_ml = max(0.0, remaining_base_ml - pg_ml)
 
     final_pg_ml = flavor_pg_ml + nicotine_pg_ml + max(0.0, pg_ml)
     final_vg_ml = flavor_vg_ml + nicotine_vg_ml + max(0.0, vg_ml)
