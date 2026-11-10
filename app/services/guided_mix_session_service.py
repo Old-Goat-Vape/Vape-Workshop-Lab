@@ -657,22 +657,24 @@ def _pour_carrier_for_ratio(payload: dict[str, Any], *, default_nic_carrier: str
 
 
 def _estimate_final_ratio_from_steps(
-  db,
-  session_id: int,
-  *,
-  target_pg_percent: float,
-  target_vg_percent: float,
-  nicotine_carrier: str = "PG",
+    db,
+    session_id: int,
+    *,
+    target_pg_percent: float,
+    target_vg_percent: float,
+    nicotine_carrier: str = "PG",
+    include_remaining: bool = False,
+    payload_overrides: dict[int, dict[str, Any]] | None = None,
 ) -> tuple[float, float]:
-    """Finished-liquid PG/VG estimate from completed pours (bases + flavour + nicotine carriers)."""
+    """Estimate poured liquid, or project the finished mix including remaining targets."""
     rows = db.execute(
         """
-        SELECT payload_json
+        SELECT id, completed_at, payload_json
         FROM mix_session_steps
-        WHERE mix_session_id = ? AND completed_at IS NOT NULL
+        WHERE mix_session_id = ? AND (completed_at IS NOT NULL OR ?)
         ORDER BY step_no ASC
         """,
-        (int(session_id),),
+        (int(session_id), bool(include_remaining)),
     ).fetchall()
     pg_ml = 0.0
     vg_ml = 0.0
@@ -681,12 +683,17 @@ def _estimate_final_ratio_from_steps(
             payload = json.loads(row["payload_json"]) if isinstance(row["payload_json"], str) else {}
         except (json.JSONDecodeError, TypeError):
             continue
+        payload = (payload_overrides or {}).get(int(row["id"]), payload)
         if str(payload.get("step_type") or "").lower() != "add_ingredient":
             continue
         try:
-            ml = float(payload.get("measured_ml") or payload.get("ml") or payload.get("target_ml") or 0.0)
-            if payload.get("measured_grams") and payload.get("density"):
-                ml = float(payload["measured_grams"]) / float(payload["density"])
+            ml = float(payload.get("ml") or payload.get("target_ml") or 0.0)
+            measured = payload.get("measured_grams")
+            density = _density_from_step_payload(payload)
+            if measured is not None and density and density > 0:
+                ml = float(measured) / density
+            elif payload.get("measured_ml") is not None:
+                ml = float(payload["measured_ml"])
         except (TypeError, ValueError):
             ml = 0.0
         carrier = _pour_carrier_for_ratio(payload, default_nic_carrier=nicotine_carrier)
@@ -1100,12 +1107,23 @@ def _adjust_pg_for_flavour_deviation(
         payload["base_adjusted_for_overpour"] = True
         payload["base_adjusted_cut_ml"] = round(cut_ml, 4)
         payload["pg_adjusted"] = True
+        preview_overrides = {int(row["id"]): payload}
+        if exclude_step_id is not None:
+            current = db.execute("SELECT payload_json FROM mix_session_steps WHERE id=? AND mix_session_id=?",
+                                 (int(exclude_step_id), int(session_id))).fetchone()
+            if current:
+                current_payload = json.loads(current["payload_json"])
+                current_target = float(current_payload.get("target_grams") or current_payload.get("grams") or 0.0)
+                current_payload["measured_grams"] = round(current_target, 2) + excess
+                preview_overrides[int(exclude_step_id)] = current_payload
         meta_for_carrier = _read_session_meta(db, int(session_id))
         est_pg, est_vg = _estimate_final_ratio_from_steps(
             db,
             int(session_id),
             target_pg_percent=target_pg_percent,
             target_vg_percent=target_vg_percent,
+            include_remaining=True,
+            payload_overrides=preview_overrides,
             nicotine_carrier=str(meta_for_carrier.get("nicotine_carrier") or "PG"),
         )
         payload["pg_adjustment_note"] = (
