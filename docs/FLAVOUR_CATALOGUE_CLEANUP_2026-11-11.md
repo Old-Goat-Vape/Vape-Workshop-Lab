@@ -106,6 +106,20 @@ Regression coverage includes all product-name families shown in the server scree
 nicotine strengths/carriers and pack sizes, true base controls, and conflicting ingredient links.
 Correction validation: 49 catalogue/search/scraper checks, 47 passed and two existing skips.
 
+### Large reviewed category batches
+
+The corrected server preview exposed 893 Base→Flavor and 18 Hardware→Flavor corrections,
+plus two true glycerine Hardware→Base entries. One flavour correction (4666, Acetyl Pyrazine)
+is blocked by an unfinished mix and must stay excluded. The 234 same-category suggestions
+were not itemised in that report and remain unapproved for data changes.
+
+Batch application now validates the complete selection against one fresh preview before its
+first write, supports compatible corrections sharing an ingredient, and rejects stale/blocked
+selections or conflicting shared-reference targets. It avoids rescanning the full catalogue for
+every corrected row. Backup and transaction rollback remain mandatory in the CLI.
+Validation: 51 catalogue/search/scraper checks, 49 passed and two existing skips; includes
+shared-reference batch success and rejection of a stale last item before the first mutation.
+
 ### Initial catalogue patch
 
 - Catalogue, flavour search, scraper parsers and scraper-run checks: 41 tests, 39 passed,

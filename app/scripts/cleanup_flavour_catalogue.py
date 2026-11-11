@@ -11,7 +11,7 @@ from services.catalogue_cleanup_service import (
     duplicate_plan,
     consolidate_group,
     category_plan,
-    apply_category_correction,
+    apply_category_corrections,
 )
 
 
@@ -100,12 +100,9 @@ def main():
             )
             for p in selected
         ]
-        corrected = [
-            apply_category_correction(
-                db, p, actor_user_id=args.actor_id, actor_role=actor["role"]
-            )
-            for p in categories
-        ]
+        corrected = apply_category_corrections(
+            db, categories, actor_user_id=args.actor_id, actor_role=actor["role"]
+        )
         db.commit()
     except Exception:
         db.rollback()

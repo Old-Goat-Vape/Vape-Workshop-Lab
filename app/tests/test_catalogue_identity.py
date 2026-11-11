@@ -62,6 +62,77 @@ class CatalogueBoundaryTests(unittest.TestCase):
     setUp = _fixtures.FlavourSearchTests.setUp
     tearDown = _fixtures.FlavourSearchTests.tearDown
 
+    def test_batch_corrections_share_one_validation_snapshot_and_support_shared_references(
+        self,
+    ):
+        from unittest.mock import patch
+        from services import catalogue_cleanup_service as service
+
+        with flask_app.app_context():
+            db = get_db()
+            db.execute(
+                "INSERT INTO flavor_reference(id,brand,name,category,active) VALUES(301,'CAP','Cotton Candy','Hardware',1)"
+            )
+            for fid in range(301, 341):
+                db.execute(
+                    "INSERT INTO flavours(id,brand,canonical_name,category,source_flavor_ref_id) VALUES(?,'CAP','Cotton Candy','Hardware',301)",
+                    (fid,),
+                )
+            plans = service.category_plan(db)
+            self.assertEqual(len(plans), 40)
+            with patch.object(
+                service, "category_plan", wraps=service.category_plan
+            ) as scan:
+                results = service.apply_category_corrections(
+                    db, plans, actor_user_id=1, actor_role="Master"
+                )
+                self.assertEqual(scan.call_count, 1)
+            self.assertEqual(len(results), 40)
+            self.assertEqual(
+                db.execute(
+                    "SELECT COUNT(*) FROM flavours WHERE category='Flavor'"
+                ).fetchone()[0],
+                40,
+            )
+            self.assertEqual(
+                db.execute(
+                    "SELECT category FROM flavor_reference WHERE id=301"
+                ).fetchone()[0],
+                "Flavor",
+            )
+
+    def test_stale_last_category_rejects_entire_batch_before_first_update(self):
+        from services import catalogue_cleanup_service as service
+
+        with flask_app.app_context():
+            db = get_db()
+            for fid in (301, 302):
+                db.execute(
+                    "INSERT INTO flavor_reference(id,brand,name,category,active) VALUES(?,'CAP',?,'Hardware',1)",
+                    (fid, f"Candy {fid}"),
+                )
+                db.execute(
+                    "INSERT INTO flavours(id,brand,canonical_name,category,source_flavor_ref_id) VALUES(?,'CAP',?,'Hardware',?)",
+                    (fid, f"Candy {fid}", fid),
+                )
+            plans = service.category_plan(db)
+            db.execute(
+                "UPDATE flavours SET profile='Changed after preview' WHERE id=302"
+            )
+            with self.assertRaisesRegex(ValueError, "changed since preview"):
+                service.apply_category_corrections(
+                    db, plans, actor_user_id=1, actor_role="Master"
+                )
+            self.assertEqual(
+                db.execute(
+                    "SELECT COUNT(*) FROM flavours WHERE category='Hardware'"
+                ).fetchone()[0],
+                2,
+            )
+            self.assertEqual(
+                db.execute("SELECT COUNT(*) FROM tvw_admin_audit_logs").fetchone()[0], 0
+            )
+
     def test_category_correction_blocks_a_different_linked_product_even_when_categories_agree(
         self,
     ):
