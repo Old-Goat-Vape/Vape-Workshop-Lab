@@ -36,3 +36,12 @@ const ackContext={stepTypeFor:s=>s.payload.step_type,ingredientLabel:p=>p.name};
 vm.createContext(ackContext);
 vm.runInContext(source.slice(source.indexOf('  const stepAckMessage ='),source.indexOf('\n  const ',source.indexOf('  const stepAckMessage =')+10))+'\nthis.ack=stepAckMessage;',ackContext);
 assert.match(ackContext.ack({steps:[{step_no:1,payload:{step_type:'add_ingredient',name:'Biscuit',measured_grams:0}}]},1),/Zero dose recorded/);
+
+context.render({mix_summary:{batch_size_ml:45.1,target_nic_mg_ml:3,
+  target_ratio_label:'30/70',estimated_final_ratio_label:'30/70',
+  batch_recovery:{status:'complete',original_ml:15,plan:{new_ml:45.1,bottle_count:1},
+    estimated_volume_ml:45.09,estimated_nicotine_mg_ml:3,estimated_ratio:'30/70'}}});
+assert.match(output.innerHTML,/45.1 ml batch/);
+assert.match(output.innerHTML,/one larger vessel/);
+assert(!output.innerHTML.includes('measured split'));
+console.log('Fractional rescue labels and single-vessel history wording passed');

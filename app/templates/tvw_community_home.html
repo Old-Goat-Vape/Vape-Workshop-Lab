@@ -68,7 +68,7 @@
           {% endif %}
         </p>
         <p class="tvw-resume-meta">
-          {% if active_guided_mix.target_ml is not none %}{{ active_guided_mix.target_ml|int }} ml batch{% endif %}
+          {% if active_guided_mix.target_ml is not none %}{{ '%g'|format(active_guided_mix.target_ml|float) }} ml batch{% endif %}
           {% if active_guided_mix.target_pgvg %}{% if active_guided_mix.target_ml is not none %} · {% endif %}{{ active_guided_mix.target_pgvg }} PG/VG{% endif %}
           {% if active_guided_mix.version_number %}{% if active_guided_mix.target_ml is not none or active_guided_mix.target_pgvg %} · {% endif %}v{{ active_guided_mix.version_number }}{% endif %}
         </p>
