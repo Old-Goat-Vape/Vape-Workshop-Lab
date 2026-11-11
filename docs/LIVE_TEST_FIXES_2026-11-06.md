@@ -71,3 +71,19 @@ Changes:
 Validation: 22 focused nicotine/order checks pass; new three-test regression set fails on the prior revision and passes here. The broader API/doc run passes 138/139 tests; the community-route login failure also reproduces on the prior revision. Node recovery UI regressions cover unknown reading, zero replacing a positive reading, reload state and legacy acceptance screens; the existing Master UI regressions still pass. The nicotine recovery page renders and all three executable inline scripts pass syntax checks. Python compilation and whitespace checks pass.
 
 Live test limitation: secure sign-in visibly reached Home as Santa's Little Helper (Master), but opening the private QA recipe immediately redirected to login; a root-page check also showed login. No live recovery/session/pour changes were made in this attempt, and none of this patch has been deployed. After deployment, retest a labelled simulated nicotine overpour with pour-back, zero/nonzero residue, reload, repeated overage and final original-target weight. Do not treat local test results as a live sign-off.
+
+## Post-deployment live acceptance — 10 November 2026
+
+PR #1 was merged as `0a7ba97f85e529327ba4be8ddb4d02ac014c20d6`; user then updated the server. Fresh private QA session #73 verified deployed changes through the browser:
+
+- Nicotine first; 0.35 g against 0.31 g requires pour-back without an accept-over action.
+- After pour-back, scale input clears and current/needed are unknown until measured. Original target and no-tare instructions remain.
+- Residue 0.08 g gives 0.23 g needed; zero gives 0.31 g needed and survives reload. A repeated 0.34 g reading remains blocked with pour-back guidance. Reaching 0.31 g completes nicotine and offers bottle movement.
+- Biscuit 0.23 g against 0.21 g follows slight-over handling. Subsequent PG target is 2.26 g / 2.18 ml, reduced from 2.28 g / 2.20 ml.
+- Vanilla Swirl 0.60 g against 0.31 g pauses. Review displays the no-automatic-correction explanation and does not advance. Review survives reload. Explicit Accept changed batch then advances to bottle movement.
+
+All pours were simulated. Session #73 remains unfinished at PG; no completed production was recorded. Full flavour rebalancing and multi-bottle correction remain unimplemented.
+
+Remaining issue found: the PG adjustment note displayed Estimated final ratio 100/0 because its estimate included completed PG-carried pours but excluded future VG. Follow-up code projects the finished mix using completed readings plus remaining targets, including the newly trimmed PG target and current flavour reading. Completed-batch summaries retain their completed-pour basis. Zero measured amounts no longer fall back to planned amounts. This follow-up needs its own deployment; the live tests above cover PR #1 only.
+
+Follow-up validation: the live 100/0 preview is reproduced by a new API regression on unchanged deployed code; it reports 30/70 after the fix. That test plus the three nicotine pour-back regressions pass, and all 12 final-report-specific tests pass. Changed Python compiles and whitespace checks pass. No live correction or updated deployment is claimed for this follow-up.
