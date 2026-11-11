@@ -6,9 +6,9 @@ from math import isfinite
 PG_DENSITY = 1.036
 VG_DENSITY = 1.26
 
-# Skip pour steps / treat as zero-requirement at or below this mass.
-ZERO_POUR_GRAMS_EPS = 0.02
-_STEP_ML_EPS = 0.008
+# Numerical zero only: small positive doses remain real ingredients.
+ZERO_POUR_GRAMS_EPS = 1e-9
+_STEP_ML_EPS = 1e-9
 
 
 CARRIER_SOURCE_EXPLICIT = "explicit"
@@ -24,6 +24,7 @@ class FlavorInput:
     # Finished-liquid carrier contribution: "PG" or "VG".
     # When omitted/blank/unknown → PG (assumed_default). Density is never used for this.
     carrier: str = ""
+    ingredient_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -277,6 +278,7 @@ def compute_mix_step_breakdown(request: MixInput) -> list[dict]:
             {
                 "step": step_no,
                 "category": "concentrate",
+                "ingredient_id": flv.ingredient_id,
                 "name": label,
                 "brand": brand,
                 "percent": round(float(flv.percent), 4),

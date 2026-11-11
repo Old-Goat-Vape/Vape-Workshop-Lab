@@ -35,6 +35,7 @@ def _flavor_from_row(row) -> FlavorInput:
         density=dens,
         brand=brand,
         carrier=_raw_carrier_from_row(row),
+        ingredient_id=int(row['flavor_id']) if isinstance(row,dict) and row.get('flavor_id') is not None else None,
     )
 
 
@@ -318,3 +319,24 @@ def live_mix_for_builder(
             "hard_stops": list(evaluation.hard_stops),
         },
     }
+
+
+def recovery_formula_for_recipe_version(**kwargs) -> list[dict]:
+    """Capture the complete start-of-mix formula, including sub-scale ingredients."""
+    request=build_mix_input_from_recipe_version(**kwargs)
+    result,_=compute_mix_with_policy(request,policy=_TVW_POLICY,hard_fail=False)
+    rows=[]
+    if result.nicotine_ml>0:
+        rows.append(dict(step_type='add_ingredient',ingredient_id=None,name='Nicotine base',brand='',category='nicotine',
+                         carrier=resolve_carrier(request.nicotine_carrier)[0],target_grams=result.nicotine_g,ml=result.nicotine_ml,pct=None))
+    for flavor in request.flavors:
+        ml=request.target_ml*flavor.percent/100
+        if ml>0:
+            rows.append(dict(step_type='add_ingredient',ingredient_id=flavor.ingredient_id,name=flavor.name,brand=flavor.brand,
+                             category='concentrate',carrier=resolve_carrier(flavor.carrier)[0],density=flavor.density,
+                             target_grams=ml*flavor.density,ml=ml,pct=flavor.percent))
+    for category,ml,grams in (('pg',result.pg_ml,result.pg_g),('vg',result.vg_ml,result.vg_g)):
+        if ml>0:
+            rows.append(dict(step_type='add_ingredient',ingredient_id=None,name=category.upper()+' (base)',brand='',category=category,
+                             carrier=category.upper(),target_grams=grams,ml=ml,pct=None))
+    return rows

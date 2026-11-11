@@ -1,0 +1,24 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const path=require('node:path');
+const source=fs.readFileSync(path.join(__dirname,'../../templates/tvw_guided_mix_session.html'),'utf8');
+const scale=require('../../static/guided_scale_input.js');
+const context={window:{GuidedScaleInput:scale,__guidedSessionLast:{steps:[]}},activeStepTargetGrams:()=>.31,isPartialScaleEntry:scale.isPartialScaleEntry,parseScaleInputGrams:scale.parseScaleGrams};
+vm.createContext(context);
+vm.runInContext(source.slice(source.indexOf('  const resolveMeasuredGramsForStep ='),source.indexOf('  const renderMixSummary ='))+'\nthis.resolve=resolveMeasuredGramsForStep;',context);
+assert.equal(context.resolve('',4).ok,false);
+assert.equal(context.resolve('   ',4).ok,false);
+assert.equal(context.resolve('0',4).grams,0);
+assert.equal(context.resolve('0,08',4).grams,.08);
+const under=source.slice(source.indexOf('  const syncUnderPourUiFromReading ='),source.indexOf('  const showAlarm ='));
+vm.runInContext('let underPourUi={stepNo:4,measured:.2,partialGrams:.1};'+under+'\nthis.sync=syncUnderPourUiFromReading;this.under=()=>underPourUi;',context);
+context.sync(4,{reading:{measured_grams:0,partial_grams:0},session:{steps:[]}});
+assert.equal(context.under().measured,0);
+assert.equal(context.under().partialGrams,0);
+const alarm=source.slice(source.indexOf('  const showAlarm ='),source.indexOf('  document.getElementById("guidedRoot").addEventListener'));
+context.stepTypeFor=()=> 'add_ingredient';
+vm.runInContext('underPourUi=null;let nicotineRecoveryUi={mode:"pour_back"};'+alarm+'\nthis.alarm=showAlarm;',context);
+// No generic warning renderer is supplied: the no-tare/pour-back card must remain intact.
+context.alarm({warnings:['Over target']},'Over target',{});
+console.log('Mixing control regressions passed');

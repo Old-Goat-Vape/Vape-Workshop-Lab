@@ -1100,3 +1100,33 @@ def insert_guided_mix_event(session_id: int):
             return denied
     return jsonify({"status": "success", **outcome, "session": bundle}), 200
 
+
+
+@tvw_api_bp.route('/mix/guided/session/<int:session_id>/batch-recovery/<operation>', methods=['POST'])
+@login_required
+def guided_batch_recovery(session_id: int, operation: str):
+    from services import batch_recovery_service as recovery
+    user_id = _current_user_id()
+    bundle = guided_mix_session_service.get_guided_session_bundle(session_id=session_id,user_id=user_id)
+    if not bundle:
+        return jsonify(status='error',message='Mix session not found.'),404
+    denied = _gate_recipe_response(int(bundle['recipe_id']))
+    if denied:
+        return denied
+    data=request.get_json(silent=True) or {}
+    try:
+        if operation=='preview':
+            plan=recovery.preview(session_id,user_id,data.get('mode'),data.get('new_ml'))
+            return jsonify(status='success',plan=plan)
+        if operation=='apply':
+            if data.get('confirmed') is not True:
+                raise recovery.RecoveryError('Review all top-ups and confirm bottle capacity before applying.')
+            recovery.apply(session_id,user_id,data.get('mode'),data.get('fingerprint'),data.get('new_ml'),data.get('capacity_ml'))
+        elif operation=='advance':
+            recovery.advance(session_id,user_id,data.get('revision'),data.get('cursor'),data.get('weight'),data.get('recording_error') is True)
+        else:
+            return jsonify(status='error',message='Unknown recovery action.'),404
+    except (recovery.RecoveryError, TypeError, ValueError) as exc:
+        get_db().rollback()
+        return jsonify(status='error',message=str(exc)),409
+    return jsonify(status='success',session=guided_mix_session_service.get_guided_session_bundle(session_id=session_id,user_id=user_id))

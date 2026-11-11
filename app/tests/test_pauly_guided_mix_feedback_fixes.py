@@ -60,7 +60,7 @@ class PaulyGuidedMixFeedbackFixes(unittest.TestCase):
                 _classify_under_pour_for_step,
             )
 
-            for target in (0.0, 0.01, 0.02):
+            for target in (0.0,):
                 cls, msg = _classify_under_pour(display_target=target, measured=0.0)
                 self.assertEqual(cls, "within_tolerance", f"target={target}")
                 self.assertEqual(msg, "")
@@ -77,6 +77,18 @@ class PaulyGuidedMixFeedbackFixes(unittest.TestCase):
                 self.assertEqual(cls_s, "within_tolerance")
                 self.assertEqual(msg_s, "")
                 self.assertNotIn("under", (msg + msg_n + msg_s).lower())
+
+    def test_small_positive_doses_are_kept_and_zero_reading_is_under(self):
+        from core.calculator import FlavorInput, MixInput, compute_mix_step_breakdown
+        from services.guided_mix_session_service import _classify_under_pour, _classify_nicotine_under_pour
+        for target in (0.01, 0.02):
+            for classify in (_classify_under_pour, _classify_nicotine_under_pour):
+                self.assertEqual(classify(display_target=target, measured=0)[0], "large_under_target")
+        request = MixInput(target_ml=10, target_nic_mg_ml=0, nic_base_mg_ml=100,
+                           pg_ratio=30, vg_ratio=70, nicotine_carrier="PG",
+                           flavors=[FlavorInput(name="Tiny flavour", percent=0.1, density=1)])
+        pours=compute_mix_step_breakdown(request)
+        self.assertAlmostEqual(next(p for p in pours if p.get("name")=="Tiny flavour")["grams"], 0.01)
 
     def test_pg_flavour_contributes_to_final_pg_and_reduces_standalone_pg(self):
         with flask_app.app_context():
