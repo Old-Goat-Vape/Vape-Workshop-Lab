@@ -142,7 +142,7 @@
 
         <div class="tvw-ws-lcd-cell tvw-ws-lcd-live" id="scaleLiveBlock">
 
-          <span class="tvw-ws-lcd-label">Scale</span>
+          <span class="tvw-ws-lcd-label">Type the grams shown on your scale</span>
 
           <div class="tvw-ws-lcd-value">
 
@@ -2597,13 +2597,13 @@
 
         scaleLiveBlock.innerHTML = `
 
-        <span class="tvw-ws-lcd-label">Scale</span>
+        <span class="tvw-ws-lcd-label">Type the grams shown on your scale</span>
 
         <div class="tvw-ws-lcd-value">
 
           <label for="focusMeasuredInput" class="visually-hidden">Grams on scale</label>
 
-          <input id="focusMeasuredInput" class="tvw-ws-input" type="text" inputmode="decimal" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="0.00" value="${scaleSeedText}" aria-label="Grams on scale">
+          <input id="focusMeasuredInput" class="tvw-ws-input" type="text" inputmode="decimal" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Enter weight" value="${scaleSeedText}" aria-label="Grams on scale">
 
           <span class="tvw-ws-unit">g</span>
 
@@ -3908,7 +3908,10 @@
 
     try {
 
-      const needsMeasured = !undoBtn && (doneBtn || acceptBtn || confirmAcceptBtn || checkTopupBtn || continuePourBtn || savePartialBtn || acceptUnderLargeBtn || nicotineCheckBtn);
+      const activeStep = ((window.__guidedSessionLast || {}).steps || []).find((s) => Number(s.step_no) === stepNo);
+      const isPourStep = !!activeStep && stepTypeFor(activeStep) === "add_ingredient";
+      const needsMeasured = !undoBtn && (isPourStep || !!measuredInput)
+        && (doneBtn || acceptBtn || confirmAcceptBtn || checkTopupBtn || continuePourBtn || savePartialBtn || acceptUnderLargeBtn || nicotineCheckBtn);
 
       let measuredGrams = null;
 
@@ -3942,7 +3945,6 @@
 
       const payload = { undo: !!undoBtn, measured_grams: measuredGrams != null ? measuredGrams : measuredRaw };
 
-      const activeStep = ((window.__guidedSessionLast || {}).steps || []).find((s) => Number(s.step_no) === stepNo);
       if (doneBtn && activeStep?.payload?.recovery_reviewed) payload.recovery_action = "accept_deviation";
       if (acceptBtn || confirmAcceptBtn) payload.accept_under = true;
 

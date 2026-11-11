@@ -525,3 +525,13 @@ must not change an active mix. The saved recipe remains unchanged.
 - Positive 0.01/0.02 g doses are real requirements, never numerical zero. A zero
   reading must remain an underpour. Reject starting a guided recipe whose positive
   dose rounds to 0.00 g; ask for a larger batch rather than silently skipping it.
+
+
+### Pour input validation versus bench actions
+
+Require an explicit current weight for actual pours only. Bench setup, scale tare,
+stock-bottle movement, recovery acknowledgements and finish controls do not require
+an absent measurement field. A blank pour is unknown, never automatically zero;
+zero is an explicit reading. The UI must say that users type the physical scale's
+gram reading. Regression checks must exercise the delegated click handler, not
+only the scale parser in isolation.

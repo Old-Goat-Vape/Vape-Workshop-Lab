@@ -474,7 +474,7 @@ def _render_recipe_detail(
         user_id=uid,
         role=role,
         username=username,
-        target_batch_ml=batch_ml_param,
+        target_batch_ml=batch_ml_param if batch_ml_param is not None else current_version.get("default_batch_ml"),
     )
     collab = recipes_repo.fetch_recipe_collab_snapshot(int(recipe["id"]))
 

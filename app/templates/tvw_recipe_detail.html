@@ -165,7 +165,7 @@
         </option>
       {% endfor %}
     </select>
-    <label for="batch_ml_sel">Batch for stash hint</label>
+    <label for="batch_ml_sel">Check stash for batch</label>
     <select id="batch_ml_sel" name="batch_ml" class="form-select form-select-sm">
       {% for n in ([10, 15, 30, 50, 60, 100, stash_panel.batch_ml|float]|unique|sort) %}
         <option value="{{ n }}" {% if (stash_panel.batch_ml|float) == (n|float) %}selected{% endif %}>{{ n }} ml</option>
@@ -261,9 +261,9 @@
         {% if ss.wcm_qty and ss.wcm_qty.reason %}
           <span class="ms-1">{{ ss.wcm_qty.reason }}</span>
         {% elif stash_panel.stash_source == 'lab_shared_holdings' %}
-          <span class="ms-1">Stash hint uses Lab-linked holdings at {{ detail.facts_batch_ml|int }} ml.</span>
+          <span class="ms-1">Stash check uses Lab-linked holdings for {{ "%g"|format(stash_panel.batch_ml) }} ml.</span>
         {% else %}
-          <span class="ms-1">Stash hint uses your catalogue at {{ detail.facts_batch_ml|int }} ml.</span>
+          <span class="ms-1">Stash check uses your saved flavours for {{ "%g"|format(stash_panel.batch_ml) }} ml.</span>
         {% endif %}
       </div>
     {% endif %}
