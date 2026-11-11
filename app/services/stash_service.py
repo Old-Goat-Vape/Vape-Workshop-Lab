@@ -178,12 +178,13 @@ def build_stash_page_rows(
 
 def fetch_stash_quick_add_options(*, limit: int = 50, query: str = "") -> list[dict[str, Any]]:
     """Lightweight flavour picker rows for stash quick-add UX."""
+    from config.catalogue_identity import visible_flavour_sql
     db = get_db()
     rows = db.execute(
-        """
+        f"""
         SELECT id, canonical_name, brand, source_flavor_ref_id
-        FROM flavours
-        WHERE COALESCE(merged_into_flavour_id, 0) = 0
+        FROM flavours f
+        WHERE {visible_flavour_sql('f')}
           AND COALESCE(is_hidden, 0) = 0
           AND COALESCE(is_invalid, 0) = 0
           AND (canonical_name LIKE ? ESCAPE '!' OR brand LIKE ? ESCAPE '!')

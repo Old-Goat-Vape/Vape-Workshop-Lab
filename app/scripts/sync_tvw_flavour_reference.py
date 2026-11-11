@@ -13,12 +13,28 @@ if APP_ROOT not in sys.path:
     sys.path.insert(0, APP_ROOT)
 
 from config.canonical_library_brands import (
-    canonical_library_brand,
-    flavor_identity_match_key,
     normalize_flavor_identity_name,
-    preferred_flavor_storage_name,
 )
 from config.flavor_name_aliases import FLAVOR_NAME_ALIASES
+from config.catalogue_identity import canonical_item, catalogue_flavor_match_key as flavor_identity_match_key
+
+
+def _identity_index(conn, table):
+    """Build once per import; legacy duplicate rows remain intact for reviewed cleanup."""
+    if table == 'flavor_reference':
+        sql = ("SELECT id, brand, name, category FROM flavor_reference WHERE COALESCE(active,1)=1 "
+               "ORDER BY (COALESCE(price_per_ml,0)>0) DESC, id")
+        name_column = 'name'
+    else:
+        sql = ("SELECT id, brand, canonical_name, category FROM flavours "
+               "WHERE COALESCE(merged_into_flavour_id,0)=0 ORDER BY id")
+        name_column = 'canonical_name'
+    result = {}
+    for row in conn.execute(sql):
+        key = canonical_item(row['brand'], row[name_column], row['category'])[2]
+        if key is not None:
+            result.setdefault(key, int(row['id']))
+    return result
 
 
 def _now_iso() -> str:
@@ -45,29 +61,6 @@ def _ensure_column(conn: sqlite3.Connection, table: str, column: str, column_sql
     if column in cols:
         return
     conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_sql}")
-
-
-def _find_or_create_flavour(conn: sqlite3.Connection, *, canonical_name: str, brand: str, category: str, profile: str | None) -> int:
-    row = conn.execute(
-        """
-        SELECT id
-        FROM flavours
-        WHERE LOWER(COALESCE(canonical_name, '')) = LOWER(?)
-          AND LOWER(COALESCE(brand, '')) = LOWER(?)
-        LIMIT 1
-        """,
-        (canonical_name, brand),
-    ).fetchone()
-    if row:
-        return int(row["id"])
-    cur = conn.execute(
-        """
-        INSERT INTO flavours (canonical_name, brand, category, profile, created_at, updated_at)
-        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        """,
-        (canonical_name, brand, category, profile),
-    )
-    return int(cur.lastrowid)
 
 
 def sync_flavours(source_db: str, target_db: str, limit: int | None = None) -> dict:
@@ -157,29 +150,26 @@ def sync_flavours(source_db: str, target_db: str, limit: int | None = None) -> d
     updated_meta = 0
     created_aliases = 0
     now = _now_iso()
+    reference_index = _identity_index(dst, 'flavor_reference')
+    catalogue_index = _identity_index(dst, 'flavours')
 
     for r in rows:
         brand_raw = str(r.get("brand") or "").strip()
         name_raw = str(r.get("name") or "").strip()
         if not brand_raw or not name_raw:
             continue
-        canonical_brand = canonical_library_brand(brand_raw, name_raw)
-        canonical_name = preferred_flavor_storage_name(name_raw)
-        normalized_name = normalize_flavor_identity_name(name_raw)
         source_name = str(r.get("source") or "lab_sync")
         category = str(r.get("category") or "Flavor")
+        canonical_brand, canonical_name, identity = canonical_item(brand_raw, name_raw, category)
+        normalized_name = normalize_flavor_identity_name(canonical_name)
         profile = str(r.get("resolved_profile") or r.get("profiles") or "")
         avg_usage = r.get("avg_usage")
         min_percent = r.get("min_percent")
         max_percent = r.get("max_percent")
         default_percent = min_percent if min_percent is not None else avg_usage
 
-        ref_row = dst.execute(
-            "SELECT id FROM flavor_reference WHERE brand = ? AND name = ?",
-            (canonical_brand, canonical_name),
-        ).fetchone()
-        if ref_row:
-            ref_id = int(ref_row["id"])
+        ref_id = reference_index.get(identity)
+        if ref_id is not None:
             dst.execute(
                 """
                 UPDATE flavor_reference
@@ -240,20 +230,11 @@ def sync_flavours(source_db: str, target_db: str, limit: int | None = None) -> d
                 ),
             )
             ref_id = int(cur.lastrowid)
+            reference_index[identity] = ref_id
             created_ref += 1
 
-        flavour_row = dst.execute(
-            """
-            SELECT id
-            FROM flavours
-            WHERE LOWER(COALESCE(canonical_name, '')) = LOWER(?)
-              AND LOWER(COALESCE(brand, '')) = LOWER(?)
-            LIMIT 1
-            """,
-            (canonical_name, canonical_brand),
-        ).fetchone()
-        if flavour_row:
-            flavour_id = int(flavour_row["id"])
+        flavour_id = catalogue_index.get(identity)
+        if flavour_id is not None:
             dst.execute(
                 """
                 UPDATE flavours
@@ -302,6 +283,7 @@ def sync_flavours(source_db: str, target_db: str, limit: int | None = None) -> d
                 ),
             )
             flavour_id = int(cur.lastrowid)
+            catalogue_index[identity] = flavour_id
             created_flavours += 1
 
         meta_payload = {

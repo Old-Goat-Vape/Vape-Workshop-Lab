@@ -33,11 +33,8 @@ class ScrapeFlavor:
 
 
 def normalize_name(name: str) -> str:
-    s = (name or "").strip().lower()
-    s = re.sub(r"\(.*?\)", " ", s)  # drop bracketed notes
-    s = re.sub(r"[^a-z0-9]+", " ", s)
-    s = re.sub(r"\s+", " ", s).strip()
-    return s
+    from config.canonical_library_brands import normalize_flavor_identity_name
+    return normalize_flavor_identity_name(name or '')
 
 
 def _norm(text: str) -> str:

@@ -114,7 +114,7 @@ def _capella_series_label(brand: str, flavor: str, combined_lower: str) -> str |
 
     if re.search(r"euro\s*series", hay) or re.search(r"capella\s+euro", hay):
         return "CAP (ES)"
-    if "(es)" in hay and "euro" in hay:
+    if "(es)" in hay and ("cap" in hay or "euro" in hay):
         return "CAP (ES)"
 
     return None
@@ -195,18 +195,11 @@ def normalize_flavor_identity_name(name: str) -> str:
 
 
 def fold_capella_brand_if_name_unmarked(canonical_brand: str, flavor_name: str) -> str:
+    """Compatibility helper: an explicit product line survives an unmarked product name.
+
+    Missing series text in a name is not evidence that two formulations are identical.
+    Verified exceptions belong in catalogue_identity, rather than a brand-wide fold.
     """
-    For dedupe / storage alignment: CAP (SL) and CAP (ES) rows whose flavour name does not
-    mention that series match plain CAP (e.g. BLCK imports omit \"Silver Line\").
-    """
-    b = (canonical_brand or "").strip()
-    if b not in {"CAP (SL)", "CAP (ES)"}:
-        return canonical_brand
-    nk = normalize_flavor_identity_name(flavor_name or "")
-    if b == "CAP (SL)" and not re.search(r"silver\s*line|\(sl\)", nk):
-        return "CAP"
-    if b == "CAP (ES)" and not re.search(r"euro\s*series|\(es\)|capella\s+euro", nk):
-        return "CAP"
     return canonical_brand
 
 

@@ -12,9 +12,9 @@ from bs4 import BeautifulSoup
 
 from config.canonical_library_brands import (
     canonical_library_brand,
-    flavor_identity_match_key,
-    preferred_flavor_storage_name,
 )
+from config.catalogue_identity import catalogue_flavor_match_key as flavor_identity_match_key
+from config.catalogue_identity import canonical_item
 
 
 VC_FLAVOURS_URL = "https://vceliquidrecipes.com/flavours"
@@ -415,6 +415,7 @@ def build_identity_index(db) -> Dict[str, Dict[str, Any]]:
         SELECT *
         FROM flavor_reference
         WHERE active = 1
+        ORDER BY (COALESCE(price_per_ml,0)>0) DESC, id
         """,
     ).fetchall()
     index: Dict[str, Dict[str, Any]] = {}
@@ -481,8 +482,7 @@ def insert_new_vc_reference(db, *, vc_item: Dict[str, Any], now_ts: str) -> None
     vc_url = (vc_item.get("vc_url") or "").strip()
     desc = (vc_item.get("description") or "").strip()
     raw_name = str(vc_item.get("name") or "")
-    canon_brand = canonical_library_brand(str(vc_item.get("brand") or ""), raw_name)
-    storage_name = preferred_flavor_storage_name(raw_name) or raw_name.strip()
+    canon_brand, storage_name, _ = canonical_item(str(vc_item.get("brand") or ""), raw_name)
     db.execute(
         """
         INSERT INTO flavor_reference (
@@ -526,8 +526,7 @@ def upsert_vc_reference_item(
     insert_new_vc_reference(db, vc_item=vc_item, now_ts=now_ts)
     if identity_index is not None:
         raw_name = str(vc_item.get("name") or "")
-        canon_brand = canonical_library_brand(str(vc_item.get("brand") or ""), raw_name)
-        storage_name = preferred_flavor_storage_name(raw_name) or raw_name.strip()
+        canon_brand, storage_name, _ = canonical_item(str(vc_item.get("brand") or ""), raw_name)
         key = flavor_identity_match_key(canon_brand, storage_name)
         if key:
             identity_index[key] = {
