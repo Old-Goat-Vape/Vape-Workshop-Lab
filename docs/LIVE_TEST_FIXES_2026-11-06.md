@@ -127,3 +127,48 @@ third-flavour overpour, select two 30 ml bottles, reload during a partial top-up
 complete the split and both carriers, and inspect both bottle summaries. Also repeat
 nicotine-only pour-back without taring, zero residue, and the 30/70 PG-preview check.
 The original saved recipe must remain unchanged.
+
+
+## Pauly report follow-up and deployed blocker — 11 November 2026
+
+Read the deploy-chat report and original `OG alpha.docx`. Pauly reported full-target
+underpours (Caramel 0.31 g, PG 6.45 g), zero volume, an unfinished dashboard entry,
+blank completion/Done, transient stash additions and confusing batch/notes labels.
+These are observations, not proof that the server ignored a correctly entered weight.
+Earlier blank-to-zero parsing can explain zero-volume symptoms; confirming his exact
+sequence still requires a fresh completed live mix. VPN-only access from his home
+network is a separate connectivity observation, not an application-code diagnosis.
+
+After the user deployed PR #3, secure sign-in reached Home as Santa's Little Helper
+(Master). Created private simulated session #74 at 30 ml. Nicotine appeared first,
+but Ready to Pour incorrectly asked for a scale reading during bench setup, with no
+weight field present. This is a regression introduced by the blank-input guard in
+PR #3: the delegated Done handler also handles setup/tare/movement/completion and
+was validating them as pours. Corrected weight validation to apply to actual pour
+steps or displayed measurement inputs. Blank real pours still block; explicit zero
+remains valid input. Added regression tests executing the real delegated handler
+for non-pour advancement, missing/blank pour fields, and zero.
+
+Live stash verification: the test account initially had Biscuit 25 ml and one
+missing flavour for its private QA recipe. Added Vanilla Swirl through What Can I
+Make; My Stash showed 10 ml saved. Reopening recipe matching showed two references,
+six visible recipes scanned, and the QA recipe under Can make now (previously
+Missing 1). Thus saved stock and fresh matching work for this case. The existing
+client deliberately reset Added back to Add after 900 ms and never recomputed the
+page. Changed success to refresh the current results after confirmed JSON success;
+failed/sign-in responses offer Retry add without pretending success.
+
+The recipe detail showed a 30 ml stash selector beside text claiming 10 ml. Stash
+calculation defaulted to 30 independently of the recipe's saved batch; the text
+incorrectly read the recipe facts. It now defaults to the selected version's batch,
+allows an explicit independent override, and labels the actual stash-check batch.
+The scale field now explicitly asks users to type grams rather than implying that
+it reads a connected scale automatically.
+
+Validation: 43 focused Python tests pass, including recipe-default/override rendering,
+22 recovery tests and 12 final-report checks. Five Node regression programs pass,
+including real non-pour click-handler progression and stash refresh/error handling.
+No live completed mix or two-bottle acceptance is claimed: session #74 remains at
+setup until this correction is pulled and the server restarted. No real liquid or
+production batch was made. Pauly's blank completion/Done and saved dashboard state
+remain live acceptance items; do not silently mark them resolved from API tests.

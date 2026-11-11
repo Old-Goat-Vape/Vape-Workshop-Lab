@@ -169,7 +169,6 @@
     btn.addEventListener("click", async () => {
       const fid = Number(btn.dataset.flavourId || 0);
       if (!fid) return;
-      const original = btn.textContent;
       btn.disabled = true;
       try {
         const res = await fetch("/api/stash", {
@@ -177,15 +176,14 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ flavour_id: fid, quantity_ml: 10, is_favorite: false }),
         });
-        if (!res.ok) throw new Error("stash");
-        btn.textContent = "Added";
+        if (!res.ok || res.redirected) throw new Error("stash");
+        const body = await res.json();
+        if (body.status !== "success") throw new Error("stash");
+        btn.textContent = "Added — updating recipes…";
+        window.location.reload();
       } catch (_err) {
-        btn.textContent = "Retry";
-      } finally {
-        setTimeout(() => {
-          btn.textContent = original;
-          btn.disabled = false;
-        }, 900);
+        btn.textContent = "Retry add";
+        btn.disabled = false;
       }
     });
   });

@@ -87,6 +87,21 @@ class LiveAuditFixTests(unittest.TestCase):
         self.assertFalse(ingredient_over_requires_recovery(measured=.23,**args))
         self.assertTrue(ingredient_over_requires_recovery(measured=.50,**args))
 
+    def test_stash_batch_matches_recipe_default_and_selected_override(self):
+        from bs4 import BeautifulSoup
+        with flask_app.app_context():
+            db=get_db()
+            db.execute("UPDATE recipes SET current_version_id=1,slug='recipe-one' WHERE id=1")
+            db.execute('UPDATE recipe_versions SET default_batch_ml=15 WHERE id=1')
+            db.commit()
+        for query,expected in (('',15),('?batch_ml=60',60)):
+            response=self.client.get('/recipes/recipe-one'+query)
+            self.assertEqual(response.status_code,200,response.data)
+            soup=BeautifulSoup(response.data,'html.parser')
+            selected=soup.select_one('#batch_ml_sel option[selected]')
+            self.assertEqual(float(selected['value']),expected)
+            self.assertIn(f'Stash check uses your saved flavours for {expected} ml.',soup.get_text(' ',strip=True))
+
 class LiveAuditBuilderTests(unittest.TestCase):
     setUp=RecipeBuilderCreateTests.setUp
     tearDown=RecipeBuilderCreateTests.tearDown
