@@ -82,6 +82,7 @@
                 <option value="help" {% if st == 'help' %}selected{% endif %}>I need help</option>
                 <option value="ready" {% if st == 'ready' %}selected{% endif %}>Ready</option>
               </select>
+              <p id="helpVisibilityNote">Choosing “I need help” makes this recipe public so the community can respond.</p>
               {% if form_errors.get('status') %}<div class="tvw-rb-field-error">{{ form_errors.status }}</div>{% endif %}
             </div>
             <div class="tvw-rb-span-2">
@@ -264,4 +265,20 @@
   };
 </script>
 <script src="{{ url_for('static', filename='tvw-recipe-builder.js') }}"></script>
+<script>
+(() => {
+  const status = document.getElementById('recipeStatus');
+  const syncHelp = () => {
+    if (status?.value !== 'help') return;
+    document.querySelectorAll('input[name="visibility"]').forEach(input => {
+      if (input.type === 'radio') input.checked = input.value === 'public';
+      else input.value = 'public';
+    });
+  };
+  status?.addEventListener('change', syncHelp);
+  document.querySelectorAll('input[name="visibility"]').forEach(input => input.addEventListener('change', syncHelp));
+  document.getElementById('recipeBuilderForm')?.addEventListener('submit', syncHelp);
+  syncHelp();
+})();
+</script>
 {% endblock %}

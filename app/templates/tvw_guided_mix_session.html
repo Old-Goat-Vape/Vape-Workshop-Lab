@@ -82,7 +82,7 @@
   </div>
   {% endif %}
 
-  <div class="tvw-ws-body tvw-ws-bench-layout">
+  <div class="tvw-ws-body tvw-ws-bench-layout" id="mixingPanels">
 
     <aside id="usedPanel" class="tvw-ws-panel tvw-ws-used" aria-label="Used bottles left side"></aside>
 
@@ -186,7 +186,18 @@
 
 
 
-  <div id="completionSummary" class="tvw-ws-panel tvw-ws-complete tvw-ws-batch-report {% if not prog.all_done %}d-none{% endif %}">
+  <div tabindex="-1" id="completionSummary" class="tvw-ws-panel tvw-ws-complete tvw-ws-batch-report {% if not prog.all_done %}d-none{% endif %}">
+
+    <div class="tvw-ws-complete-actions">
+      <a class="tvw-ws-exit" href="#mixSummaryDetail">VIEW BATCH REPORT</a>
+
+      <a class="tvw-ws-exit-primary" href="{{ mix_again_href }}">MIX AGAIN</a>
+
+      <a class="tvw-ws-exit" href="{{ url_for('tvw_recipes.tvw_recipe_detail', slug=rslug) }}?version_id={{ bundle.recipe_version_id }}">BACK TO RECIPE</a>
+
+      <a class="tvw-ws-exit" href="{{ url_for('tvw_community.community_home') }}">DASHBOARD</a>
+
+    </div>
 
     <div id="mixSummaryDetail" class="tvw-ws-mix-summary" aria-live="polite"></div>
 
@@ -210,15 +221,7 @@
 
     </section>
 
-    <div class="tvw-ws-complete-actions">
 
-      <a class="tvw-ws-exit-primary" href="{{ mix_again_href }}">MIX AGAIN</a>
-
-      <a class="tvw-ws-exit" href="{{ url_for('tvw_recipes.tvw_recipe_detail', slug=rslug) }}?version_id={{ bundle.recipe_version_id }}">BACK TO RECIPE</a>
-
-      <a class="tvw-ws-exit" href="{{ url_for('tvw_community.community_home') }}">DASHBOARD</a>
-
-    </div>
 
   </div>
 
@@ -1998,7 +2001,7 @@
 
       <header class="tvw-ws-report-header">
 
-        <p class="tvw-ws-report-kicker">Finished batch</p>
+        <p class="tvw-ws-report-kicker">${batchMl} ml batch complete</p>
 
         <h2 class="tvw-ws-report-title">${recipeName}</h2>
 
@@ -2020,7 +2023,7 @@
           ${flavourPct != null ? `<div><dt>Recipe flavour</dt><dd>${flavourPct}%</dd></div>` : ""}
           ${actualFlavourPct != null ? `<div><dt>Estimated final flavour</dt><dd>${actualFlavourPct}%</dd></div>` : ""}
 
-          <div><dt>Final volume</dt><dd>${estVol} ml</dd></div>
+          <div><dt>Estimated volume from recorded pours</dt><dd>${estVol} ml</dd></div>
 
           <div><dt>Status</dt><dd>${status}</dd></div>
 
@@ -3205,6 +3208,10 @@
       return;
     }
     const prog = sess.progress || {};
+    const mixingPanels = document.getElementById("mixingPanels");
+    const wasComplete = root.classList.contains("is-complete");
+    root.classList.toggle("is-complete", !!prog.all_done);
+    if (mixingPanels) mixingPanels.classList.toggle("d-none", !!prog.all_done);
 
     if (completionSummary) {
 
@@ -3249,6 +3256,10 @@
     }
 
     setFocus(sess);
+    if (prog.all_done && !wasComplete && completionSummary) {
+      completionSummary.focus();
+      completionSummary.scrollIntoView({block: "start"});
+    }
 
   };
 
