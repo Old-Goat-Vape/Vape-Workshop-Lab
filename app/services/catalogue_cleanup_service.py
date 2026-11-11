@@ -87,16 +87,53 @@ def category_plan(db):
 
 
 def apply_category_correction(db, plan, *, actor_user_id, actor_role):
-    current = next(
-        (p for p in category_plan(db) if p["catalogue_id"] == plan["catalogue_id"]),
-        None,
-    )
-    if not current or current["fingerprint"] != plan["fingerprint"]:
-        raise ValueError(
-            "Catalogue category changed since preview; generate a fresh plan."
+    return apply_category_corrections(
+        db, [plan], actor_user_id=actor_user_id, actor_role=actor_role
+    )[0]
+
+
+def apply_category_corrections(db, plans, *, actor_user_id, actor_role):
+    """Validate every selection once before writing; caller holds the write transaction.
+
+    Shared ingredient links with the same correction are supported. Conflicting corrections,
+    stale previews and blocked selections reject the whole batch before its first mutation.
+    """
+    if not plans:
+        return []
+    current_by_id = {p["catalogue_id"]: p for p in category_plan(db)}
+    validated = []
+    selected_ids = set()
+    reference_targets = {}
+    for plan in plans:
+        current = current_by_id.get(plan["catalogue_id"])
+        if not current or current["fingerprint"] != plan["fingerprint"]:
+            raise ValueError(
+                "Catalogue category changed since preview; generate a fresh plan."
+            )
+        if current["issues"]:
+            raise ValueError("; ".join(current["issues"]))
+        if current["catalogue_id"] in selected_ids:
+            raise ValueError("A catalogue correction was selected more than once.")
+        selected_ids.add(current["catalogue_id"])
+        if current["reference"]:
+            ref_id = current["reference"]["id"]
+            previous = reference_targets.setdefault(
+                ref_id, current["proposed_category"]
+            )
+            if previous != current["proposed_category"]:
+                raise ValueError(
+                    "Selected corrections disagree about a shared ingredient category."
+                )
+        validated.append(current)
+    return [
+        _apply_validated_category_correction(
+            db, current, actor_user_id=actor_user_id, actor_role=actor_role
         )
-    if current["issues"]:
-        raise ValueError("; ".join(current["issues"]))
+        for current in validated
+    ]
+
+
+def _apply_validated_category_correction(db, current, *, actor_user_id, actor_role):
     db.execute(
         "UPDATE flavours SET category=? WHERE id=?",
         (current["proposed_category"], current["catalogue_id"]),
