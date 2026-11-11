@@ -257,3 +257,43 @@ estimates, fresh blank inputs, explicit zero, delegated bench controls and stash
 refresh. Rendered completed-page scripts compile. No full-app, mobile, multi-account,
 production-job or network/VPN sign-off is claimed. Further physical overpour after
 splitting remains a paused separate-correction limitation.
+
+
+## Post-PR #5 live acceptance — 11 November 2026
+
+After the user pulled/restarted again, existing report #74 showed both recovered
+bottles at estimated 30.00 ml / 2.99 mg/ml, separate actual nicotine/flavour, and
+historical PG changes labelled superseded by recipe rescue. Report #75 now showed
+the previously omitted recorded zero Biscuit and actual flavour 3.22%. Dashboard
+links returned to community Home.
+
+Fresh private simulation #77 repeated the 15 ml zero-nicotine case. Pour fields
+started blank; blank submission was rejected. Explicit Biscuit zero accepted through
+confirmation, with Underpour accepted and Zero dose recorded wording. Vanilla 0.49 g,
+PG displayed/entered 3.86 g and VG 13.23 g completed at 14.70 ml / 29:71. The final
+report explicitly listed Biscuit accepted 0.00 g and did not falsely list PG as under.
+QA simulation notes were saved.
+
+Session #78 was a 15 ml / 3 mg/ml simulation (not a 30 ml original batch): nicotine
+0.47 g, Biscuit 0.31 g and Vanilla 1.40 g against its 0.47 g target. Two 15 ml bottles
+were correctly refused because the minimum corrected volume was 45.1 ml. Chose the
+minimum larger-vessel plan and confirmed a 50 ml working vessel. Required top-ups:
+nicotine 0.93 g, Biscuit 0.62 g, no more Vanilla, PG 10.28 g, VG 39.78 g. After the
+preparation task, Home showed Recipe recovery, Step 2 of 15, 14 remaining. Continue
+Mix reopened that exact task. All top-ups/mixing/completion succeeded: 45.09 ml,
+estimated 3.00 mg/ml, 30/70 and 4.99% actual flavour. Reload retained completion and
+saved QA notes. No real liquid was mixed.
+
+Remaining display cleanup from this run: integer formatting rounded 45.1 ml to 45 ml
+in Home, history, some bench labels, links and the final-report batch heading. Keep
+fractional batch targets in those displays/links. A one-vessel rescue report must not
+claim a measured split occurred; describe a split only when its weight exists.
+These template-only follow-ups do not change calculation, dosing or saved weights.
+
+
+Display-cleanup validation: 20 focused Python completion/report/doc checks pass,
+including fractional Home/history/bench labels and history links. Batch-report,
+ordinary-control and nicotine Node regressions pass. The completed fractional-batch
+page's three executable inline scripts compile. Whitespace checks pass. Live
+acceptance above covers deployed PR #5; fractional-label and conditional-split-copy
+cleanup requires its subsequent deployment.

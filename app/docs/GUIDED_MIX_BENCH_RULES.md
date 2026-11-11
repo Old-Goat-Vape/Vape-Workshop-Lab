@@ -549,3 +549,9 @@ without inventing consent. Preserve historical deviations after recipe rescue, b
 label them rebalanced/superseded. Show each recovered bottle's estimated volume and
 strength. Active recovery counts come from recovery tasks, including Home resume;
 completed personal mixes return to community Home rather than the Lab dashboard.
+
+
+Fractional recovery targets (for example 45.1 ml) must retain their decimal part in
+Home resume, history, recipe links, bench metadata and final batch headings. Show
+measured-split history only when a split was actually recorded; one-vessel rescues
+retain original pours and top-ups without inventing a transfer.

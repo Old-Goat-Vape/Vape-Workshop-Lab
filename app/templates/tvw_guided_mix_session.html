@@ -28,7 +28,7 @@
 
      data-session-id="{{ session_id }}"
 
-     data-batch-ml="{{ (bundle.batch_size_ml or bundle.target_ml)|int }}"
+     data-batch-ml="{{ '%g'|format((bundle.batch_size_ml or bundle.target_ml)|float) }}"
 
      data-recipe-name="{{ bundle.recipe_name or recipe.name }}"
 
@@ -60,7 +60,7 @@
 
       <span class="tvw-ws-counter" id="focusStepBadge">—</span>
 
-      <span class="tvw-ws-batch" id="batchReadout">{{ bundle.target_ml|int }} ml</span>
+      <span class="tvw-ws-batch" id="batchReadout">{{ '%g'|format(bundle.target_ml|float) }} ml</span>
 
     </div>
 
@@ -92,9 +92,9 @@
 
         <h2 class="tvw-ws-center-recipe" id="centerRecipeName">{{ bundle.recipe_name or recipe.name }}</h2>
 
-        <p class="tvw-ws-center-batch" id="centerBatchMeta">{{ bundle.target_ml|int }} ml batch</p>
+        <p class="tvw-ws-center-batch" id="centerBatchMeta">{{ '%g'|format(bundle.target_ml|float) }} ml batch</p>
 
-        <p class="tvw-ws-center-contents" id="centerBottleContents">Batch progress: 0.00 ml of {{ bundle.target_ml|int }} ml</p>
+        <p class="tvw-ws-center-contents" id="centerBottleContents">Batch progress: 0.00 ml of {{ '%g'|format(bundle.target_ml|float) }} ml</p>
 
         <div class="tvw-ws-fill-track" aria-hidden="true"><div class="tvw-ws-fill-fill" id="centerFillBar" style="width:0%"></div></div>
 
@@ -1683,7 +1683,7 @@
 
     const bottleContents = fill.targetMl > 0
 
-      ? `Batch progress: ${fill.doneMl.toFixed(2)} ml of ${Number(fill.targetMl).toFixed(0)} ml`
+      ? `Batch progress: ${fill.doneMl.toFixed(2)} ml of ${Number(fill.targetMl)} ml`
 
       : `Batch progress: ${fill.doneMl.toFixed(2)} ml`;
 
@@ -1693,7 +1693,7 @@
 
       centerBatchMeta.textContent = fill.targetMl > 0
 
-        ? `${Number(fill.targetMl).toFixed(0)} ml batch · ${ratio.pg}/${ratio.vg} PG/VG`
+        ? `${Number(fill.targetMl)} ml batch · ${ratio.pg}/${ratio.vg} PG/VG`
 
         : `${ratio.pg}/${ratio.vg} PG/VG`;
 
@@ -1990,7 +1990,7 @@
     const parts = [];
     const rescue = summary.batch_recovery;
     if (rescue && rescue.status === "complete") {
-      parts.push(`<section class="tvw-ws-report-card"><h3>Recipe rescued</h3><p>Originally ${Number(rescue.original_ml)} ml → ${Number(rescue.plan.new_ml)} ml in ${Number(rescue.plan.bottle_count)} bottle(s).</p><p>Estimated from recorded pours: ${Number(rescue.estimated_volume_ml).toFixed(2)} ml · ${Number(rescue.estimated_nicotine_mg_ml).toFixed(2)} mg/ml · ${escHtml(rescue.estimated_ratio)} PG/VG.</p><p>Original pours, top-ups and the measured split are retained in this batch record. The saved recipe is unchanged.</p>${(rescue.bottles || []).length ? `<ul aria-label="Recovered bottles">${rescue.bottles.map(b => `<li>Bottle ${Number(b.number)}: estimated ${Number(b.estimated_volume_ml).toFixed(2)} ml · ${Number(b.estimated_nicotine_mg_ml).toFixed(2)} mg/ml.</li>`).join('')}</ul>` : ''}<details><summary>View original pours and recovery top-ups</summary><h4>Before recovery</h4><ul>${(rescue.original_pours || []).map(p => `<li>${escHtml(p.brand || '')} ${escHtml(p.name)}: ${Number(p.actual_grams).toFixed(2)} g recorded; original target ${Number(p.target_grams).toFixed(2)} g.</li>`).join('')}</ul><h4>Recovery additions</h4><ul>${(rescue.topups || []).map(p => `<li>${p.bottle ? 'Bottle ' + Number(p.bottle) : 'Before split / larger vessel'}: ${escHtml(p.brand || '')} ${escHtml(p.name)} — ${Number(p.actual_grams).toFixed(2)} g added (additional target ${Number(p.target_grams).toFixed(2)} g).</li>`).join('')}</ul>${rescue.split_weight_grams != null ? `<p>Mixed liquid transferred to Bottle 2: ${Number(rescue.split_weight_grams).toFixed(2)} g.</p>` : ''}</details></section>`);
+      parts.push(`<section class="tvw-ws-report-card"><h3>Recipe rescued</h3><p>Originally ${Number(rescue.original_ml)} ml → ${Number(rescue.plan.new_ml)} ml in ${Number(rescue.plan.bottle_count) === 2 ? 'two bottles' : 'one larger vessel'}.</p><p>Estimated from recorded pours: ${Number(rescue.estimated_volume_ml).toFixed(2)} ml · ${Number(rescue.estimated_nicotine_mg_ml).toFixed(2)} mg/ml · ${escHtml(rescue.estimated_ratio)} PG/VG.</p><p>Original pours and top-ups${rescue.split_weight_grams != null ? ', including the measured split,' : ''} are retained in this batch record. The saved recipe is unchanged.</p>${(rescue.bottles || []).length ? `<ul aria-label="Recovered bottles">${rescue.bottles.map(b => `<li>Bottle ${Number(b.number)}: estimated ${Number(b.estimated_volume_ml).toFixed(2)} ml · ${Number(b.estimated_nicotine_mg_ml).toFixed(2)} mg/ml.</li>`).join('')}</ul>` : ''}<details><summary>View original pours and recovery top-ups</summary><h4>Before recovery</h4><ul>${(rescue.original_pours || []).map(p => `<li>${escHtml(p.brand || '')} ${escHtml(p.name)}: ${Number(p.actual_grams).toFixed(2)} g recorded; original target ${Number(p.target_grams).toFixed(2)} g.</li>`).join('')}</ul><h4>Recovery additions</h4><ul>${(rescue.topups || []).map(p => `<li>${p.bottle ? 'Bottle ' + Number(p.bottle) : 'Before split / larger vessel'}: ${escHtml(p.brand || '')} ${escHtml(p.name)} — ${Number(p.actual_grams).toFixed(2)} g added (additional target ${Number(p.target_grams).toFixed(2)} g).</li>`).join('')}</ul>${rescue.split_weight_grams != null ? `<p>Mixed liquid transferred to Bottle 2: ${Number(rescue.split_weight_grams).toFixed(2)} g.</p>` : ''}</details></section>`);
     }
 
 
@@ -2002,7 +2002,7 @@
 
         <h2 class="tvw-ws-report-title">${recipeName}</h2>
 
-        <p class="tvw-ws-report-meta">${batchMl.toFixed(0)} ml batch</p>
+        <p class="tvw-ws-report-meta">${batchMl} ml batch</p>
 
       </header>
 

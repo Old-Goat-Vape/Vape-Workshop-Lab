@@ -11,14 +11,14 @@ class LiveCompletionAccuracyTests(unittest.TestCase):
     setUp = TVWApiTests.setUp
     tearDown = TVWApiTests.tearDown
 
-    def create(self):
+    def create(self,target_ml=15):
         with flask_app.app_context():
             db = get_db()
             db.execute('UPDATE recipe_items SET amount_percent=2')
             db.execute("INSERT INTO flavor_reference (id,brand,name,category,density,active) VALUES (102,'TFA','Vanilla Swirl','Flavor',1.036,1)")
             db.execute('INSERT INTO recipe_items (version_id,ingredient_id,amount_percent) VALUES (1,102,3)')
             db.commit()
-        response = self.client.post('/api/mix/guided/session', json=dict(recipe_id=1,target_ml=15,target_nic_mg_ml=0,pg_ratio=30,vg_ratio=70))
+        response = self.client.post('/api/mix/guided/session', json=dict(recipe_id=1,target_ml=target_ml,target_nic_mg_ml=0,pg_ratio=30,vg_ratio=70))
         self.assertEqual(response.status_code,201,response.data)
         return response.get_json()['mix_session_id']
 
@@ -85,3 +85,16 @@ class LiveCompletionAccuracyTests(unittest.TestCase):
         soup=BeautifulSoup(self.client.get(f'/guided-mix/session/{sid}').data,'html.parser')
         dashboard=next(a for a in soup.select('.tvw-ws-complete-actions a') if a.get_text(strip=True)=='DASHBOARD')
         self.assertIn(dashboard['href'],('/', '/community'))
+
+    def test_fractional_batch_labels_and_history_links_preserve_volume(self):
+        from bs4 import BeautifulSoup
+        sid=self.create(target_ml=45.1)
+        home=self.client.get('/community')
+        self.assertEqual(home.status_code,200)
+        self.assertIn('45.1 ml batch',BeautifulSoup(home.data,'html.parser').get_text(' ',strip=True))
+        history=BeautifulSoup(self.client.get('/my-mixes').data,'html.parser')
+        self.assertIn('45.1 ml',history.get_text(' ',strip=True))
+        self.assertTrue(any('batch_ml=45.1' in a.get('href','') for a in history.select('a')))
+        guided=BeautifulSoup(self.client.get(f'/guided-mix/session/{sid}').data,'html.parser')
+        self.assertEqual(guided.select_one('#batchReadout').get_text(strip=True),'45.1 ml')
+        self.assertEqual(float(guided.select_one('#guidedRoot')['data-batch-ml']),45.1)
