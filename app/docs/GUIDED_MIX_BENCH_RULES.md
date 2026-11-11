@@ -488,3 +488,40 @@ Before trusting a guided mix change, test:
 - Serious overpour review does not silently correct a recipe. The first action persists and shows the review; explicit **Accept changed batch** then records a deviation with remaining pours unchanged. Strict policies block acceptance. No nicotine compensation is applied.
 - A dynamic overpour increments performance once when inserted, not again when retried. Underpour attempts corrected before acceptance do not become final underpour coaching.
 - The ordinary final step is **Final batch check**, distinct from recovery for a specific ingredient. Completed progress and status remain complete after reload.
+
+
+## Recipe-preserving rescue — 11 November 2026
+
+A serious flavour overpour pauses ordinary mixing. Offer a reviewed proportional
+rescue alongside the explicitly changed-recipe option. Calculate from the immutable
+session formula and every actual pour, including earlier PG trims. Catalogue edits
+must not change an active mix. The saved recipe remains unchanged.
+
+- Minimum corrected volume is the largest actual/original ingredient multiplier.
+  Subtract what is already present from every new target; never repeat full doses.
+- Two matching bottles means exactly twice the original recipe. Refuse it when the
+  minimum is larger, or when the corrected concentrate stage cannot fit the current
+  bottle. Confirm usable capacity, headroom, ingredient availability and labels.
+- Revisit nicotine first, then all flavours needing extra liquid. Tare once before
+  each additional pour, keep partial readings, then cap/move stock left. Mixed liquid
+  must never be returned to nicotine or flavour stock. The original nicotine-only
+  no-tare pour-back flow remains separate.
+- Mix the corrected concentrated liquid thoroughly. Tare empty Bottle 2, transfer
+  half the recorded liquid mass, excluding container weights. Use the measured split
+  fraction to calculate the separate PG/VG additions for Bottle 1 and Bottle 2.
+  Select each labelled bottle, finish carriers, mix and save both records.
+- Save revisions/cursors atomically; stale or repeated requests cannot repeat a pour.
+  Ordinary complete/undo controls cannot bypass active recovery. Resume the exact
+  saved recovery task after reload.
+- An additional overpour stops recovery. Before splitting, a fresh plan must include
+  that liquid and any unfinished partial pour. Once transfer starts, never treat the
+  liquid as a single vessel again. An actual post-split overpour currently requires
+  separate correction/additional capacity; it cannot silently complete. Explicit
+  typing-error corrections preserve the old and new recorded weights in history.
+- Retain original pours, every top-up, transfer mass, estimated per-bottle volume and
+  nicotine strength, actual PG/VG, and recovery events. Estimates reflect 0.01 g scale
+  resolution. Never promise laboratory precision.
+- Production jobs with locked quantities cannot be resized by personal rescue.
+- Positive 0.01/0.02 g doses are real requirements, never numerical zero. A zero
+  reading must remain an underpour. Reject starting a guided recipe whose positive
+  dose rounds to 0.00 g; ask for a larger batch rather than silently skipping it.

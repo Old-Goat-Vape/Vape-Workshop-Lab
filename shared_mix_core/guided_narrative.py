@@ -261,7 +261,7 @@ def build_guided_narrative_steps(
         except (TypeError, ValueError):
             target_ml = 0.0
         # Skip zero-requirement pours — never ask the operator to confirm underpour of 0 g.
-        if grams <= 0.02 and target_ml < 0.008:
+        if grams <= 1e-9 and target_ml < 1e-9:
             continue
         pct = ing.get("pct")
         pct_f = float(pct) if pct is not None else 0.0

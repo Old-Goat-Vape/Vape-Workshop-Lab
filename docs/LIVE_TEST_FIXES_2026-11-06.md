@@ -87,3 +87,43 @@ All pours were simulated. Session #73 remains unfinished at PG; no completed pro
 Remaining issue found: the PG adjustment note displayed Estimated final ratio 100/0 because its estimate included completed PG-carried pours but excluded future VG. Follow-up code projects the finished mix using completed readings plus remaining targets, including the newly trimmed PG target and current flavour reading. Completed-batch summaries retain their completed-pour basis. Zero measured amounts no longer fall back to planned amounts. This follow-up needs its own deployment; the live tests above cover PR #1 only.
 
 Follow-up validation: the live 100/0 preview is reproduced by a new API regression on unchanged deployed code; it reports 30/70 after the fix. That test plus the three nicotine pour-back regressions pass, and all 12 final-report-specific tests pass. Changed Python compiles and whitespace checks pass. No live correction or updated deployment is claimed for this follow-up.
+
+
+## Recipe-preserving recovery implementation — 11 November 2026
+
+The ratio-preview follow-up is merged in PR #2 (`cd1c9735d6822fd4ece772345cdded8784f9fd35`).
+The new recovery workflow replaces the previously missing proportional rescue:
+
+- Review the minimum balanced batch or exactly two original-size bottles. The plan
+  uses immutable formula snapshots and actual ingredient weights, combines repeated
+  ingredient IDs, and restores original targets after an earlier PG trim.
+- Confirm capacity/headroom and ingredients. Correct nicotine and all flavours,
+  cap/move stock left, mix concentrated liquid, split by measured liquid mass, then
+  select and finish PG/VG in each labelled bottle. Refuse impossible two-bottle or
+  insufficient concentrate-stage capacity before changing the session.
+- Persist every task/partial reading, guard revisions against duplicate requests,
+  block ordinary mixing controls, and retain original pours and recovery additions
+  in history. Final estimates include actual strength, ratio and per-bottle volume.
+- Mixed-liquid nicotine top-ups never use the nicotine-only stock pour-back flow.
+  A further physical overpour pauses. Before splitting, replan from all added liquid;
+  after transfer starts, retain separate bottle records and require a separate
+  correction/additional capacity. Confirmed typing mistakes have an auditable edit.
+- Blank input no longer becomes zero. Positive 0.01/0.02 g requirements stay present;
+  a positive dose that rounds to 0.00 g rejects guided start with a larger-batch
+  explanation. Older incomplete formula captures reject rescue rather than guessing.
+
+Validation: 55 focused Python recovery/nicotine/ratio/report/precision/doc tests pass,
+plus a separate legacy-incomplete-formula regression. A broader 202-test run passes
+201; the sole failure is the previously reproduced community-route login expectation
+(302 versus 200), outside this mixing change. All four JavaScript regression programs
+pass. The rendered guided-mix page's three executable inline scripts pass Node syntax
+checks. Python compilation and whitespace checks pass.
+
+Deployment/live limitation: these new two-bottle and precision changes have not yet
+been exercised on Pauly's server. Local API and JavaScript checks are not live visual
+acceptance. Browser access to the local preview was unavailable; no bypass was used.
+After pulling main and restarting, run a fresh private simulated 30 ml batch with a
+third-flavour overpour, select two 30 ml bottles, reload during a partial top-up,
+complete the split and both carriers, and inspect both bottle summaries. Also repeat
+nicotine-only pour-back without taring, zero residue, and the 30/70 PG-preview check.
+The original saved recipe must remain unchanged.

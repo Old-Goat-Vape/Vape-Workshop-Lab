@@ -253,6 +253,7 @@
 <script src="{{ url_for('static', filename='policy_feedback.js') }}"></script>
 
 <script src="{{ url_for('static', filename='guided_scale_input.js') }}"></script>
+<script src="{{ url_for('static', filename='batch_recovery.js') }}"></script>
 
 <script>
 
@@ -1904,6 +1905,8 @@
     const targetG = activeStepTargetGrams(stepNo);
 
     const trimmed = String(raw ?? "").trim();
+    if (trimmed === "") return { ok: false, message: "Enter the current scale reading. A blank field is not a zero reading." };
+
 
     if (trimmed !== "" && isPartialScaleEntry(trimmed)) {
 
@@ -1982,6 +1985,11 @@
     const status = escHtml(summary.completion_status || "Complete");
 
     const parts = [];
+    const rescue = summary.batch_recovery;
+    if (rescue && rescue.status === "complete") {
+      parts.push(`<section class="tvw-ws-report-card"><h3>Recipe rescued</h3><p>Originally ${Number(rescue.original_ml)} ml → ${Number(rescue.plan.new_ml)} ml in ${Number(rescue.plan.bottle_count)} bottle(s).</p><p>Estimated from recorded pours: ${Number(rescue.estimated_volume_ml).toFixed(2)} ml · ${Number(rescue.estimated_nicotine_mg_ml).toFixed(2)} mg/ml · ${escHtml(rescue.estimated_ratio)} PG/VG.</p><p>Original pours, top-ups and the measured split are retained in this batch record. The saved recipe is unchanged.</p><details><summary>View original pours and recovery top-ups</summary><h4>Before recovery</h4><ul>${(rescue.original_pours || []).map(p => `<li>${escHtml(p.brand || '')} ${escHtml(p.name)}: ${Number(p.actual_grams).toFixed(2)} g recorded; original target ${Number(p.target_grams).toFixed(2)} g.</li>`).join('')}</ul><h4>Recovery additions</h4><ul>${(rescue.topups || []).map(p => `<li>${p.bottle ? 'Bottle ' + Number(p.bottle) : 'Before split / larger vessel'}: ${escHtml(p.brand || '')} ${escHtml(p.name)} — ${Number(p.actual_grams).toFixed(2)} g added (additional target ${Number(p.target_grams).toFixed(2)} g).</li>`).join('')}</ul>${rescue.split_weight_grams != null ? `<p>Mixed liquid transferred to Bottle 2: ${Number(rescue.split_weight_grams).toFixed(2)} g.</p>` : ''}</details></section>`);
+    }
+
 
     parts.push(`
 
@@ -2960,7 +2968,10 @@
 
       goatLine.className = "tvw-ws-goat-inline";
 
+      const canRebalance = !["nicotine", "pg", "vg"].includes(String(p.ingredient_category || "").toLowerCase());
       focusActions.innerHTML = `
+        ${canRebalance ? '<button type="button" class="tvw-ws-commit" data-batch-action="preview" data-mode="two_bottles">Make two same-size bottles</button><button type="button" class="tvw-ws-commit" data-batch-action="preview" data-mode="larger_vessel">Balance in a larger vessel</button>' : ''}
+
 
         <button type="button" class="tvw-ws-commit js-done-step" data-step-no="${current.step_no}">${p.recovery_reviewed ? "Accept changed batch" : "Review recovery plan"}</button>
 
@@ -3180,6 +3191,14 @@
     }
 
 
+    const recoveryRefresh = updated => { window.__guidedSessionLast = updated; applySession(updated); };
+    if (window.BatchRecoveryUI) {
+      window.BatchRecoveryUI.bind(sess, recoveryRefresh);
+      if (window.BatchRecoveryUI.render(sess, recoveryRefresh)) return;
+    } else if (sess.batch_recovery && sess.batch_recovery.status !== "complete") {
+      focusCard.textContent = "Recovery controls could not load. Reload this page before continuing this mix.";
+      return;
+    }
     const prog = sess.progress || {};
 
     if (completionSummary) {
@@ -3442,11 +3461,11 @@
 
     const payload = (step && step.payload) || {};
 
-    underPourUi.measured = Number(reading.measured_grams || underPourUi.measured || 0);
+    underPourUi.measured = Number(reading.measured_grams ?? underPourUi.measured ?? 0);
 
     underPourUi.displayTarget = Number(reading.display_target_grams || underPourUi.displayTarget || 0);
 
-    underPourUi.partialGrams = Number(reading.partial_grams || payload.partial_grams || underPourUi.partialGrams || 0);
+    underPourUi.partialGrams = Number(reading.partial_grams ?? payload.partial_grams ?? underPourUi.partialGrams ?? 0);
 
     underPourUi.policy = body.policy || underPourUi.policy;
 
@@ -3480,7 +3499,7 @@
 
     }
 
-    if (nicotineRecoveryUi && ["continue_pour", "recovery_check", "still_over", "under_decision", "over_decision", "accept_confirm"].includes(nicotineRecoveryUi.mode)) {
+    if (nicotineRecoveryUi && ["pour_back", "continue_pour", "recovery_check", "still_over", "under_decision", "over_decision", "accept_confirm"].includes(nicotineRecoveryUi.mode)) {
 
       return;
 

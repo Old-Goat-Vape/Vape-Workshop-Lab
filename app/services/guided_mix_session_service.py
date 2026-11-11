@@ -232,6 +232,8 @@ def _classify_under_pour(*, display_target: float, measured: float) -> tuple[str
     # Zero-requirement pours must never prompt underpour confirmation.
     if float(display_target) <= ZERO_POUR_GRAMS_EPS:
         return "within_tolerance", ""
+    if float(measured) <= ZERO_POUR_GRAMS_EPS:
+        return "large_under_target", "Nothing added yet\nThis ingredient has a positive target. Add it before continuing, or explicitly record an underpour."
     under_by = float(display_target) - float(measured)
     if under_by <= 0.0005:
         return "within_tolerance", ""
@@ -377,6 +379,8 @@ def _classify_nicotine_under_pour(*, display_target: float, measured: float) -> 
     """Nicotine under-pour copy stresses final strength impact."""
     if float(display_target) <= ZERO_POUR_GRAMS_EPS:
         return "within_tolerance", ""
+    if float(measured) <= ZERO_POUR_GRAMS_EPS:
+        return "large_under_target", "Nothing added yet\nThis ingredient has a positive target. Add it before continuing, or explicitly record an underpour."
     under_by = float(display_target) - float(measured)
     if under_by <= 0.0005:
         return "within_tolerance", ""
@@ -894,6 +898,20 @@ def _completion_status_label(
     return "Complete"
 
 
+def _batch_recovery_report(meta):
+    state=meta.get("batch_recovery")
+    if not state:
+        return None
+    report={key:state.get(key) for key in ("status","original_ml","estimated_volume_ml","estimated_nicotine_mg_ml","estimated_ratio","bottles","split_weight_grams")}
+    report["plan"]={key:state["plan"][key] for key in ("new_ml","bottle_count","bottle_ml")}
+    items={i["key"]:i for i in state["plan"]["ingredients"]}
+    report["original_pours"]=[dict(name=i["payload"]["name"],brand=i["payload"].get("brand"),target_grams=i["original_grams"],
+                                  actual_grams=state.get("original_pours",{}).get(i["key"],0)) for i in items.values()]
+    report["topups"]=[dict(name=items[a["key"]]["payload"]["name"],brand=items[a["key"]]["payload"].get("brand"),
+                           bottle=a["bottle"],target_grams=a["target"],actual_grams=a["grams"]) for a in state["additions"]]
+    return report
+
+
 def _build_guided_mix_summary(
     db,
     session_id: int,
@@ -955,12 +973,12 @@ def _build_guided_mix_summary(
         if str(payload.get("step_type") or "").lower() != "add_ingredient":
             continue
         try:
-            ml = float(payload.get("measured_ml") or payload.get("ml") or payload.get("target_ml") or 0.0)
+            ml = float(payload["measured_ml"] if payload.get("measured_ml") is not None else (payload.get("ml") or payload.get("target_ml") or 0.0))
         except (TypeError, ValueError):
             ml = 0.0
         poured_ml += ml
     flavour_over_count = sum(1 for d in accepted_deviations if d.get("kind") == "flavour_over")
-    has_adjustments = bool(pg_adjustments or accepted_deviations or nicotine_events)
+    has_adjustments = bool(pg_adjustments or accepted_deviations or nicotine_events or meta.get("batch_recovery"))
     user_notes, user_notes_updated_at = _user_notes_from_meta(meta)
     planned = meta.get("planned_composition") if isinstance(meta.get("planned_composition"), dict) else {}
     ratio_achievable = bool(planned.get("ratio_achievable", True))
@@ -999,6 +1017,7 @@ def _build_guided_mix_summary(
     summary = {
         "recipe_name": str(recipe_name or "").strip() or None,
         "summary_title": "Finished batch",
+        "batch_recovery": _batch_recovery_report(meta),
         "batch_size_ml": batch_size_ml,
         "target_nic_mg_ml": round(target_nic, 4),
         "total_flavor_percent": total_flavour_pct,
@@ -1036,7 +1055,7 @@ def _build_guided_mix_summary(
         "user_notes_updated_at": user_notes_updated_at,
     }
     if include_raw_event_log:
-        summary["raw_event_log"] = event_log
+        summary["raw_event_log"] = event_log + list((meta.get("batch_recovery") or {}).get("events") or [])
     return summary
 
 
@@ -1743,10 +1762,20 @@ def create_guided_mix_session(
                 vg_ratio=float(vg_ratio),
                 nicotine_carrier=str(nicotine_carrier or "PG"),
             )
+            recovery_formula = tvw_mix_service.recovery_formula_for_recipe_version(
+                recipe_id=recipe_id,version_id=resolved_version_id,target_ml=float(target_ml),
+                target_nic_mg_ml=float(target_nic_mg_ml),nic_base_mg_ml=float(nic_base_mg_ml),
+                pg_ratio=float(pg_ratio),vg_ratio=float(vg_ratio),nicotine_carrier=str(nicotine_carrier or "PG"),
+            )
+        for ingredient in recovery_formula:
+            grams = float(ingredient["target_grams"])
+            if grams > ZERO_POUR_GRAMS_EPS and round(grams, 2) == 0:
+                raise ValueError(f"{ingredient['name']} needs {grams:.4f} g, below this bench's 0.01 g scale resolution. Increase the batch size before starting.")
         span["step_count"] = len(steps)
 
         # Minimal meta only — no steps[], no mix_summary, no raw_event_log.
         session_meta = {
+            "recovery_formula": recovery_formula,
             "step_model": "guided_assistant_v1",
             "tone_profile": "tvw",
             "nicotine_carrier": str(nicotine_carrier or "PG"),
@@ -2307,6 +2336,8 @@ def _build_guided_session_bundle_inner(
         "performance_summary": perf_summary,
         "coach_summary": coach_summary,
         "mix_summary": mix_summary,
+        "batch_recovery": ({key:value for key,value in session_meta["batch_recovery"].items()
+                            if key not in {"events","additions","split_actuals","original_pours"}}) if for_client and session_meta.get("batch_recovery") else session_meta.get("batch_recovery"),
         "user_notes": user_notes,
         "user_notes_updated_at": user_notes_updated_at,
         "production_job_id": (
@@ -2389,6 +2420,10 @@ def complete_guided_step_with_policy(
             "name": policy.name, "allowed": False, "decision": "production_cancelled",
             "warnings": [], "hard_stops": [message],
         }}
+    recovery = _read_session_meta(db, int(session_id)).get("batch_recovery")
+    if recovery and recovery.get("status") in {"active", "blocked"}:
+        return {"ok": False, "message": "Complete or pause the saved batch recovery before using the original steps.",
+                "policy": {"name": policy.name, "allowed": False, "decision": "batch_recovery_active", "warnings": [], "hard_stops": ["Batch recovery is in progress."]}}
     next_open = db.execute(
         """
         SELECT step_no
@@ -2780,7 +2815,7 @@ def complete_guided_step_with_policy(
                 "reading": reading_eval,
             }
 
-        # Zero / near-zero required amount: auto-satisfy — never prompt underpour.
+        # Only a genuinely zero requirement can auto-satisfy.
         if display_target <= ZERO_POUR_GRAMS_EPS or target <= ZERO_POUR_GRAMS_EPS:
             reading_eval["classification"] = "within_tolerance"
             reading_eval["measured_grams"] = float(measured)
