@@ -7,6 +7,7 @@ Used by canonical library repair. Returns a new category only when signals clear
 from __future__ import annotations
 
 import re
+from html import unescape
 from typing import Optional, Tuple
 
 from config.canonical_library_brands import canonical_library_brand
@@ -38,7 +39,7 @@ def normalize_category_label(raw: str | None) -> str:
 
 
 def _hay(brand: str, name: str) -> str:
-    return f"{brand or ''} {name or ''}".lower()
+    return unescape(f"{brand or ''} {name or ''}").lower()
 
 
 def _vc_catalog_source(src: str | None) -> bool:
@@ -51,22 +52,26 @@ _ECOMM_SHOP_META_RX = re.compile(r"\bitem\s+customizations?\b", re.I)
 
 _nic_rx = re.compile(
     r"\b(nicotine|nicsalt|nic\s*salt|salt\s*nic|salt\s*nicotine|freebase|nic\s*shot|nicotine\s*shot|"
-    r"nic\s*base|nicotine\s*base)\b",
+    r"nic\s*base|nicotine\s*base|clyro\s*nic)\b",
     re.I,
 )
 _pg_vg_rx = re.compile(
-    r"\b(propylene\s*glycol|vegetable\s*glycerin|vegetable\s*glycerol|mono[- ]?propylene\s*glycol|"
+    r"\b(propylene\s*glycol|vegetable\s*glycerine?|vegetable\s*glycerol|mono[- ]?propylene\s*glycol|"
     r"poly\s*ethylene\s*glycol|peg\s*\d+)\b|"
     r"\b99[,.]?\d?\s*%?\s*vg\b|\b99[,.]?\d?\s*%?\s*pg\b|\b100\s*%?\s*vg\b|\b100\s*%?\s*pg\b",
     re.I,
 )
 _pg_vg_short_rx = re.compile(
-    r"(^|\b)(pg|vg)\s*(liquid|base|bottle)?\b|(^|\b)(vpg|pgvg|50\s*/\s*50|5050|70\s*/\s*30)\b",
+    # Whole base-product names only. A carrier suffix or dessert name is not a base.
+    r"^\s*(?:pg|vg|vpg|pgvg|pg\s*/\s*vg|vg\s*/\s*pg|50\s*/\s*50|5050|70\s*/\s*30)"
+    r"\s*(?:(?:[-–—:()]\s*)?(?:liquid|base|blend|usp|bp|ep|grade|pharmaceutical|food|"
+    r"\d+(?:[.,]\d+)?\s*(?:ml|l|litres?|liters?))\s*\)?\s*)*$",
     re.I,
 )
 _hw_rx = re.compile(
     r"\b("
     r"ceramic\s*tweezers?|ub\s*(?:max|pro)\s*coils?|nexmesh|cotton\s*bacon|"
+    r"atomi[sz]er\s*stand|510\s*stand|"
     r"drip\s*tip|510\s*tip|replacement\s*glass|bubble\s*glass|glass\s*tube|"
     r"prebuilt\s*coil|mesh\s*coil|coil\s*head|atomizer\s*head|vape\s*coil|"
     r"18650|21700|battery\s*wrap|battery\s*case|\bmod\b|\btank\b|sub[\s-]?ohm\s*tank|rta|rdta|rda\b|"
@@ -143,6 +148,11 @@ def _is_concentrate_line_brand(brand: str, name: str) -> bool:
     cb = canonical_library_brand(brand or "", name or "")
     if cb in _KNOWN_CONCENTRATE_CANON:
         return True
+    if (brand or '').strip().casefold() in {
+        'get suckered', 'kandi hed', 'real flavors', 'real flavours',
+        'one on one', 'diy flavor shack', 'diy flavour shack',
+    }:
+        return True
     return bool(
         re.match(
             r"^(INW|FA|WF|VT|HS|OOO|PUR|SC|NIC\s*RIV|NR)\b",
@@ -158,7 +168,7 @@ def _nic_score(text: str, is_nicotine: int) -> int:
         s += 4
     if _nic_rx.search(text):
         s += 3
-    if re.search(r"\b\d{1,2}(?:\.\d+)?\s*mg(?:\s*/\s*ml)?\b", text) and (
+    if re.search(r"\b\d+(?:\.\d+)?\s*mg(?:\s*/\s*ml)?\b", text) and (
         "nic" in text or "salt" in text or "freebase" in text
     ):
         s += 2
@@ -172,7 +182,7 @@ def _base_score(text: str, nic_score: int) -> int:
     if _pg_vg_rx.search(text):
         s += 4
     if _pg_vg_short_rx.search(text):
-        s += 3
+        s += 4
     if re.search(r"\b(shortfill|shake\s*n\s*vape|longfill|hybrid\s*bases?)\b", text):
         s += 3
     if re.search(r"\b(diluent|carrier|base\s*liquid|mixing\s*base)\b", text) and "nic" not in text:
@@ -203,13 +213,14 @@ def merge_category_bucket(
     """Single bucket label so duplicate groups only merge when buckets match."""
     cur = normalize_category_label(category)
     text = _hay(brand, name)
-    ns = _nic_score(text, is_nicotine)
-    bs = _base_score(text, ns)
+    product_name = unescape(name or '').lower()
+    ns = _nic_score(product_name, is_nicotine)
+    bs = _base_score(product_name, ns)
     hs = _hw_score(text, brand)
     flavor_line = _is_concentrate_line_brand(brand, name)
 
     # Hardware/base/nicotine signals beat vendor brand — shop uses one brand for concentrate + merch.
-    if ns >= 3:
+    if cur == NICOTINE or ns >= 3:
         return NICOTINE
     if bs >= 3:
         return BASE
@@ -239,12 +250,13 @@ def suggest_category_correction(
     raw_cat = (current or "").strip()
     cur = normalize_category_label(current)
     text = _hay(brand, name)
-    ns = _nic_score(text, is_nicotine)
-    bs = _base_score(text, ns)
+    product_name = unescape(name or '').lower()
+    ns = _nic_score(product_name, is_nicotine)
+    bs = _base_score(product_name, ns)
     hs = _hw_score(text, brand)
     flavor_line = _is_concentrate_line_brand(brand, name)
 
-    if ns >= 3:
+    if cur == NICOTINE or ns >= 3:
         target = NICOTINE
         t_reason = "nicotine_signal"
     elif bs >= 3:
@@ -266,6 +278,7 @@ def suggest_category_correction(
         and cur == HARDWARE
         and ns < 3
         and bs < 3
+        and hs < 3
         and not _ECOMM_SHOP_META_RX.search(name or "")
     ):
         if target == HARDWARE or t_reason == "no_strong_signal":

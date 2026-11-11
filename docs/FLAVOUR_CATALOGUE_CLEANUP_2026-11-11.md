@@ -87,6 +87,27 @@ Direct third-party SQL writes are outside the supported import matching paths.
 
 ## Validation
 
+### Correction after reviewing the server preview
+
+The first server preview exposed incorrect inherited category heuristics. Do **not** apply its
+272 category suggestions as a batch. ClyroNic 36/100 mg/ml was incorrectly proposed as Base;
+PG/VG suffixes and `50/50 Bar` dessert names were treated as bases; BLCK's 510 Atomizer Stand
+was proposed as a flavour. None of those category changes were applied during duplicate cleanup.
+
+The corrected rules decode HTML entities, recognise ClyroNic, preserve existing Nicotine
+categories/positive nicotine flags, require whole base-product shorthand rather than a carrier
+substring, recognise the stand as hardware, and recognise the flavour manufacturers in those
+reviewed examples. A supplier's nicotine-related name alone does not classify its products as
+nicotine. Strong hardware evidence also survives VC source metadata. Category cleanup now blocks
+conflicting linked product names/manufacturers even when both classifiers propose the same category.
+
+After deploying this correction, generate a **fresh preview** before further category cleanup.
+Regression coverage includes all product-name families shown in the server screenshots, both
+nicotine strengths/carriers and pack sizes, true base controls, and conflicting ingredient links.
+Correction validation: 49 catalogue/search/scraper checks, 47 passed and two existing skips.
+
+### Initial catalogue patch
+
 - Catalogue, flavour search, scraper parsers and scraper-run checks: 41 tests, 39 passed,
   two existing skips. This includes 14 catalogue regressions covering alias reuse, separate
   formulations, category boundaries, edit conflicts, reviewed category correction, backup creation,

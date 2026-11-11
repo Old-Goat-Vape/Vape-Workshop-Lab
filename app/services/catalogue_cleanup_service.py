@@ -49,6 +49,14 @@ def category_plan(db):
         ):
             continue
         issues = []
+        if (
+            ref
+            and canonical_item(item["brand"], item["canonical_name"], "Flavor")[2]
+            != canonical_item(ref.get("brand"), ref.get("name"), "Flavor")[2]
+        ):
+            issues.append(
+                "Catalogue and linked ingredient names or manufacturers disagree; review their identity first"
+            )
         if ref_proposed != proposed:
             issues.append(
                 "Catalogue and linked ingredient disagree; review their identity first"

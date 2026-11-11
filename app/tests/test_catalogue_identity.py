@@ -62,6 +62,46 @@ class CatalogueBoundaryTests(unittest.TestCase):
     setUp = _fixtures.FlavourSearchTests.setUp
     tearDown = _fixtures.FlavourSearchTests.tearDown
 
+    def test_category_correction_blocks_a_different_linked_product_even_when_categories_agree(
+        self,
+    ):
+        from services.catalogue_cleanup_service import (
+            category_plan,
+            apply_category_correction,
+        )
+
+        with flask_app.app_context():
+            db = get_db()
+            db.execute(
+                "INSERT INTO flavor_reference(id,brand,name,category,is_nicotine,active) VALUES(301,'Clyrolinx','ClyroNic PG 100mg/ml','Nicotine',1,1)"
+            )
+            db.execute(
+                "INSERT INTO flavours(id,brand,canonical_name,category,source_flavor_ref_id) VALUES(301,'CAP','Cotton Candy','Hardware',301)"
+            )
+            plan = category_plan(db)[0]
+            self.assertTrue(
+                any(
+                    "names or manufacturers disagree" in issue
+                    for issue in plan["issues"]
+                )
+            )
+            with self.assertRaisesRegex(ValueError, "names or manufacturers disagree"):
+                apply_category_correction(
+                    db, plan, actor_user_id=1, actor_role="Master"
+                )
+            self.assertEqual(
+                db.execute("SELECT category FROM flavours WHERE id=301").fetchone()[0],
+                "Hardware",
+            )
+            self.assertEqual(
+                tuple(
+                    db.execute(
+                        "SELECT category,is_nicotine FROM flavor_reference WHERE id=301"
+                    ).fetchone()
+                ),
+                ("Nicotine", 1),
+            )
+
     def test_edit_cannot_create_another_existing_flavour_identity(self):
         from services.inventory_service import update_item_from_form
 
