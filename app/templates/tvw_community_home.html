@@ -151,6 +151,18 @@
     {% endif %}
   </div>
 
+  <section class="tvw-rd-panel my-4" aria-labelledby="communityHelpHeading">
+    <h2 id="communityHelpHeading">Mixers asking for help</h2>
+    <p>Share suggestions, tasting notes, or ideas to improve a recipe.</p>
+    {% for item in help_recipes %}
+      <article class="card bg-dark text-light border-warning p-3 mb-2">
+        <h3 class="h5"><a href="{{ item.detail_href }}#communityFeedback">{{ item.name }}</a></h3>
+        <p>Help needed · By {{ item.owner_username or 'a community mixer' }}</p>
+        <a href="{{ item.detail_href }}#communityFeedback">Read recipe and offer help →</a>
+      </article>
+    {% else %}<p>No public help requests right now.</p>{% endfor %}
+    <a href="{{ url_for('tvw_recipes.tvw_recipe_library', status='help') }}">View all help requests</a>
+  </section>
   {% include "partials/tvw_discovery_section.html" %}
 </div>
 {% endblock %}

@@ -34,7 +34,7 @@
 
   {% if st == 'HELP' %}
     <div class="alert alert-warning tvw-rd-alert py-2">
-      <strong>Need help</strong> — the author is asking for input on this recipe.
+      <strong>Help needed</strong> — the author is asking for input on this recipe. <a href="#communityFeedback">Offer a suggestion</a>
       {% if collab.latest_help_request and collab.latest_help_request.reason %}
         <div class="mt-1 mb-0">{{ collab.latest_help_request.reason }}</div>
       {% endif %}
@@ -129,7 +129,7 @@
             <li><a class="dropdown-item" href="{{ url_for('tvw_recipes.tvw_recipe_mix_logs', slug=(recipe.slug or recipe.id)) }}">Batch history</a></li>
             <li><a class="dropdown-item" href="{{ url_for('tvw_recipes.tvw_my_mixes') }}">My mixes</a></li>
             <li><hr class="dropdown-divider"></li>
-            <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#feedbackModal">Leave feedback</button></li>
+            <li><a class="dropdown-item" href="#communityFeedback">Comments and suggestions</a></li>
             <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#reportModal">Report recipe</button></li>
           </ul>
         </div>
@@ -370,6 +370,48 @@
     </aside>
   </div>
 
+<section class="tvw-rd-panel my-4" id="communityFeedback" aria-labelledby="feedbackModalLabel">
+  <div class="community-feedback-content">
+    <div class="modal-content bg-dark text-light border-secondary">
+      <div class="modal-header border-secondary">
+        <h2 class="h4" id="feedbackModalLabel">Comments, notes and suggestions</h2>
+      </div>
+      <div class="modal-body">
+        <p class="text-secondary">Help the mixer improve this recipe. Share what to change and why. Tasting notes for <strong>v{{ active_version.version_number }}</strong>. Visible items follow community moderation rules.</p>
+        <div class="row g-2 mb-2">
+          <div class="col-12">
+            <label class="form-label small text-secondary mb-0" for="feedback_body">Main message</label>
+            <textarea id="feedback_body" class="form-control" rows="4" placeholder="Ask a question, share tasting notes, or explain your suggestion…"></textarea>
+          </div>
+          <div class="col-6 col-md-4">
+            <label class="form-label small text-secondary mb-0" for="feedback_score">Score (0–10, optional)</label>
+            <input id="feedback_score" type="number" min="0" max="10" step="0.5" class="form-control form-control-sm" placeholder="Not tasted yet? Leave blank">
+          </div>
+          <div class="col-6 col-md-4">
+            <label class="form-label small text-secondary mb-0" for="feedback_steep">Steep days</label>
+            <input id="feedback_steep" type="number" min="0" step="1" class="form-control form-control-sm" placeholder="e.g. 7">
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label small text-secondary mb-0" for="feedback_device">Device</label>
+            <input id="feedback_device" class="form-control form-control-sm" placeholder="RDA, pod, etc.">
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label small text-secondary mb-0" for="feedback_issue">Issue type</label>
+            <input id="feedback_issue" class="form-control form-control-sm" placeholder="harsh, mute, separation…">
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label small text-secondary mb-0" for="feedback_suggested">Suggested changes</label>
+            <input id="feedback_suggested" class="form-control form-control-sm" placeholder="+/- %, substitute…">
+          </div>
+        </div>
+        <button class="btn btn-sm btn-outline-light mb-3" type="button" id="btnSubmitFeedback">Post comment or suggestion</button>
+        <p id="feedbackPostStatus" role="status" aria-live="polite"></p>
+        <div id="feedbackList" class="vstack gap-3"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
   <div class="tvw-rd-secondary-grid">
     <section class="tvw-rd-panel" id="recipeEngagementPanel">
       <p class="tvw-rd-panel-kicker">Community</p>
@@ -422,7 +464,7 @@
       <section class="tvw-rd-panel" id="ownerControlsPanel">
         <p class="tvw-rd-panel-kicker">Owner</p>
         <h2 class="tvw-rd-panel-title">Owner controls</h2>
-        <p class="small text-secondary mb-2">Workflow status for this recipe. Others see the badge near the title.</p>
+        <p class="small text-secondary mb-2">Choosing Need help makes this recipe public and adds it to community help requests.</p>
         <div class="d-flex flex-wrap gap-2 mb-2">
           <button type="button" class="btn btn-sm btn-outline-secondary" data-status="wip">Work in progress</button>
           <button type="button" class="btn btn-sm btn-outline-info" data-status="help">Need help</button>
@@ -464,47 +506,7 @@
   </details>
 </div>
 
-<div class="modal fade" id="feedbackModal" tabindex="-1" aria-labelledby="feedbackModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
-    <div class="modal-content bg-dark text-light border-secondary">
-      <div class="modal-header border-secondary">
-        <h2 class="modal-title h5" id="feedbackModalLabel">Leave feedback</h2>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <p class="small text-secondary">Structured tasting notes for <strong>v{{ active_version.version_number }}</strong>. Visible items follow community moderation rules.</p>
-        <div class="row g-2 mb-2">
-          <div class="col-12">
-            <label class="form-label small text-secondary mb-0" for="feedback_body">Main message</label>
-            <input id="feedback_body" class="form-control form-control-sm" placeholder="Tasting notes, balance, off-notes…">
-          </div>
-          <div class="col-6 col-md-4">
-            <label class="form-label small text-secondary mb-0" for="feedback_score">Score (0–10)</label>
-            <input id="feedback_score" type="number" min="0" max="10" step="0.5" class="form-control form-control-sm" value="7">
-          </div>
-          <div class="col-6 col-md-4">
-            <label class="form-label small text-secondary mb-0" for="feedback_steep">Steep days</label>
-            <input id="feedback_steep" type="number" min="0" step="1" class="form-control form-control-sm" placeholder="e.g. 7">
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label small text-secondary mb-0" for="feedback_device">Device</label>
-            <input id="feedback_device" class="form-control form-control-sm" placeholder="RDA, pod, etc.">
-          </div>
-          <div class="col-12 col-md-6">
-            <label class="form-label small text-secondary mb-0" for="feedback_issue">Issue type</label>
-            <input id="feedback_issue" class="form-control form-control-sm" placeholder="harsh, mute, separation…">
-          </div>
-          <div class="col-12 col-md-6">
-            <label class="form-label small text-secondary mb-0" for="feedback_suggested">Suggested changes</label>
-            <input id="feedback_suggested" class="form-control form-control-sm" placeholder="+/- %, substitute…">
-          </div>
-        </div>
-        <button class="btn btn-sm btn-outline-light mb-3" type="button" id="btnSubmitFeedback">Submit feedback</button>
-        <div id="feedbackList" class="vstack gap-2 small"></div>
-      </div>
-    </div>
-  </div>
-</div>
+
 
 <div class="modal fade" id="reportModal" tabindex="-1" aria-labelledby="reportModalLabel" aria-hidden="true">
   <div class="modal-dialog">
@@ -943,7 +945,7 @@
           recipe_version_id: activeVersionId,
           feedback_type: "structured",
           body: document.getElementById("feedback_body").value || "",
-          score_overall: Number(document.getElementById("feedback_score").value || 0),
+          score_overall: document.getElementById("feedback_score").value === "" ? null : Number(document.getElementById("feedback_score").value),
           device: document.getElementById("feedback_device").value || "",
           issue_type: document.getElementById("feedback_issue").value || "",
           suggested_changes: document.getElementById("feedback_suggested").value || "",
@@ -955,8 +957,11 @@
       document.getElementById("feedback_issue").value = "";
       document.getElementById("feedback_suggested").value = "";
       document.getElementById("feedback_steep").value = "";
+      document.getElementById("feedback_score").value = "";
+      document.getElementById("feedbackPostStatus").textContent = "Your comment has been posted.";
       await renderFeedback();
     } catch (err) {
+      document.getElementById("feedbackPostStatus").textContent = err.message;
       if (engagementHint) engagementHint.textContent = err.message;
     }
   });

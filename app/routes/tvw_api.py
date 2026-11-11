@@ -15,7 +15,7 @@ from services import guided_mix_session_service
 from services import holdings_bridge_service
 from services import stash_service
 from services import tvw_mix_service
-from utils.auth import is_old_goat_role, login_required, tvw_enforce_account_before_request
+from utils.auth import can_access_tvw_admin, is_old_goat_role, login_required, tvw_enforce_account_before_request
 from utils.guided_mix_perf import guided_mix_perf_span, json_byte_size, log_guided_step_complete_summary
 
 tvw_api_bp = Blueprint("tvw_api", __name__, url_prefix="/api")
@@ -168,11 +168,16 @@ def set_recipe_status(recipe_id: int):
         return jsonify({"status": "error", "message": "Invalid status."}), 400
     db = get_db()
     version_id = int(data.get("recipe_version_id") or 0) or None
-    row = db.execute("SELECT status FROM recipes WHERE id = ?", (recipe_id,)).fetchone()
+    row = db.execute("SELECT status, created_by FROM recipes WHERE id = ?", (recipe_id,)).fetchone()
     if not row:
         return jsonify({"status": "error", "message": "Recipe not found."}), 404
+    if row["created_by"] != _current_user_id() and not can_access_tvw_admin(session.get("role")):
+        return jsonify({"status": "error", "message": "Only the owner or an admin can change recipe status."}), 403
     previous = str(row["status"] or "")
-    db.execute("UPDATE recipes SET status = ? WHERE id = ?", (new_status.upper(), recipe_id))
+    db.execute(
+        "UPDATE recipes SET status = ?, visibility = CASE WHEN ? = 'help' THEN 'public' ELSE visibility END, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (new_status.upper(), new_status, recipe_id),
+    )
     db.execute(
         """
         INSERT INTO recipe_status_updates (recipe_id, recipe_version_id, from_status, to_status, changed_by, reason, created_at)
@@ -246,6 +251,15 @@ def add_recipe_feedback(recipe_id: int):
         body_out = f"{combined}\n\n{main}" if main else combined
     else:
         body_out = main
+    if not body_out:
+        return jsonify({"status": "error", "message": "Add a comment, tasting note, or suggested change."}), 400
+    raw_score = data.get("score_overall")
+    try:
+        score = None if raw_score in (None, "") else float(raw_score)
+    except (TypeError, ValueError):
+        return jsonify({"status": "error", "message": "Score must be between 0 and 10."}), 400
+    if score is not None and (not isfinite(score) or not 0 <= score <= 10):
+        return jsonify({"status": "error", "message": "Score must be between 0 and 10."}), 400
     cur = db.execute(
         """
         INSERT INTO recipe_feedback (recipe_id, recipe_version_id, author_user_id, feedback_type, body, score_overall, created_at)
@@ -257,7 +271,7 @@ def add_recipe_feedback(recipe_id: int):
             _current_user_id(),
             str(data.get("feedback_type") or "structured"),
             body_out,
-            float(data.get("score_overall") or 0.0),
+            score,
             _now_utc_iso(),
         ),
     )

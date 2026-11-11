@@ -325,7 +325,13 @@ def build_community_discovery_context(
             if age < timedelta(days=7):
                 featured_badge = "New recipe"
 
+    help_rows, _ = recipes_repo.fetch_tvw_library(
+        status="help", page_size=6, sort_by="updated", sort_dir="desc",
+        viewer_user_id=viewer_user_id, viewer_is_old_goat=False,
+        public_discovery_only=True,
+    )
     return {
+        "help_recipes": [_enrich_tab_recipe(row, tab_id="updated") for row in help_rows],
         "discovery_featured": featured,
         "discovery_featured_badge": featured_badge,
         "discovery_tabs": tabs,

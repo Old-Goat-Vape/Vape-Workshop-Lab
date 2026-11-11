@@ -171,6 +171,8 @@ def parse_recipe_builder_form(form, *, is_edit: bool = False) -> RecipeBuilderPa
     status = values["status"]
     if status not in _ALLOWED_STATUS:
         errors["status"] = "Choose a valid recipe status."
+    if status == "help":
+        visibility = values["visibility"] = "public"
 
     try:
         pg_ratio = _parse_float_field(values["calc_pg_ratio"], 30.0)

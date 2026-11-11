@@ -1327,3 +1327,11 @@ body.tvw-bench-mode .tvw-ws-pour-equiv-note {
   color: rgba(255, 255, 255, 0.58);
 }
 
+
+/* Completed batches replace the bench rather than sitting below an empty grid. */
+.tvw-workstation.is-complete #mixingPanels { display: none !important; }
+.tvw-ws-complete { scroll-margin-top: 1rem; }
+.tvw-ws-complete-actions a { font-size: 1rem; padding: .85rem 1.2rem; }
+.tvw-ws-report-header .tvw-ws-report-kicker { font-size: 1.35rem; color: #d4af37; }
+#communityFeedback { scroll-margin-top: 2rem; }
+#communityFeedback .modal-body, #communityFeedback .modal-header { padding: 1rem; }
