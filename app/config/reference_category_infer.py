@@ -11,6 +11,7 @@ from html import unescape
 from typing import Optional, Tuple
 
 from config.canonical_library_brands import canonical_library_brand
+from config.catalogue_product_policy import product_kind, verified_liquid_concentrate
 
 FLAVOR = "Flavor"
 HARDWARE = "Hardware"
@@ -148,9 +149,14 @@ def _is_concentrate_line_brand(brand: str, name: str) -> bool:
     cb = canonical_library_brand(brand or "", name or "")
     if cb in _KNOWN_CONCENTRATE_CANON:
         return True
-    if (brand or '').strip().casefold() in {
-        'get suckered', 'kandi hed', 'real flavors', 'real flavours',
-        'one on one', 'diy flavor shack', 'diy flavour shack',
+    if (brand or "").strip().casefold() in {
+        "get suckered",
+        "kandi hed",
+        "real flavors",
+        "real flavours",
+        "one on one",
+        "diy flavor shack",
+        "diy flavour shack",
     }:
         return True
     return bool(
@@ -185,7 +191,10 @@ def _base_score(text: str, nic_score: int) -> int:
         s += 4
     if re.search(r"\b(shortfill|shake\s*n\s*vape|longfill|hybrid\s*bases?)\b", text):
         s += 3
-    if re.search(r"\b(diluent|carrier|base\s*liquid|mixing\s*base)\b", text) and "nic" not in text:
+    if (
+        re.search(r"\b(diluent|carrier|base\s*liquid|mixing\s*base)\b", text)
+        and "nic" not in text
+    ):
         s += 2
     return s
 
@@ -213,7 +222,7 @@ def merge_category_bucket(
     """Single bucket label so duplicate groups only merge when buckets match."""
     cur = normalize_category_label(category)
     text = _hay(brand, name)
-    product_name = unescape(name or '').lower()
+    product_name = unescape(name or "").lower()
     ns = _nic_score(product_name, is_nicotine)
     bs = _base_score(product_name, ns)
     hs = _hw_score(text, brand)
@@ -222,11 +231,17 @@ def merge_category_bucket(
     # Hardware/base/nicotine signals beat vendor brand — shop uses one brand for concentrate + merch.
     if cur == NICOTINE or ns >= 3:
         return NICOTINE
+    if product_kind(brand, name) == "Hardware":
+        return HARDWARE
     if bs >= 3:
         return BASE
     if hs >= 3:
         return HARDWARE
-    if flavor_line and ns < 2:
+    if (
+        flavor_line
+        or _name_reads_as_liquid_concentrate_or_additive(name)
+        or verified_liquid_concentrate(brand, name)
+    ) and ns < 2:
         return FLAVOR
     return cur
 
@@ -250,7 +265,7 @@ def suggest_category_correction(
     raw_cat = (current or "").strip()
     cur = normalize_category_label(current)
     text = _hay(brand, name)
-    product_name = unescape(name or '').lower()
+    product_name = unescape(name or "").lower()
     ns = _nic_score(product_name, is_nicotine)
     bs = _base_score(product_name, ns)
     hs = _hw_score(text, brand)
@@ -262,10 +277,14 @@ def suggest_category_correction(
     elif bs >= 3:
         target = BASE
         t_reason = "base_signal"
-    elif hs >= 3:
+    elif hs >= 3 or product_kind(brand, name) == "Hardware":
         target = HARDWARE
         t_reason = "hardware_signal"
-    elif flavor_line and ns < 2:
+    elif (
+        flavor_line
+        or _name_reads_as_liquid_concentrate_or_additive(name)
+        or verified_liquid_concentrate(brand, name)
+    ) and ns < 2:
         target = FLAVOR
         t_reason = "flavor_brand_line"
     else:
@@ -299,11 +318,17 @@ def suggest_category_correction(
         reason = "normalized_label_only"
     elif target != cur:
         weak = (
-            (target == HARDWARE and hs < 4)
+            (target == HARDWARE and hs < 4 and product_kind(brand, name) != "Hardware")
             or (target == BASE and bs < 4)
             or (target == NICOTINE and ns < 3)
             or (target == FLAVOR and cur == HARDWARE and hs >= 3 and not vc)
-            or (target == FLAVOR and cur == HARDWARE and t_reason == "flavor_brand_line" and hs >= 2 and not vc)
+            or (
+                target == FLAVOR
+                and cur == HARDWARE
+                and t_reason == "flavor_brand_line"
+                and hs >= 2
+                and not vc
+            )
             or (
                 target == FLAVOR
                 and cur == HARDWARE
@@ -326,7 +351,12 @@ def suggest_category_correction(
         nic_new = 1
         if reason == "unchanged" or reason.startswith("weak"):
             reason = "sync_is_nicotine"
-    elif eff != NICOTINE and int(is_nicotine or 0) == 1 and ns < 2 and not _nic_rx.search(text):
+    elif (
+        eff != NICOTINE
+        and int(is_nicotine or 0) == 1
+        and ns < 2
+        and not _nic_rx.search(text)
+    ):
         nic_new = 0
         if reason == "unchanged":
             reason = "clear_false_nic_flag"

@@ -71,6 +71,7 @@
               {% if row.is_hidden %}<span class="badge text-bg-secondary">hidden</span>{% endif %}
               {% if row.is_invalid %}<span class="badge text-bg-warning">invalid</span>{% endif %}
               {% if row.suspicious %}<span class="badge text-bg-danger">suspicious</span>{% endif %}
+              {% if row.product_kind %}<div>Excluded from recipe choices: {{ row.product_kind }}</div>{% endif %}
             </td>
             <td>{% if row.dup_group_size > 1 %}<span class="badge text-bg-info">{{ row.dup_group_size }}</span>{% else %}—{% endif %}</td>
             <td>

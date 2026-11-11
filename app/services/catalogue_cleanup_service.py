@@ -11,6 +11,7 @@ from models.tvw_admin_repo import (
     _repoint_recipe_items_merge_dup_versions,
 )
 from config.reference_category_infer import merge_category_bucket
+from config.catalogue_product_policy import product_kind
 
 
 def category_plan(db):
@@ -49,6 +50,17 @@ def category_plan(db):
         ):
             continue
         issues = []
+        kind = product_kind(item["brand"], item["canonical_name"])
+        if kind in {
+            "Pending Verification",
+            "Powder Additive",
+            "Other Chemical",
+            "Fragrance",
+            "Finished Liquid",
+        }:
+            issues.append(
+                f"Excluded from recipe choices: {kind}; do not infer a mixing ingredient category"
+            )
         if (
             ref
             and canonical_item(item["brand"], item["canonical_name"], "Flavor")[2]
@@ -75,6 +87,7 @@ def category_plan(db):
             "brand": item["brand"],
             "name": item["canonical_name"],
             "proposed_category": proposed,
+            "product_kind": kind,
             "before": item,
             "reference": ref,
             "issues": issues,

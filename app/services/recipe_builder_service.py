@@ -230,10 +230,10 @@ def parse_recipe_builder_form(form, *, is_edit: bool = False) -> RecipeBuilderPa
         errors["flavours"] = errors.get("flavours") or row_errors[0]
         errors["_flavour_rows"] = "; ".join(row_errors[:3])
 
-    ref_map = recipes_repo.fetch_flavour_reference_map([i for i, _ in items])
+    ref_map = recipes_repo.fetch_flavour_reference_map([i for i, _ in items], recipe_eligible_only=True)
     for ing_id, _pct in items:
         if ing_id not in ref_map:
-            errors["flavours"] = f"Unknown flavour (id {ing_id}). Search and select from the library."
+            errors["flavours"] = f"Unknown flavour (id {ing_id}) or product unavailable as a mixing ingredient. Search and select from the library."
             break
 
     try:

@@ -46,6 +46,8 @@ def apply_sqlite_connection_pragmas(conn: sqlite3.Connection) -> None:
     conn.execute("PRAGMA journal_mode=WAL;")
     conn.execute("PRAGMA synchronous=NORMAL;")
     conn.execute("PRAGMA busy_timeout=60000;")
+    from config.catalogue_identity import register_catalogue_functions
+    register_catalogue_functions(conn)
 
 
 def read_sqlite_connection_settings(conn: sqlite3.Connection) -> dict[str, str | int]:

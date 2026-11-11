@@ -227,7 +227,11 @@ def list_flavour_identity_cleanup_rows(
         """,
         (*params, page_size, offset),
     ).fetchall()
-    return [dict(r) for r in rows], total
+    from config.catalogue_product_policy import product_kind
+    result = [dict(r) for r in rows]
+    for item in result:
+        item['product_kind'] = product_kind(item['brand'], item['canonical_name'])
+    return result, total
 
 
 def fetch_flavour_identity_bundle(flavour_id: int) -> dict[str, Any] | None:

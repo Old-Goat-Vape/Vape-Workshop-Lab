@@ -14,7 +14,6 @@ from bs4 import BeautifulSoup
 from config.canonical_library_brands import canonical_library_brand
 from scrapers.safe_print import safe_print
 
-
 BASE_URL = "https://clyrolinx.co.za/"
 BRAND = "Clyrolinx"
 SOURCE = "clyrolinx_scraper"
@@ -34,7 +33,8 @@ class ScrapeFlavor:
 
 def normalize_name(name: str) -> str:
     from config.canonical_library_brands import normalize_flavor_identity_name
-    return normalize_flavor_identity_name(name or '')
+
+    return normalize_flavor_identity_name(name or "")
 
 
 def _norm(text: str) -> str:
@@ -83,7 +83,9 @@ def _robots_ok(url: str, user_agent: str = "*") -> bool:
         return True
 
 
-def fetch_page(url: str, *, session: requests.Session, delay_s: float = 10.0) -> Optional[str]:
+def fetch_page(
+    url: str, *, session: requests.Session, delay_s: float = 10.0
+) -> Optional[str]:
     if not _robots_ok(url):
         safe_print(f"[Clyrolinx] robots.txt disallows: {url}")
         return None
@@ -129,14 +131,17 @@ def fetch_store_api_page(
 
 
 def _classify_category_from_slugs(slugs: List[str], name: str) -> str:
-    blob = " ".join([s.lower() for s in slugs] + [(_norm(name) or "")])
-    if "nicotine" in blob or "clyronic" in blob or "nic" in blob:
-        return "Nicotine"
-    if "vg" in blob or "pg" in blob or "vegetable" in blob or "propylene" in blob:
-        return "Base"
-    if "bottles" in blob or "syringes" in blob or "bottle" in blob:
+    from config.reference_category_infer import merge_category_bucket
+
+    categories = " ".join(slugs).casefold()
+    # Match product categories, not substrings: "unicorn" contains "nic".
+    if re.search(r"\b(?:bottles?|syringes?)\b", categories):
         return "Hardware"
-    return "Flavor"
+    if re.search(r"\b(?:nicotine|clyronic)\b", categories):
+        return "Nicotine"
+    if re.search(r"\b(?:vegetable|propylene|vg|pg)\b", categories):
+        return "Base"
+    return merge_category_bucket(BRAND, name, "Flavor", 0)
 
 
 def parse_flavor_data(product: Dict[str, Any]) -> Optional[ScrapeFlavor]:
@@ -150,6 +155,21 @@ def parse_flavor_data(product: Dict[str, Any]) -> Optional[ScrapeFlavor]:
 
     categories = product.get("categories") or []
     slugs = [c.get("slug", "") for c in categories if isinstance(c, dict)]
+    from config.catalogue_product_policy import product_kind
+
+    excluded = product_kind(BRAND, name)
+    if excluded in {
+        "Finished Liquid",
+        "Fragrance",
+        "Other Chemical",
+        "Powder Additive",
+        "Pending Verification",
+    }:
+        return None
+    if "/vape-juice/" in permalink or any(
+        re.search(r"vape-juice|its-(?:e-liquid|nic-salt)", s, re.I) for s in slugs
+    ):
+        return None
     cat = _classify_category_from_slugs(slugs, name)
 
     # Skip perfumes/fragrances entirely (not relevant to lab flavors)
@@ -157,7 +177,8 @@ def parse_flavor_data(product: Dict[str, Any]) -> Optional[ScrapeFlavor]:
     if "perfume" in name_l or "fragrance" in name_l:
         return None
     if any("perfume" in (s or "").lower() for s in slugs) or any(
-        "perfume" in (c.get("name", "").lower()) or "fragrance" in (c.get("name", "").lower())
+        "perfume" in (c.get("name", "").lower())
+        or "fragrance" in (c.get("name", "").lower())
         for c in categories
         if isinstance(c, dict)
     ):
@@ -175,7 +196,7 @@ def parse_flavor_data(product: Dict[str, Any]) -> Optional[ScrapeFlavor]:
     # price is in minor units; currency_minor_unit indicates decimal places.
     minor_unit = int(prices.get("currency_minor_unit") or 2)
     try:
-        price_raw = float(price_minor) / (10 ** minor_unit) if price_minor else 0.0
+        price_raw = float(price_minor) / (10**minor_unit) if price_minor else 0.0
     except Exception:
         price_raw = 0.0
 
@@ -208,9 +229,13 @@ def upsert_flavor(
     """Insert new or update prices on existing. Returns 'added'|'updated'|'skipped'."""
     norm = normalize_name(flavor.name)
     price_raw = float(flavor.price_raw or 0.0)
-    unit_size_ml = float(flavor.unit_size_ml) if flavor.unit_size_ml is not None else None
+    unit_size_ml = (
+        float(flavor.unit_size_ml) if flavor.unit_size_ml is not None else None
+    )
     price_per_ml = (price_raw / unit_size_ml) if unit_size_ml else 0.0
-    canon_brand = canonical_library_brand(str(flavor.brand or ""), str(flavor.name or ""))
+    canon_brand = canonical_library_brand(
+        str(flavor.brand or ""), str(flavor.name or "")
+    )
 
     existing = existing_by_norm.get(norm)
     if existing:
@@ -347,7 +372,9 @@ def run_clyrolinx_scraper(
     # Use WooCommerce Store API (public) instead of HTML, because /shop/ is JS-driven.
     per_page = 100
     for page in range(1, max_pages + 1):
-        products = fetch_store_api_page(session=sess, page=page, per_page=per_page, delay_s=delay_s)
+        products = fetch_store_api_page(
+            session=sess, page=page, per_page=per_page, delay_s=delay_s
+        )
         if not products:
             break
         safe_print(f"[Clyrolinx] API page {page}: {len(products)} products")
@@ -357,7 +384,9 @@ def run_clyrolinx_scraper(
             if not flav:
                 continue
             try:
-                outcome = upsert_flavor(db, flav, existing_by_norm=existing_by_norm, now=now)
+                outcome = upsert_flavor(
+                    db, flav, existing_by_norm=existing_by_norm, now=now
+                )
                 if outcome == "added":
                     added.append(
                         {
@@ -379,12 +408,16 @@ def run_clyrolinx_scraper(
 
         db.commit()
 
-    safe_print(f"[Clyrolinx] Done. Added: {len(added)}, Updated: {updated}, Unchanged: {skipped}")
+    safe_print(
+        f"[Clyrolinx] Done. Added: {len(added)}, Updated: {updated}, Unchanged: {skipped}"
+    )
     return added, skipped, updated
 
 
 # Back-compat alias used by older call sites / tests.
-def insert_or_skip(db, flavor: ScrapeFlavor, *, existing_norm_names: set[str], now: str) -> bool:
+def insert_or_skip(
+    db, flavor: ScrapeFlavor, *, existing_norm_names: set[str], now: str
+) -> bool:
     """Legacy insert-only helper. Prefer upsert_flavor."""
     norm = normalize_name(flavor.name)
     if norm in existing_norm_names:
@@ -394,4 +427,3 @@ def insert_or_skip(db, flavor: ScrapeFlavor, *, existing_norm_names: set[str], n
         existing_norm_names.add(norm)
         return True
     return False
-
