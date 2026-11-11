@@ -155,6 +155,8 @@ def list_flavour_identity_cleanup_rows(
 ) -> tuple[list[dict[str, Any]], int]:
     """Catalogue rows for duplicate / suspicious / merged flavour identity review."""
     db = get_db()
+    from config.catalogue_identity import register_catalogue_functions
+    register_catalogue_functions(db)
     page = max(1, int(page or 1))
     page_size = max(1, int(page_size or 50))
     offset = (page - 1) * page_size
@@ -170,16 +172,7 @@ def list_flavour_identity_cleanup_rows(
 
     view = (view or "").strip().lower()
     if view == "duplicates":
-        where.append(
-            """
-            EXISTS (
-              SELECT 1 FROM flavours f2
-              WHERE LOWER(TRIM(COALESCE(f2.brand, ''))) = LOWER(TRIM(COALESCE(f.brand, '')))
-                AND LOWER(TRIM(COALESCE(f2.canonical_name, ''))) = LOWER(TRIM(COALESCE(f.canonical_name, '')))
-                AND f2.id != f.id
-            )
-            """
-        )
+        where.append("dg.c > 1 AND COALESCE(f.merged_into_flavour_id,0)=0")
     elif view == "suspicious":
         where.append(
             "(COALESCE(TRIM(f.canonical_name), '') = '' OR COALESCE(TRIM(f.brand), '') = '' "
@@ -200,13 +193,12 @@ def list_flavour_identity_cleanup_rows(
     wsql = " AND ".join(where)
     dup_join = """
     LEFT JOIN (
-      SELECT LOWER(TRIM(COALESCE(brand, ''))) AS b,
-             LOWER(TRIM(COALESCE(canonical_name, ''))) AS n,
+      SELECT tvw_catalogue_key(brand, canonical_name, category) AS identity_key,
              COUNT(*) AS c
       FROM flavours
-      GROUP BY 1, 2
-    ) dg ON dg.b = LOWER(TRIM(COALESCE(f.brand, '')))
-          AND dg.n = LOWER(TRIM(COALESCE(f.canonical_name, '')))
+      WHERE COALESCE(merged_into_flavour_id,0)=0
+      GROUP BY 1
+    ) dg ON dg.identity_key = tvw_catalogue_key(f.brand, f.canonical_name, f.category)
     """
     count_row = db.execute(
         f"SELECT COUNT(1) AS c FROM flavours f {dup_join} WHERE {wsql}",
@@ -308,6 +300,8 @@ def _source_target_ref_ids(*, source: dict[str, Any], target: dict[str, Any]) ->
 
 
 def _repoint_recipe_items_merge_dup_versions(db, *, source_ref_id: int, target_ref_id: int) -> int:
+    if source_ref_id == target_ref_id:
+        return 0
     rows = db.execute(
         "SELECT id, version_id, amount_percent FROM recipe_items WHERE ingredient_id = ?",
         (int(source_ref_id),),

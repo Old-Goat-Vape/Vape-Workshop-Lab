@@ -16,9 +16,10 @@ from bs4 import BeautifulSoup
 from config.vc_dtl_scraper_config import VC_DTL_CONFIG
 from config.canonical_library_brands import (
     canonical_library_brand,
-    flavor_identity_match_key,
     normalize_flavor_identity_name,
 )
+from config.catalogue_identity import catalogue_flavor_match_key as flavor_identity_match_key
+from config.catalogue_identity import canonical_item, find_reference
 from config.flavor_name_aliases import FLAVOR_NAME_ALIASES
 from scrapers.vc_shared import (
     compute_content_hash,
@@ -1037,7 +1038,8 @@ def _record_provenance(
 
 
 def _build_reference_lookup(db) -> dict[tuple[str, str], int]:
-    rows = db.execute("SELECT id, brand, name FROM flavor_reference WHERE active = 1").fetchall()
+    rows = db.execute("SELECT id, brand, name FROM flavor_reference WHERE active = 1 "
+                      "ORDER BY (COALESCE(price_per_ml,0)>0) DESC, id").fetchall()
     out: dict[tuple[str, str], int] = {}
     for r in rows:
         key = flavor_identity_match_key(str(r["brand"] or ""), str(r["name"] or ""))
@@ -1189,18 +1191,14 @@ def _ensure_reference_for_flavor(
     flavor = (flavor_raw or "").strip()
     if not flavor:
         return None
-    canon_b = canonical_library_brand(brand, flavor)
+    canon_b, flavor, _ = canonical_item(brand, flavor)
     key = flavor_identity_match_key(brand, flavor)
     existing = reference_lookup.get(key)
     if existing:
         return int(existing)
 
-    row = db.execute(
-        "SELECT id FROM flavor_reference WHERE brand = ? AND name = ? LIMIT 1",
-        (canon_b, flavor),
-    ).fetchone()
-    if row:
-        ref_id = int(row["id"])
+    ref_id = find_reference(db,brand=canon_b,name=flavor,category='Flavor')
+    if ref_id is not None:
         reference_lookup[key] = ref_id
         return ref_id
 

@@ -28,7 +28,7 @@
       <div class="col-12 col-md-4">
         <select class="form-select form-select-sm" name="view">
           <option value="" {% if view == '' %}selected{% endif %}>All rows (filter below ignores some)</option>
-          <option value="duplicates" {% if view == 'duplicates' %}selected{% endif %}>Likely duplicates (same brand+name)</option>
+          <option value="duplicates" {% if view == 'duplicates' %}selected{% endif %}>Likely duplicates (manufacturer and product identity)</option>
           <option value="suspicious" {% if view == 'suspicious' %}selected{% endif %}>Suspicious (empty or tiny name)</option>
           <option value="merged" {% if view == 'merged' %}selected{% endif %}>Merged into another</option>
           <option value="hidden" {% if view == 'hidden' %}selected{% endif %}>Hidden</option>

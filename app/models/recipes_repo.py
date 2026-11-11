@@ -581,12 +581,13 @@ def replace_recipe_tags(*, recipe_id: int, tags: Sequence[str]) -> None:
 
 
 def fetch_flavour_reference_options(*, limit: int = 500) -> List[Dict[str, Any]]:
+    from config.catalogue_identity import flavour_category_sql
     db = get_db()
     rows = db.execute(
-        """
+        f"""
         SELECT id, brand, name, COALESCE(density, 1.036) AS density
         FROM flavor_reference
-        WHERE active = 1
+        WHERE active = 1 AND {flavour_category_sql('category')} AND COALESCE(is_nicotine,0)=0
         ORDER BY brand COLLATE NOCASE ASC, name COLLATE NOCASE ASC
         LIMIT ?
         """,
@@ -608,9 +609,10 @@ def search_flavour_reference_for_builder(*, query: str, limit: int = 100) -> Lis
     like_prefix = f"{q_lower}%"
     like_contains = f"%{q_lower}%"
     lim = max(1, min(int(limit or 100), 250))
+    from config.catalogue_identity import flavour_category_sql
     db = get_db()
     rows = db.execute(
-        """
+        f"""
         SELECT
             hits.id,
             hits.brand,
@@ -631,6 +633,7 @@ def search_flavour_reference_for_builder(*, query: str, limit: int = 100) -> Lis
               ON fv.source_flavor_ref_id = fr.id
              AND COALESCE(fv.merged_into_flavour_id, 0) = 0
             WHERE COALESCE(fr.active, 1) = 1
+              AND {flavour_category_sql('fr.category')} AND COALESCE(fr.is_nicotine,0)=0
               AND (
                 lower(COALESCE(fr.name, '')) LIKE ?
                 OR lower(COALESCE(fr.brand, '')) LIKE ?
@@ -731,11 +734,12 @@ def fetch_tvw_flavours(
       - ``avg_usage_percent``: ``avg_usage`` else ``default_percent`` from import/catalog;
         NULL if neither set (UI shows —).
     """
+    from config.catalogue_identity import visible_flavour_sql
     db = get_db()
     page = max(1, int(page or 1))
     page_size = max(1, min(100, int(page_size or 24)))
     offset = (page - 1) * page_size
-    where = ["1=1"]
+    where = [visible_flavour_sql("f")]
     params: list[Any] = []
     if search:
         where.append("(f.canonical_name LIKE ? OR COALESCE(f.brand, '') LIKE ?)")
@@ -807,13 +811,14 @@ def fetch_tvw_flavours(
 
 
 def fetch_tvw_flavour_manufacturers(*, limit: int = 1000) -> list[str]:
+    from config.catalogue_identity import visible_flavour_sql
     db = get_db()
     rows = db.execute(
-        """
+        f"""
         SELECT DISTINCT TRIM(COALESCE(brand, '')) AS brand
-        FROM flavours
+        FROM flavours f
         WHERE COALESCE(brand, '') != ''
-          AND COALESCE(merged_into_flavour_id, 0) = 0
+          AND {visible_flavour_sql("f")}
         ORDER BY LOWER(brand) ASC
         LIMIT ?
         """,

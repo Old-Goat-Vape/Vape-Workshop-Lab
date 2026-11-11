@@ -9,7 +9,8 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
-from config.canonical_library_brands import canonical_library_brand
+from config.catalogue_identity import canonical_item, find_reference, reference_identity_index
+from config.reference_category_infer import merge_category_bucket
 from db import sqlite_retry
 from scrapers.blck_variant_normalize import normalize_variant_fields
 from scrapers.safe_print import safe_print
@@ -144,6 +145,7 @@ def _upsert_flavour_reference_from_primary_variant(
     now: str,
     added: List[str],
     updated: List[str],
+    identity_index: Optional[Dict[str, int]] = None,
 ) -> None:
     """Keep legacy flavour_reference catalogue for concentrates (first volumetric variant preferred)."""
     variants = product.get("variants") or []
@@ -196,11 +198,12 @@ def _upsert_flavour_reference_from_primary_variant(
     price_per_ml = pack_price / volume if volume > 0 else 0.0
     full_url = f"https://blck.co.za/products/{handle}"
     clean_name = title.replace(vendor, "").strip() or title
-    canon_brand = canonical_library_brand(str(vendor or ""), str(clean_name or ""))
+    canon_brand, clean_name, identity = canonical_item(str(vendor or ""), str(clean_name or ""), category)
 
+    existing_id = identity_index.get(identity) if identity_index is not None else find_reference(db, brand=canon_brand, name=clean_name, category=category)
     existing = db.execute(
-        "SELECT id, price_per_ml FROM flavor_reference WHERE brand = ? AND name = ?",
-        (canon_brand, clean_name),
+        "SELECT id, price_per_ml FROM flavor_reference WHERE id = ?",
+        (existing_id,),
     ).fetchone()
     if existing:
         if abs(float(existing["price_per_ml"] or 0) - price_per_ml) > 0.01:
@@ -225,7 +228,7 @@ def _upsert_flavour_reference_from_primary_variant(
         )
         updated.append(clean_name)
     else:
-        db.execute(
+        cur = db.execute(
             """
             INSERT INTO flavor_reference
                 (brand, name, source, category, price_per_ml, url, last_scraped, active, price_raw, unit_size_ml)
@@ -233,6 +236,8 @@ def _upsert_flavour_reference_from_primary_variant(
             """,
             (canon_brand, clean_name, category, price_per_ml, full_url, now, pack_price, volume),
         )
+        if identity_index is not None:
+            identity_index[identity] = int(cur.lastrowid)
         added.append(clean_name)
 
 
@@ -265,32 +270,13 @@ def scrape_vc_flavors(db, limit_pages=30):
             nonlocal added, updated, variants_upserted, variants_price_changed
             db.execute("BEGIN IMMEDIATE")
             try:
+                identity_index = reference_identity_index(db)
                 for p in products_data:
                     title = p.get("title", "")
                     vendor = p.get("vendor", "Unknown")
                     p_type = str(p.get("product_type", "") or "").lower()
-                    title_lower = title.lower()
 
-                    category = "Flavor"
-                    hw_keys = [
-                        "bottle",
-                        "cap",
-                        "beaker",
-                        "scale",
-                        "syringe",
-                        "magnetic",
-                        "can",
-                        "jerry",
-                        "pet",
-                        "glass",
-                    ]
-                    if any(x in title_lower or x in p_type for x in hw_keys):
-                        category = "Hardware"
-                    elif any(x in title_lower for x in ["nicotine", "nic salt", "freebase nic", "gold nic"]):
-                        category = "Nicotine"
-                    elif any(x in title_lower for x in ["vegetable glycerin", "propylene glycol", "vg (", "pg ("]):
-                        if "flavour" not in title_lower or "glycer" in title_lower or "glycol" in title_lower:
-                            category = "Base"
+                    category = merge_category_bucket(vendor, title, "Flavor", 0)
 
                     # Persist EVERY Shopify variant (source of truth for pack pricing).
                     for v in p.get("variants") or []:
@@ -309,7 +295,8 @@ def scrape_vc_flavors(db, limit_pages=30):
                     a_names: List[str] = []
                     u_names: List[str] = []
                     _upsert_flavour_reference_from_primary_variant(
-                        db, product=p, category=category, now=now, added=a_names, updated=u_names
+                        db, product=p, category=category, now=now, added=a_names, updated=u_names,
+                        identity_index=identity_index,
                     )
                     added += len(a_names)
                     updated += len(u_names)

@@ -363,11 +363,13 @@ def fetch_reference_id_by_brand_name(*, brand: str, name: str) -> Optional[int]:
 
 
 def insert_reference(*, brand: str, name: str, category: str) -> int:
-    from config.canonical_library_brands import canonical_library_brand, preferred_flavor_storage_name
+    from config.catalogue_identity import canonical_item, find_reference
 
     db = get_db()
-    canon_b = canonical_library_brand(brand or "", name or "")
-    storage_n = preferred_flavor_storage_name(name or "") or (name or "").strip()
+    existing = find_reference(db, brand=brand, name=name, category=category)
+    if existing is not None:
+        return existing
+    canon_b, storage_n, _ = canonical_item(brand, name, category)
     cur = db.execute(
         "INSERT INTO flavor_reference (brand, name, category, active) VALUES (?, ?, ?, 1)",
         (canon_b, storage_n, category),
@@ -385,7 +387,13 @@ def fetch_library_item_reference_id(item_id: int) -> Optional[int]:
 
 
 def update_reference_fields(*, reference_id: int, name: str, brand: str, category: str) -> None:
+    from config.catalogue_identity import canonical_item, find_reference, CatalogueIdentityConflict
     db = get_db()
+    current = fetch_reference_basic(reference_id)
+    if current and canonical_item(current['brand'],current['name'],current['category'])[2] != canonical_item(brand,name,category)[2]:
+        existing = find_reference(db,brand=brand,name=name,category=category)
+        if existing is not None and existing != int(reference_id):
+            raise CatalogueIdentityConflict(f'This flavour already exists (ingredient {existing}). Use the existing entry or the catalogue cleanup tool.')
     db.execute(
         "UPDATE flavor_reference SET name = ?, brand = ?, category = ? WHERE id = ?",
         (name, brand, category, int(reference_id)),

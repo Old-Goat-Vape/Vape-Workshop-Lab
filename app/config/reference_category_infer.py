@@ -66,6 +66,7 @@ _pg_vg_short_rx = re.compile(
 )
 _hw_rx = re.compile(
     r"\b("
+    r"ceramic\s*tweezers?|ub\s*(?:max|pro)\s*coils?|nexmesh|cotton\s*bacon|"
     r"drip\s*tip|510\s*tip|replacement\s*glass|bubble\s*glass|glass\s*tube|"
     r"prebuilt\s*coil|mesh\s*coil|coil\s*head|atomizer\s*head|vape\s*coil|"
     r"18650|21700|battery\s*wrap|battery\s*case|\bmod\b|\btank\b|sub[\s-]?ohm\s*tank|rta|rdta|rda\b|"

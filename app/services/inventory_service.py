@@ -504,6 +504,7 @@ def update_item_from_form(
     unit: str,
     cost_per_g: str | None,
 ) -> Tuple[Dict[str, Any], int]:
+    from config.catalogue_identity import CatalogueIdentityConflict
     try:
         ref_id = inventory_repo.fetch_library_item_reference_id(int(item_id))
         if not ref_id:
@@ -518,6 +519,9 @@ def update_item_from_form(
         log_change(actor_id=actor_id, action="EDIT", target_id=item_id, details=f"Updated by {actor_username or ''}")
         get_db().commit()
         return {"status": "success", "category": category}, 200
+    except CatalogueIdentityConflict as exc:
+        get_db().rollback()
+        return {"status": "error", "message": str(exc)}, 409
     except Exception as exc:
         get_db().rollback()
         return {"status": "error", "message": str(exc)}, 500
