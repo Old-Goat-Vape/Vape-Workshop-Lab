@@ -42,7 +42,7 @@ def key(p):
 
 def _context(session_id, user_id):
     db = get_db()
-    row = db.execute('SELECT * FROM mix_sessions WHERE id=? AND user_id=?', (session_id,user_id)).fetchone()
+    row = db.execute('SELECT * FROM mix_sessions WHERE id=? AND user_id=? AND abandoned_at IS NULL', (session_id,user_id)).fetchone()
     if not row:
         raise RecoveryError('Mix session not found.')
     if row['completed_at']:
@@ -297,7 +297,7 @@ def advance(session_id,user_id,revision,cursor,weight=None,recording_error=False
     db=get_db()
     db.execute('BEGIN IMMEDIATE')
     try:
-        row=db.execute('SELECT * FROM mix_sessions WHERE id=? AND user_id=?',(session_id,user_id)).fetchone()
+        row=db.execute('SELECT * FROM mix_sessions WHERE id=? AND user_id=? AND abandoned_at IS NULL',(session_id,user_id)).fetchone()
         if not row:
             raise RecoveryError('Mix session not found.')
         meta=json.loads(row['result_json'] or '{}')

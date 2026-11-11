@@ -1334,7 +1334,7 @@ def save_guided_session_user_notes(
     """Persist optional mixer-written batch notes on a completed guided session."""
     db = get_db()
     own = db.execute(
-        "SELECT id FROM mix_sessions WHERE id = ? AND user_id = ?",
+        "SELECT id FROM mix_sessions WHERE id = ? AND user_id = ? AND abandoned_at IS NULL",
         (int(session_id), int(user_id)),
     ).fetchone()
     if not own:
@@ -1505,7 +1505,7 @@ def update_guided_session_vessel_ml(*, session_id: int, user_id: int, vessel_ml:
     """Persist active vessel/container size for tolerance scaling and coherent recovery (mix_sessions.result_json)."""
     db = get_db()
     own = db.execute(
-        "SELECT id FROM mix_sessions WHERE id = ? AND user_id = ?",
+        "SELECT id FROM mix_sessions WHERE id = ? AND user_id = ? AND abandoned_at IS NULL",
         (int(session_id), int(user_id)),
     ).fetchone()
     if not own:
@@ -2002,6 +2002,8 @@ def list_user_mix_sessions(
             "OR (LOWER(COALESCE(base.mode, 'quick')) = 'guided' AND base.open_steps = 0))"
         )
 
+    mode_where += " AND ms.abandoned_at IS " + ("NOT NULL" if f == "abandoned" else "NULL")
+
     total_row = db.execute(
         f"""
         WITH base AS (
@@ -2036,6 +2038,9 @@ def list_user_mix_sessions(
                 ms.result_json,
                 ms.created_at,
                 ms.completed_at,
+                ms.abandoned_at,
+                ms.production_job_id,
+                EXISTS (SELECT 1 FROM production_job_batches pb WHERE pb.guided_mix_session_id = ms.id) AS is_production,
                 r.id AS recipe_id,
                 r.name AS recipe_name,
                 r.slug AS recipe_slug,
@@ -2079,8 +2084,10 @@ def list_user_mix_sessions(
         total_s = int(d["total_steps"] or 0)
         d["open_steps"] = open_s
         d["total_steps"] = total_s
+        d["abandoned"] = bool(d.get("abandoned_at"))
+        d["can_abandon"] = mode == "guided" and open_s > 0 and not d.get("completed_at") and not d["abandoned"] and not d.get("production_job_id") and not d.get("is_production")
         if mode == "guided":
-            d["in_progress"] = open_s > 0
+            d["in_progress"] = open_s > 0 and not d["abandoned"]
             d["completed"] = total_s > 0 and open_s == 0
         else:
             d["in_progress"] = False
@@ -2137,7 +2144,7 @@ def list_user_guided_sessions(*, user_id: int, limit: int = 30) -> list[dict[str
         FROM mix_sessions ms
         JOIN recipe_versions rv ON rv.id = ms.recipe_version_id
         JOIN recipes r ON r.id = rv.recipe_id
-        WHERE ms.user_id = ? AND LOWER(COALESCE(ms.mode, '')) = 'guided'
+        WHERE ms.user_id = ? AND ms.abandoned_at IS NULL AND LOWER(COALESCE(ms.mode, '')) = 'guided'
           AND NOT EXISTS (
               SELECT 1 FROM production_job_batches pb
               JOIN production_jobs pj ON pj.id = pb.production_job_id
@@ -2218,7 +2225,7 @@ def _build_guided_session_bundle_inner(
                result_json, created_at, completed_at,
                production_job_id, production_job_recipe_id
         FROM mix_sessions
-        WHERE id = ? AND user_id = ?
+        WHERE id = ? AND user_id = ? AND abandoned_at IS NULL
         """,
         (session_id, user_id),
     ).fetchone()
@@ -2230,7 +2237,7 @@ def _build_guided_session_bundle_inner(
                 SELECT id, user_id, recipe_version_id, mode, target_ml, target_nic, target_pgvg,
                        result_json, created_at, completed_at
                 FROM mix_sessions
-                WHERE id = ? AND user_id = ?
+                WHERE id = ? AND user_id = ? AND abandoned_at IS NULL
                 """,
                 (session_id, user_id),
             ).fetchone()
@@ -2436,7 +2443,7 @@ def complete_guided_step_with_policy(
     if policy is None:
         policy = tvw_mix_policy()
     own = db.execute(
-        "SELECT id FROM mix_sessions WHERE id = ? AND user_id = ?",
+        "SELECT id FROM mix_sessions WHERE id = ? AND user_id = ? AND abandoned_at IS NULL",
         (session_id, user_id),
     ).fetchone()
     if not own:
@@ -3496,7 +3503,7 @@ def insert_dynamic_guided_event_step(
     """Public entry point to insert event-driven runtime steps."""
     db = get_db()
     own = db.execute(
-        "SELECT id FROM mix_sessions WHERE id = ? AND user_id = ?",
+        "SELECT id FROM mix_sessions WHERE id = ? AND user_id = ? AND abandoned_at IS NULL",
         (int(session_id), int(user_id)),
     ).fetchone()
     if not own:

@@ -240,7 +240,7 @@ def tvw_what_can_i_make():
 def tvw_my_mixes():
     uid = int(session.get("user_id"))
     filt = (request.args.get("filter") or "all").strip().lower()
-    if filt not in ("all", "in_progress", "completed", "guided", "quick"):
+    if filt not in ("all", "in_progress", "completed", "guided", "quick", "abandoned"):
         filt = "all"
     page_raw = (request.args.get("page") or "1").strip()
     page = int(page_raw) if page_raw.isdigit() else 1
@@ -263,6 +263,26 @@ def tvw_my_mixes():
         total=total,
         total_pages=total_pages,
     )
+
+
+@tvw_recipes_bp.route("/my-mixes/<int:session_id>/<action>", methods=["POST"])
+@login_required
+def tvw_mix_lifecycle(session_id: int, action: str):
+    if action not in {"abandon", "restore"}:
+        abort(404)
+    from services.mix_session_lifecycle_service import set_abandoned
+    try:
+        set_abandoned(session_id=session_id, user_id=int(session["user_id"]), abandoned=action == "abandon")
+    except LookupError:
+        abort(404)
+    except ValueError as exc:
+        flash(str(exc), "warning")
+    else:
+        flash("Mix abandoned. You can restore it from Abandoned." if action == "abandon" else "Mix restored. Resume it from In progress.", "success")
+    filt = request.form.get("filter", "all")
+    if filt not in {"all", "in_progress", "completed", "guided", "quick", "abandoned"}:
+        filt = "all"
+    return redirect(url_for("tvw_recipes.tvw_my_mixes", filter=filt))
 
 
 @tvw_recipes_bp.route("/guided-mix")

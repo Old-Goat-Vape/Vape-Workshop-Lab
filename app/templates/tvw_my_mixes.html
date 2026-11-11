@@ -22,13 +22,25 @@
        href="{% if key == 'all' %}{{ url_for('tvw_recipes.tvw_my_mixes') }}{% else %}{{ url_for('tvw_recipes.tvw_my_mixes', filter=key) }}{% endif %}">{{ label }}</a>
   {%- endmacro %}
 
+  {% macro lifecycle_action(row) -%}
+    {% if row.abandoned or row.can_abandon %}
+      <form method="post" class="d-inline" action="{{ url_for('tvw_recipes.tvw_mix_lifecycle', session_id=row.id, action='restore' if row.abandoned else 'abandon') }}"
+            {% if not row.abandoned %}onsubmit="return confirm('Abandon this incomplete mix? It will leave your active list. Recorded pours and notes are kept, stock is unchanged, and you can restore it from Abandoned.');"{% endif %}>
+        <input type="hidden" name="filter" value="{{ filter_active }}">
+        <button class="btn btn-sm {{ 'btn-outline-light' if row.abandoned else 'btn-outline-danger' }}" type="submit">{{ 'Restore mix' if row.abandoned else 'Abandon mix' }}</button>
+      </form>
+    {% endif %}
+  {%- endmacro %}
+
   <div class="d-flex flex-wrap gap-2 mb-3">
     {{ filter_link('All', 'all') }}
     {{ filter_link('In progress', 'in_progress') }}
     {{ filter_link('Completed', 'completed') }}
     {{ filter_link('Guided only', 'guided') }}
     {{ filter_link('Quick only', 'quick') }}
+    {{ filter_link('Abandoned', 'abandoned') }}
   </div>
+  <p class="text-secondary">Finished testing or stopped a mix? Choose <strong>Abandon mix</strong> to remove it from your active list. You can restore it from Abandoned; recorded pours and notes are kept.</p>
   <div class="small text-secondary mb-2">{{ total }} mix session(s)</div>
 
   <section class="card shadow-sm">
@@ -75,7 +87,9 @@
                   <td class="small text-secondary">{{ row.created_at }}</td>
                   <td class="small text-secondary">{{ row.completed_at or "—" }}</td>
                   <td>
-                    {% if row.mode == 'quick' %}
+                    {% if row.abandoned %}
+                      <span class="badge text-bg-secondary">Abandoned · {{ row.abandoned_at }}</span>
+                    {% elif row.mode == 'quick' %}
                       <span class="badge text-bg-secondary">Quick logged</span>
                     {% elif row.in_progress %}
                       <span class="badge text-bg-warning text-dark">Guided in progress · {{ row.open_steps }} left</span>
@@ -83,9 +97,9 @@
                       <span class="badge text-bg-success">Guided completed</span>
                     {% endif %}
                   </td>
-                  <td class="text-end text-nowrap">
+                  <td class="text-end">
                     <a class="btn btn-sm btn-outline-light py-0" href="{{ recipe_href }}">Recipe</a>
-                    {% if row.mode == 'guided' %}
+                    {% if row.mode == 'guided' and not row.abandoned %}
                       {% if row.in_progress %}
                         <a class="btn btn-sm btn-warning py-0" href="{{ url_for('tvw_recipes.tvw_guided_mix_session', session_id=row.id) }}">Resume</a>
                       {% else %}
@@ -95,6 +109,7 @@
                     {% else %}
                       <a class="btn btn-sm btn-outline-secondary py-0" href="{{ recipe_href }}">Mix again</a>
                     {% endif %}
+                    {{ lifecycle_action(row) }}
                   </td>
                 </tr>
               {% endfor %}
@@ -125,7 +140,9 @@
                 <div class="text-secondary mt-1">Started: {{ row.created_at }}</div>
                 <div class="text-secondary mt-1">Completed: {{ row.completed_at or "—" }}</div>
                 <div class="mt-2">
-                  {% if row.mode == 'quick' %}
+                  {% if row.abandoned %}
+                    <span class="badge text-bg-secondary">Abandoned · {{ row.abandoned_at }}</span>
+                  {% elif row.mode == 'quick' %}
                     <span class="badge text-bg-secondary">Quick logged</span>
                   {% elif row.in_progress %}
                     <span class="badge text-bg-warning text-dark">Guided in progress · {{ row.open_steps }} left</span>
@@ -136,7 +153,7 @@
                 <div class="d-grid gap-2 mt-3">
                   <div class="btn-group">
                     <a class="btn btn-sm btn-outline-light" href="{{ recipe_href }}">Open recipe</a>
-                    {% if row.mode == 'guided' %}
+                    {% if row.mode == 'guided' and not row.abandoned %}
                       {% if row.in_progress %}
                         <a class="btn btn-sm btn-warning" href="{{ url_for('tvw_recipes.tvw_guided_mix_session', session_id=row.id) }}">Resume</a>
                       {% else %}
@@ -147,6 +164,7 @@
                       <a class="btn btn-sm btn-outline-secondary" href="{{ recipe_href }}">Mix again</a>
                     {% endif %}
                   </div>
+                  {{ lifecycle_action(row) }}
                 </div>
               </div>
             </div>
