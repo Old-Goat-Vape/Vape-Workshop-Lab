@@ -192,7 +192,7 @@ def apply(session_id,user_id,mode,fingerprint,new_ml=None,capacity_ml=None):
             raise RecoveryError('The recorded pours changed. Review a fresh recovery plan before applying it.')
         plan=_composition(_build_plan(items,original,mode,new_ml),row,meta)
         capacity=number(capacity_ml,'mixing vessel capacity')
-        required=plan['partial_ml'] if mode=='two_bottles' else plan['new_ml']
+        required=max(original,plan['partial_ml']) if mode=='two_bottles' else plan['new_ml']
         if capacity<required or (mode=='two_bottles' and capacity<original):
             raise RecoveryError(f'Confirm a vessel with at least {required:.2f} ml working capacity and room to mix.')
         previous=meta.get('batch_recovery') or {}

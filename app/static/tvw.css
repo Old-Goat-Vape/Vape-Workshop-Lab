@@ -1124,11 +1124,11 @@ body.tvw-bench-mode .tvw-ws-pour-equiv-note {
 }
 .tvw-ws-report-stats dt {
   margin: 0 0 .25rem;
-  font-size: .72rem;
+  font-size: clamp(.9rem, 1.2vw, 1rem);
   font-weight: 700;
   letter-spacing: .08em;
   text-transform: uppercase;
-  color: #666;
+  color: #b8b8b8;
 }
 .tvw-ws-report-stats dd {
   margin: 0;
@@ -1234,8 +1234,8 @@ body.tvw-bench-mode .tvw-ws-pour-equiv-note {
   letter-spacing: .12em;
 }
 .tvw-ws-complete p {
-  font-size: .85rem;
-  color: #555;
+  font-size: 1.125rem;
+  color: #c9c9c9;
   margin: 0 0 1rem;
 }
 .tvw-ws-complete-actions {

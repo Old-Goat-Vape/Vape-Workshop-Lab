@@ -55,7 +55,7 @@
     <article class="tvw-action-card tvw-action-card--resume tvw-action-card--slot-top">
       <div class="tvw-card-resume-layout">
         <div class="tvw-card-resume-head">
-          <span class="tvw-status-pill tvw-status-pill--active">In progress</span>
+          <span class="tvw-status-pill tvw-status-pill--active">{{ 'Recipe recovery' if active_guided_mix.recovery_active else 'In progress' }}</span>
           <h2 class="tvw-action-card-title tvw-action-card-title--compact">Resume your mix</h2>
         </div>
         <p class="tvw-resume-recipe-name">{{ active_guided_mix.recipe_name }}</p>

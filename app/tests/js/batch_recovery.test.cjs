@@ -13,7 +13,7 @@ class Node {
   setAttribute(){}
   remove(){nodes.delete(this.id);}
 }
-for(const id of ['focusCard','usedPanel','todoPanel','completionSummary','roleChip','focusStepBadge','batchReadout'])nodes.set(id,new Node());
+for(const id of ['focusCard','usedPanel','todoPanel','completionSummary','roleChip','focusStepBadge','batchReadout','progLabel','focusMeasured'])nodes.set(id,new Node());
 let click;
 const context={window:{},document:{getElementById:id=>nodes.get(id),createElement:()=>new Node(),addEventListener:(event,fn)=>{click=fn;}},fetch:null};
 vm.createContext(context);
@@ -46,6 +46,8 @@ const action=async(batchAction,mode)=>click({target:{closest:()=>({dataset:{batc
   };
   await action('apply');
   assert.match(box.innerHTML,/Prepare and label/);
+  assert.equal(nodes.get('progLabel').textContent,`Recovery 1/${tasks.length}`);
+  assert.equal(nodes.get('focusMeasured').textContent,'');
   for(let cursor=1;cursor<tasks.length;cursor++){
     api.render({id:42,batch_recovery:{...state,cursor}},refresh);
     const html=box.innerHTML;

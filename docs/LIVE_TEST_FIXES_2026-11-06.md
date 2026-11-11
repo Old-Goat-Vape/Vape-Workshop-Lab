@@ -172,3 +172,88 @@ No live completed mix or two-bottle acceptance is claimed: session #74 remains a
 setup until this correction is pulled and the server restarted. No real liquid or
 production batch was made. Pauly's blank completion/Done and saved dashboard state
 remain live acceptance items; do not silently mark them resolved from API tests.
+
+
+## Live acceptance after PR #4 deployment — 11 November 2026
+
+The user updated the server and requested comprehensive retesting. Existing secure
+Santa's Little Helper / Master sign-in remained valid. Used private QA recipe #114,
+version #116; all readings below were simulated, with no real liquid mixed.
+
+### Completed two-bottle rescue: session #74
+
+- Setup and tare advanced without a weight. Nicotine remained first. Blank actual
+  pour input was rejected. Nicotine 0.99 g against 0.93 g required no-tare pour-back;
+  acknowledgement cleared the residue field and showed unknown current/needed.
+- Residue 0.08 g left 0.85 g needed. Explicit zero saved as zero, needed 0.93 g,
+  and survived reload. A transient old message while a request was in flight was
+  initially observed; after save settled, values and reload were correct. Final
+  0.93 g completed nicotine and progress increased to 0.90 ml.
+- Biscuit 0.64 g against 0.62 g triggered the small-over PG trim. Vanilla Swirl
+  1.40 g against 0.93 g paused and offered two bottles/larger-vessel recovery.
+- Plan: original 30 ml, minimum 45.1 ml, two 30 ml bottles for 60 ml. Extra doses:
+  nicotine 0.93 g, Biscuit 0.60 g, Vanilla 0.46 g. Preview target 3 mg/ml, 30/70.
+  Undersized 3 ml working capacity was rejected without applying the plan.
+- A 0.40 g partial nicotine top-up persisted through reload, with 0.53 g remaining.
+  Completed nicotine and both flavour top-ups, cap/move prompts, thorough mixing,
+  and a 2.48 g liquid-only concentrate transfer into empty tared Bottle 2.
+- Finished Bottle 1 and Bottle 2 separately: each PG 6.84 g and VG 26.46 g, then
+  mix/check/label. Saved completion showed 59.99 ml, estimated 2.99 mg/ml, 30/70.
+  Original pours, all additions and transfer mass were visible in report details.
+- Completion and QA notes survived reload. My Mixes showed #74 completed at 60 ml.
+  Home no longer resumed #74; it offered older unfinished #73 instead. Recipe #114
+  remained private, version 1.0, 10 ml default, 2%/3% flavours and 3 mg/ml default.
+
+### Ordinary completion / Pauly reproduction: session #75
+
+- Started a 15 ml, zero-nicotine session. No nicotine step was generated. Entered
+  Biscuit zero deliberately: Nothing added yet appeared; Accept Underpour opened
+  confirmation, and Confirm Accept Underpour advanced rather than looping.
+- Vanilla 0.49 g against 0.47 g trimmed PG. PG preview included future VG and
+  correctly estimated 29/71 because Biscuit was deliberately omitted (not 100/0).
+  Entered displayed PG 3.86 g and VG 13.23 g. Progress reached 14.70/15 ml.
+- Batch checked and Done saved a populated report: 14.70 ml, zero target nicotine,
+  29/71. Added a QA simulation note explaining the deliberately missing flavour.
+  No blank completion screen or inert Done was reproduced on the updated workflow.
+
+### Stash, defaults and Quick Mix
+
+- Recipe stash check defaulted to its saved 10 ml and matched its explanatory text.
+  Selecting 15 ml updated both while retaining independent recipe mix defaults.
+- Added Coconut Candy DX through What Can I Make. Without manual reload, stock
+  count changed from two to three and Almond Joy moved to Missing 2 flavours;
+  Missing more changed from five to four. No transient reset to stale Add/results.
+- Quick Mix at 15 ml / zero nicotine produced 0.30 and 0.45 ml flavours, 3.75 ml
+  PG and 10.50 ml VG, 30/70 and no nicotine. A 150 mg/ml target against 100 mg/ml
+  base was rejected with Target nicotine cannot exceed the nicotine base strength.
+
+### Follow-up accuracy / display fixes discovered
+
+These are locally verified follow-ups, not yet deployed during the live checks:
+
+- Fresh pour input was still seeded with 0.00: now unknown/blank until entered;
+  deliberately recorded zero and saved residues remain zero. Zero-dose acknowledgements
+  no longer claim the ingredient is physically in the bottle.
+- #75's report omitted accepted zero Biscuit and displayed planned 5% as Total flavour.
+  New underpour acceptances are logged; older completed underpours are described from
+  actual records without inventing an acceptance event. Report separates recipe
+  percentage from estimated actual flavour and nicotine. An all-zero batch reports
+  zero volume and unknown composition, rather than the planned bottle volume.
+- Rounded PG target could display 3.86 g but be re-rounded from hidden precision to
+  3.87 g during validation, creating a false underpour. Server now honors its captured
+  display target, and bundles supply a consistent two-decimal target for legacy steps.
+- Active recovery now uses its actual task counts in Home/history and its accessible
+  progress label. Completed report lists each bottle's volume/nicotine estimate and
+  identifies historical PG trims/deviations as superseded by rebalancing.
+- Completion Dashboard now returns to community Home. Capacity errors report the
+  actual minimum accepted bottle capacity. Completion report text contrast/labels
+  were improved for readability.
+
+Validation: 55 focused Python tests passed, then seven completion/nicotine checks
+passed after the last wording/empty-volume refinement. Broader run: 208/209 pass;
+sole failure remains the previously reproduced community-route login expectation.
+Six JavaScript regression programs pass, including report composition, both bottle
+estimates, fresh blank inputs, explicit zero, delegated bench controls and stash
+refresh. Rendered completed-page scripts compile. No full-app, mobile, multi-account,
+production-job or network/VPN sign-off is claimed. Further physical overpour after
+splitting remains a paused separate-correction limitation.

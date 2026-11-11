@@ -323,3 +323,19 @@ class BatchRecoveryTests(unittest.TestCase):
         response=self.post(sid,'preview',{'mode':'two_bottles'})
         self.assertEqual(response.status_code,409,response.data)
         self.assertIn('complete flavour formula',response.get_json()['message'])
+
+    def test_resume_counts_use_recovery_tasks_and_report_contains_each_bottle(self):
+        sid,_=self.start_overpour()
+        _,state=self.apply_plan(sid)
+        self.advance(sid,state)
+        listing=self.client.get('/api/mix/guided/sessions').get_json()['items']
+        row=next(item for item in listing if item['id']==sid)
+        self.assertTrue(row['recovery_active'])
+        self.assertEqual(row['total_steps'],len(state['tasks']))
+        self.assertEqual(row['open_steps'],len(state['tasks'])-1)
+        state=self.client.get(f'/api/mix/guided/session/{sid}').get_json()['session']['batch_recovery']
+        result=self.finish(sid,state)['mix_summary']
+        self.assertTrue(result['adjustments_superseded_by_recovery'])
+        self.assertEqual([b['number'] for b in result['batch_recovery']['bottles']],[1,2])
+        for bottle in result['batch_recovery']['bottles']:
+            self.assertAlmostEqual(bottle['estimated_volume_ml'],30,delta=.05)

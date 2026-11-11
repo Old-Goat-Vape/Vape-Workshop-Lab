@@ -54,6 +54,8 @@
     const role=document.getElementById('roleChip');if(role)role.textContent=state.status==='blocked' ? 'Recovery paused' : 'Recipe recovery';
     const badge=document.getElementById('focusStepBadge');if(badge)badge.textContent=`${state.cursor+1} / ${state.tasks.length}`;
     const batch=document.getElementById('batchReadout');if(batch)batch.textContent=`${state.plan.new_ml} ml total`;
+    const progress=document.getElementById('progLabel');if(progress)progress.textContent=`Recovery ${state.cursor+1}/${state.tasks.length}`;
+    const measured=document.getElementById('focusMeasured');if(measured)measured.textContent='';
     const p=state.plan, task=state.tasks[state.cursor], box=panel();
     const intro=`<h2>Recipe recovery — ${p.new_ml} ml ${p.bottle_count===2 ? `in two ${p.bottle_ml} ml bottles` : 'in one vessel'}</h2><p>Step ${state.cursor+1} of ${state.tasks.length}. Saved automatically after each confirmation. You can leave and resume here.</p>`;
     if (state.status==='blocked') {
