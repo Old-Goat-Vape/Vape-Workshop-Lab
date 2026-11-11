@@ -1265,10 +1265,14 @@ body.tvw-bench-mode .tvw-ws-pour-equiv-note {
   font-size: .68rem;
   text-transform: uppercase;
   letter-spacing: .08em;
-  color: #444;
+  color: #d8d8d8;
   text-decoration: none;
+  border: 1px solid #777;
+  border-radius: .25rem;
+  background: #181818;
 }
-.tvw-ws-exit:hover { color: #666; }
+.tvw-ws-exit:hover, .tvw-ws-exit:focus-visible { color: #fff; border-color: #d4af37; background: #29251c; }
+.tvw-ws-exit:focus-visible, .tvw-ws-exit-primary:focus-visible { outline: 3px solid #d4af37; outline-offset: 3px; }
 
 .visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
 
