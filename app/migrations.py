@@ -658,6 +658,7 @@ def run_startup_migrations() -> dict:
         ("recipe_feedback", "moderation_reason", "TEXT"),
         ("recipe_status_updates", "recipe_version_id", "INTEGER"),
         ("mix_sessions", "completed_at", "DATETIME"),
+        ("mix_sessions", "abandoned_at", "DATETIME"),
         # community UGC moderation (TVW admin Phase 3)
         ("flavour_notes", "is_hidden", "INTEGER DEFAULT 0"),
         ("flavour_notes", "moderation_status", "TEXT DEFAULT 'active'"),
