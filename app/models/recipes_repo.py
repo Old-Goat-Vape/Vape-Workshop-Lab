@@ -581,13 +581,13 @@ def replace_recipe_tags(*, recipe_id: int, tags: Sequence[str]) -> None:
 
 
 def fetch_flavour_reference_options(*, limit: int = 500) -> List[Dict[str, Any]]:
-    from config.catalogue_identity import flavour_category_sql
+    from config.catalogue_identity import recipe_flavour_sql
     db = get_db()
     rows = db.execute(
         f"""
         SELECT id, brand, name, COALESCE(density, 1.036) AS density
-        FROM flavor_reference
-        WHERE active = 1 AND {flavour_category_sql('category')} AND COALESCE(is_nicotine,0)=0
+        FROM flavor_reference fr
+        WHERE active = 1 AND {recipe_flavour_sql('fr')} AND COALESCE(is_nicotine,0)=0
         ORDER BY brand COLLATE NOCASE ASC, name COLLATE NOCASE ASC
         LIMIT ?
         """,
@@ -609,7 +609,7 @@ def search_flavour_reference_for_builder(*, query: str, limit: int = 100) -> Lis
     like_prefix = f"{q_lower}%"
     like_contains = f"%{q_lower}%"
     lim = max(1, min(int(limit or 100), 250))
-    from config.catalogue_identity import flavour_category_sql
+    from config.catalogue_identity import recipe_flavour_sql
     db = get_db()
     rows = db.execute(
         f"""
@@ -633,7 +633,7 @@ def search_flavour_reference_for_builder(*, query: str, limit: int = 100) -> Lis
               ON fv.source_flavor_ref_id = fr.id
              AND COALESCE(fv.merged_into_flavour_id, 0) = 0
             WHERE COALESCE(fr.active, 1) = 1
-              AND {flavour_category_sql('fr.category')} AND COALESCE(fr.is_nicotine,0)=0
+              AND {recipe_flavour_sql('fr')} AND COALESCE(fr.is_nicotine,0)=0
               AND (
                 lower(COALESCE(fr.name, '')) LIKE ?
                 OR lower(COALESCE(fr.brand, '')) LIKE ?
@@ -699,17 +699,19 @@ def search_flavour_reference_for_builder(*, query: str, limit: int = 100) -> Lis
     return out
 
 
-def fetch_flavour_reference_map(reference_ids: Sequence[int]) -> Dict[int, Dict[str, Any]]:
+def fetch_flavour_reference_map(reference_ids: Sequence[int], *, recipe_eligible_only: bool = False) -> Dict[int, Dict[str, Any]]:
     ids = [int(x) for x in reference_ids if int(x or 0) > 0]
     if not ids:
         return {}
     db = get_db()
+    from config.catalogue_identity import recipe_flavour_sql
+    eligibility = f" AND {recipe_flavour_sql('fr')} AND COALESCE(fr.is_nicotine,0)=0" if recipe_eligible_only else ''
     ph = ",".join("?" * len(ids))
     rows = db.execute(
         f"""
         SELECT id, brand, name, COALESCE(density, 1.036) AS density
-        FROM flavor_reference
-        WHERE id IN ({ph}) AND active = 1
+        FROM flavor_reference fr
+        WHERE id IN ({ph}) AND active = 1 {eligibility}
         """,
         tuple(ids),
     ).fetchall()

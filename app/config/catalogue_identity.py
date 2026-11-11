@@ -89,6 +89,11 @@ def find_reference(db, *, brand, name, category="Flavor"):
 
 
 def register_catalogue_functions(db):
+    from config.catalogue_product_policy import recipe_product_allowed
+
+    db.create_function(
+        "tvw_recipe_product_allowed", 3, recipe_product_allowed, deterministic=True
+    )
     db.create_function(
         "tvw_catalogue_key",
         3,
@@ -106,11 +111,15 @@ def flavour_category_sql(column):
     return f"LOWER(TRIM(COALESCE(NULLIF({column},''),'Flavor'))) IN ('flavor','flavour','flavors','flavours','concentrate','concentrates','additive')"
 
 
+def recipe_flavour_sql(alias, name_column="name"):
+    return f"({flavour_category_sql(alias+'.category')} AND tvw_recipe_product_allowed({alias}.brand,{alias}.{name_column},{alias}.category)=1)"
+
+
 def visible_flavour_sql(alias="f"):
     return (
         f"COALESCE({alias}.merged_into_flavour_id,0)=0 AND COALESCE({alias}.is_hidden,0)=0 "
         f"AND COALESCE({alias}.is_invalid,0)=0 AND LOWER(COALESCE({alias}.moderation_status,'active'))='active' "
-        f"AND {flavour_category_sql(alias+'.category')} "
+        f"AND {recipe_flavour_sql(alias,'canonical_name')} "
         f"AND NOT EXISTS (SELECT 1 FROM flavor_reference cr WHERE cr.id={alias}.source_flavor_ref_id "
-        f"AND (NOT ({flavour_category_sql('cr.category')}) OR COALESCE(cr.is_nicotine,0)=1 OR COALESCE(cr.active,1)=0))"
+        f"AND (NOT ({recipe_flavour_sql('cr')}) OR COALESCE(cr.is_nicotine,0)=1 OR COALESCE(cr.active,1)=0))"
     )
