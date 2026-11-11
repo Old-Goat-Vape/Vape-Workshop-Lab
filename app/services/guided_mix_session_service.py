@@ -748,6 +748,11 @@ def _format_accepted_deviation_row(entry: dict[str, Any]) -> dict[str, Any] | No
             "ingredient": ingredient,
             "label": f"{ingredient} accepted over target",
         }
+    if event == "accepted_flavour_under":
+        measured=float(entry.get("measured_grams",0))
+        target=float(entry.get("target_grams",0))
+        return {"kind":"flavour_under", "ingredient":ingredient,
+                "label":f"{ingredient}: accepted {measured:.2f} g against {target:.2f} g target"}
     if event == "accepted_carrier_under":
         name_upper = ingredient.upper()
         if "VG" in name_upper or "GLYCERIN" in name_upper or name_upper == "VG":
@@ -957,6 +962,9 @@ def _build_guided_mix_summary(
         nicotine_carrier=nic_carrier,
     )
     poured_ml = 0.0
+    flavour_ml = 0.0
+    nicotine_ml = 0.0
+    recorded_pours = 0
     rows = db.execute(
         """
         SELECT payload_json FROM mix_session_steps
@@ -977,6 +985,22 @@ def _build_guided_mix_summary(
         except (TypeError, ValueError):
             ml = 0.0
         poured_ml += ml
+        recorded_pours += 1
+        kind = _ingredient_kind(payload)
+        if kind == "nicotine":
+            nicotine_ml += ml
+        elif kind not in {"pg", "vg"}:
+            flavour_ml += ml
+            # Older completed sessions did not log accepted flavour underpours.
+            # Describe the recorded fact without inventing a missing acceptance event.
+            measured = payload.get("measured_grams")
+            target = payload.get("display_target_grams", payload.get("target_grams", payload.get("grams",0)))
+            name = _short_ingredient_label(str(payload.get("name") or ""))
+            if measured is not None and not payload.get("superseded_by_recovery") and not payload.get("recovery_topup"):
+                classification,_ = _classify_under_pour(display_target=float(target),measured=float(measured))
+                if classification != "within_tolerance" and not any(d.get("kind")=="flavour_under" and d.get("ingredient")==name for d in accepted_deviations):
+                    accepted_deviations.append({"kind":"flavour_under","ingredient":name,
+                        "label":f"{name}: recorded {float(measured):.2f} g against {float(target):.2f} g target"})
     flavour_over_count = sum(1 for d in accepted_deviations if d.get("kind") == "flavour_over")
     has_adjustments = bool(pg_adjustments or accepted_deviations or nicotine_events or meta.get("batch_recovery"))
     user_notes, user_notes_updated_at = _user_notes_from_meta(meta)
@@ -1021,13 +1045,16 @@ def _build_guided_mix_summary(
         "batch_size_ml": batch_size_ml,
         "target_nic_mg_ml": round(target_nic, 4),
         "total_flavor_percent": total_flavour_pct,
+        "estimated_final_flavor_percent": round(100*flavour_ml/poured_ml,3) if poured_ml>0 else None,
+        "estimated_final_nicotine_mg_ml": round(nicotine_ml*float(meta.get("nic_base_mg_ml") or 100)/poured_ml,3) if poured_ml>0 else None,
+        "adjustments_superseded_by_recovery": (meta.get("batch_recovery") or {}).get("status")=="complete",
         "target_pg_percent": pg_pct,
         "target_vg_percent": vg_pct,
         "target_ratio_label": f"{int(round(pg_pct))}/{int(round(vg_pct))}",
-        "estimated_final_volume_ml": round(poured_ml if poured_ml > 0 else batch_size_ml, 2),
+        "estimated_final_volume_ml": round(poured_ml if recorded_pours else batch_size_ml, 2),
         "estimated_final_pg_percent": est_pg,
         "estimated_final_vg_percent": est_vg,
-        "estimated_final_ratio_label": f"{int(est_pg)}/{int(est_vg)}",
+        "estimated_final_ratio_label": f"{int(est_pg)}/{int(est_vg)}" if poured_ml>0 or not recorded_pours else "Unknown — no liquid recorded",
         "ratio_achievable": ratio_achievable,
         "ratio_warning": ratio_warning or None,
         "standalone_pg_ml": planned.get("standalone_pg_ml"),
@@ -1040,7 +1067,7 @@ def _build_guided_mix_summary(
         ),
         "ratio_shift_explanation": ratio_shift_explanation,
         "pg_adjustments_heading": (
-            "PG adjusted after accepted flavour overpours" if pg_adjustments else None
+            ("Earlier PG trim — superseded by recipe rescue" if (meta.get("batch_recovery") or {}).get("status")=="complete" else "PG adjusted after accepted flavour overpours") if pg_adjustments else None
         ),
         "pg_adjustments": pg_adjustments,
         "accepted_deviations": accepted_deviations,
@@ -2068,6 +2095,11 @@ def list_user_mix_sessions(
             if rj_raw:
                 rj = json.loads(rj_raw) if isinstance(rj_raw, str) else (rj_raw or {})
                 notes, notes_updated = _user_notes_from_meta(rj if isinstance(rj, dict) else {})
+                recovery = rj.get("batch_recovery") if isinstance(rj,dict) else None
+                if recovery and recovery.get("status") in {"active","blocked"}:
+                    d["total_steps"]=len(recovery.get("tasks") or [])
+                    d["open_steps"]=max(0,d["total_steps"]-int(recovery.get("cursor",0)))
+                    d["recovery_active"]=True
         except (json.JSONDecodeError, TypeError):
             notes, notes_updated = "", None
         d["user_notes"] = notes
@@ -2132,6 +2164,11 @@ def list_user_guided_sessions(*, user_id: int, limit: int = 30) -> list[dict[str
             if rj_raw:
                 rj = json.loads(rj_raw) if isinstance(rj_raw, str) else (rj_raw or {})
                 notes, notes_updated = _user_notes_from_meta(rj if isinstance(rj, dict) else {})
+                recovery = rj.get("batch_recovery") if isinstance(rj,dict) else None
+                if recovery and recovery.get("status") in {"active","blocked"}:
+                    d["total_steps"]=len(recovery.get("tasks") or [])
+                    d["open_steps"]=max(0,d["total_steps"]-int(recovery.get("cursor",0)))
+                    d["recovery_active"]=True
         except (json.JSONDecodeError, TypeError):
             notes, notes_updated = "", None
         d["user_notes"] = notes
@@ -2230,6 +2267,8 @@ def _build_guided_session_bundle_inner(
             d["payload"] = json.loads(raw_pl) if isinstance(raw_pl, str) else (raw_pl or {})
         except json.JSONDecodeError:
             d["payload"] = {}
+        if d["payload"].get("step_type")=="add_ingredient" and d["payload"].get("display_target_grams") is None:
+            d["payload"]["display_target_grams"]=_display_target_grams(d["payload"].get("target_grams",d["payload"].get("grams",0)))
         if for_client:
             d.pop("payload_json", None)
         if d.get("completed_at") is None:
@@ -2778,7 +2817,7 @@ def complete_guided_step_with_policy(
             direction="over",
         )
         measured = float(measured_grams or 0.0)
-        display_target = _display_target_grams(target)
+        display_target = _display_target_grams((step_payload or {}).get("display_target_grams") if (step_payload or {}).get("display_target_grams") is not None else target)
         display_measured = round(measured, 2)
         # Bench notes use the same 0.01 g rounding the mixer sees on the card / scale LCD.
         under_by = display_target - display_measured
@@ -3185,6 +3224,8 @@ def complete_guided_step_with_policy(
                 batch_size_ml=batch_size_ml,
                 policy=policy,
             )
+            if accept_under and classification != "within_tolerance":
+                under_msg = f"Underpour accepted\nRecorded {measured:.2f} g against {display_target:.2f} g target. This batch uses less of this ingredient than planned."
             reading_eval["classification"] = classification
             reading_eval["remaining_grams"] = float(max(0.0, under_by))
             reading_eval["needed_grams"] = float(max(0.0, under_by))
@@ -3225,6 +3266,14 @@ def complete_guided_step_with_policy(
                         note=under_msg,
                         note_kind="carrier_guidance",
                     )
+
+            if accept_under and classification != "within_tolerance" and ingredient_kind not in {"pg","vg","nicotine"}:
+                _append_mix_event_log(db,int(session_id),{
+                    "event":"accepted_flavour_under","ingredient":str((step_payload or {}).get("name") or "Flavour"),
+                    "step_no":int(step_no),"target_grams":float(display_target),"measured_grams":float(measured),
+                    "under_by_grams":float(under_by)})
+                if step_payload is not None:
+                    step_payload["accepted_under_target"]=True
 
             # Persist reading but do not complete until mixer accepts (or pours to target/over).
             if (

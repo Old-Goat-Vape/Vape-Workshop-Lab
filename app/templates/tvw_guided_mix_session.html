@@ -216,7 +216,7 @@
 
       <a class="tvw-ws-exit" href="{{ url_for('tvw_recipes.tvw_recipe_detail', slug=rslug) }}?version_id={{ bundle.recipe_version_id }}">BACK TO RECIPE</a>
 
-      <a class="tvw-ws-exit" href="{{ url_for('dashboard_index') }}">DASHBOARD</a>
+      <a class="tvw-ws-exit" href="{{ url_for('tvw_community.community_home') }}">DASHBOARD</a>
 
     </div>
 
@@ -1394,6 +1394,7 @@
 
       const upcoming = nextName ? ` Next up: ${nextName}.` : "";
 
+      if (p.measured_grams != null && Number(p.measured_grams) === 0) return `✓ Zero dose recorded for ${shortName || "Ingredient"}.${move}${upcoming}`;
       return `✓ Nice. ${shortName || "Ingredient"} is in.${move}${upcoming}`;
 
     }
@@ -1786,8 +1787,8 @@
       nicotineRecoveryUi
       && stepNo != null
       && Number(nicotineRecoveryUi.stepNo) === Number(stepNo)
-      && nicotineRecoveryUi.mode !== "pour_back"
     ) {
+      if (nicotineRecoveryUi.mode === "pour_back") return null;
       if (nicotineRecoveryUi.measured == null) return null;
       const m = Number(nicotineRecoveryUi.measured);
       if (Number.isFinite(m) && m >= 0) return m;
@@ -1803,18 +1804,18 @@
 
     if (p.nicotine_recovery_mode) {
       const m = Number(p.recovery_current_scale_grams ?? p.measured_grams);
-      return Number.isFinite(m) ? m : 0;
+      return Number.isFinite(m) ? m : null;
     }
 
     if (p.under_decision_pending) {
 
       const m = Number(p.measured_grams);
 
-      return Number.isFinite(m) ? m : 0;
+      return Number.isFinite(m) ? m : null;
 
     }
 
-    return 0;
+    return null;
 
   };
 
@@ -1981,13 +1982,15 @@
     const targetNic = Number(summary.target_nic_mg_ml != null ? summary.target_nic_mg_ml : (sess.target_nic || sessionMeta.targetNic || 0));
 
     const flavourPct = summary.total_flavor_percent != null ? Number(summary.total_flavor_percent).toFixed(1) : null;
+    const actualFlavourPct = summary.estimated_final_flavor_percent != null ? Number(summary.estimated_final_flavor_percent).toFixed(2) : null;
+    const actualNic = summary.estimated_final_nicotine_mg_ml != null ? Number(summary.estimated_final_nicotine_mg_ml).toFixed(2) : null;
 
     const status = escHtml(summary.completion_status || "Complete");
 
     const parts = [];
     const rescue = summary.batch_recovery;
     if (rescue && rescue.status === "complete") {
-      parts.push(`<section class="tvw-ws-report-card"><h3>Recipe rescued</h3><p>Originally ${Number(rescue.original_ml)} ml → ${Number(rescue.plan.new_ml)} ml in ${Number(rescue.plan.bottle_count)} bottle(s).</p><p>Estimated from recorded pours: ${Number(rescue.estimated_volume_ml).toFixed(2)} ml · ${Number(rescue.estimated_nicotine_mg_ml).toFixed(2)} mg/ml · ${escHtml(rescue.estimated_ratio)} PG/VG.</p><p>Original pours, top-ups and the measured split are retained in this batch record. The saved recipe is unchanged.</p><details><summary>View original pours and recovery top-ups</summary><h4>Before recovery</h4><ul>${(rescue.original_pours || []).map(p => `<li>${escHtml(p.brand || '')} ${escHtml(p.name)}: ${Number(p.actual_grams).toFixed(2)} g recorded; original target ${Number(p.target_grams).toFixed(2)} g.</li>`).join('')}</ul><h4>Recovery additions</h4><ul>${(rescue.topups || []).map(p => `<li>${p.bottle ? 'Bottle ' + Number(p.bottle) : 'Before split / larger vessel'}: ${escHtml(p.brand || '')} ${escHtml(p.name)} — ${Number(p.actual_grams).toFixed(2)} g added (additional target ${Number(p.target_grams).toFixed(2)} g).</li>`).join('')}</ul>${rescue.split_weight_grams != null ? `<p>Mixed liquid transferred to Bottle 2: ${Number(rescue.split_weight_grams).toFixed(2)} g.</p>` : ''}</details></section>`);
+      parts.push(`<section class="tvw-ws-report-card"><h3>Recipe rescued</h3><p>Originally ${Number(rescue.original_ml)} ml → ${Number(rescue.plan.new_ml)} ml in ${Number(rescue.plan.bottle_count)} bottle(s).</p><p>Estimated from recorded pours: ${Number(rescue.estimated_volume_ml).toFixed(2)} ml · ${Number(rescue.estimated_nicotine_mg_ml).toFixed(2)} mg/ml · ${escHtml(rescue.estimated_ratio)} PG/VG.</p><p>Original pours, top-ups and the measured split are retained in this batch record. The saved recipe is unchanged.</p>${(rescue.bottles || []).length ? `<ul aria-label="Recovered bottles">${rescue.bottles.map(b => `<li>Bottle ${Number(b.number)}: estimated ${Number(b.estimated_volume_ml).toFixed(2)} ml · ${Number(b.estimated_nicotine_mg_ml).toFixed(2)} mg/ml.</li>`).join('')}</ul>` : ''}<details><summary>View original pours and recovery top-ups</summary><h4>Before recovery</h4><ul>${(rescue.original_pours || []).map(p => `<li>${escHtml(p.brand || '')} ${escHtml(p.name)}: ${Number(p.actual_grams).toFixed(2)} g recorded; original target ${Number(p.target_grams).toFixed(2)} g.</li>`).join('')}</ul><h4>Recovery additions</h4><ul>${(rescue.topups || []).map(p => `<li>${p.bottle ? 'Bottle ' + Number(p.bottle) : 'Before split / larger vessel'}: ${escHtml(p.brand || '')} ${escHtml(p.name)} — ${Number(p.actual_grams).toFixed(2)} g added (additional target ${Number(p.target_grams).toFixed(2)} g).</li>`).join('')}</ul>${rescue.split_weight_grams != null ? `<p>Mixed liquid transferred to Bottle 2: ${Number(rescue.split_weight_grams).toFixed(2)} g.</p>` : ''}</details></section>`);
     }
 
 
@@ -2009,11 +2012,13 @@
 
           <div><dt>Target nicotine</dt><dd>${targetNic.toFixed(1)} mg/ml</dd></div>
 
+          ${actualNic != null ? `<div><dt>Estimated final nicotine</dt><dd>${actualNic} mg/ml</dd></div>` : ""}
           <div><dt>Target PG/VG</dt><dd>${targetRatio}</dd></div>
 
           <div><dt>Estimated final PG/VG</dt><dd>${estRatio}</dd></div>
 
-          ${flavourPct != null ? `<div><dt>Total flavour</dt><dd>${flavourPct}%</dd></div>` : ""}
+          ${flavourPct != null ? `<div><dt>Recipe flavour</dt><dd>${flavourPct}%</dd></div>` : ""}
+          ${actualFlavourPct != null ? `<div><dt>Estimated final flavour</dt><dd>${actualFlavourPct}%</dd></div>` : ""}
 
           <div><dt>Final volume</dt><dd>${estVol} ml</dd></div>
 
@@ -2065,7 +2070,7 @@
 
         <section class="tvw-ws-report-section" aria-label="Accepted deviations">
 
-          <h3 class="tvw-ws-report-section-title">Accepted deviations</h3>
+          <h3 class="tvw-ws-report-section-title">${summary.adjustments_superseded_by_recovery ? 'Earlier deviations — rebalanced' : 'Accepted deviations'}</h3>
 
           <ul class="tvw-ws-report-list">${lines}</ul>
 

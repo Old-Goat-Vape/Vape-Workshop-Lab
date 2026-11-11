@@ -535,3 +535,17 @@ an absent measurement field. A blank pour is unknown, never automatically zero;
 zero is an explicit reading. The UI must say that users type the physical scale's
 gram reading. Regression checks must exercise the delegated click handler, not
 only the scale parser in isolation.
+
+
+### Completion accuracy and recovery progress
+
+A fresh scale field is unknown/blank, not a fabricated 0.00 reading. Preserve an
+explicit zero across saves/reloads, and log a deliberately accepted zero flavour.
+Validate the same two-decimal target shown to the operator; never re-round hidden
+precision to a different target. Final reports distinguish recipe flavour percentage
+from estimated actual flavour/nicotine, and use actual zero volume when nothing was
+recorded. For older underpours lacking acceptance events, describe recorded weights
+without inventing consent. Preserve historical deviations after recipe rescue, but
+label them rebalanced/superseded. Show each recovered bottle's estimated volume and
+strength. Active recovery counts come from recovery tasks, including Home resume;
+completed personal mixes return to community Home rather than the Lab dashboard.
