@@ -876,6 +876,7 @@ def _run_single_scraper(name: str, *, actor_id: int, run_type: str, run_key: str
                 resume = False
             res = run_vc_dtl_scraper(
                 db,
+                actor_id=actor_id,
                 mode=mode,
                 source_user_id=source_user_id,
                 resume=resume,
