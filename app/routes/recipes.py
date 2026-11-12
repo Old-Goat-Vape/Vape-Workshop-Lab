@@ -72,7 +72,7 @@ def cost_calculator():
 def cost_calculator_calculate():
     user = recipe_service.user_context_from_session(dict(session))
     if not user.show_cost:
-        return jsonify({"status": "error", "message": "Recipe costing is restricted to the Old Goat account."}), 403
+        return jsonify({"status": "error", "message": "Recipe costing is restricted to the Old Goat account or Old Goat role."}), 403
 
     from services.recipe_cost_calculator_service import BatchCostInputs, build_batch_cost_for_recipe
 
@@ -122,7 +122,7 @@ def cost_calculator_calculate():
 def _require_old_goat_costing():
     user = recipe_service.user_context_from_session(dict(session))
     if not user.show_cost:
-        return None, (jsonify({"status": "error", "message": "Recipe costing is restricted to the Old Goat account."}), 403)
+        return None, (jsonify({"status": "error", "message": "Recipe costing is restricted to the Old Goat account or Old Goat role."}), 403)
     return user, None
 
 

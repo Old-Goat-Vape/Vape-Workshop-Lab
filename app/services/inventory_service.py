@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, List, Tuple
 from db import get_db
 from models import inventory_repo
 from services import flavor_recipe_analytics_service as recipe_analytics
-from utils.auth import ROLE_HIERARCHY
+from utils.auth import ROLE_HIERARCHY, can_access_private_costs
 
 # Flask-only helpers used by rank_required
 from flask import flash, redirect, session, url_for
@@ -496,6 +496,7 @@ def update_item_from_form(
     *,
     actor_id: int | None,
     actor_username: str | None,
+    actor_role: str | None = None,
     item_id: int,
     name: str,
     brand: str,
@@ -512,7 +513,7 @@ def update_item_from_form(
         inventory_repo.update_reference_fields(reference_id=ref_id, name=name, brand=brand, category=category)
         inventory_repo.update_library_item_fields(item_id=int(item_id), current_stock=float(stock), unit=unit)
 
-        if (actor_username or "").lower() == "old goat":
+        if can_access_private_costs(actor_username, actor_role):
             if cost_per_g:
                 inventory_repo.update_library_item_cost_per_g(item_id=int(item_id), cost_per_g=float(cost_per_g))
 

@@ -28,6 +28,7 @@ from utils.guided_mix_perf import (
 from utils.auth import (
     can_access_tvw_admin,
     is_old_goat_role,
+    can_access_private_costs,
     login_required,
     tvw_enforce_account_before_request,
 )
@@ -514,7 +515,7 @@ def _render_recipe_detail(
     is_owner = bool(uid is not None and int(recipe.get("created_by") or 0) == int(uid))
     can_cost_recipe = bool(
         current_app.config.get("TVW_ENABLE_LAB_MODULES")
-        and str(session.get("username") or "").strip().lower() == "old goat"
+        and can_access_private_costs(session.get("username"), session.get("role"))
     )
     cost_calculator_url = None
     if can_cost_recipe:

@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, session, jsonify, redirect, url_for, flash
 
-from utils.auth import login_required, ROLE_HIERARCHY
+from utils.auth import login_required, ROLE_HIERARCHY, can_access_private_costs
 from services.inventory_service import (
     effective_user_level,
     rank_required,
@@ -31,7 +31,7 @@ def index():
 
     user_name = session.get("username", "")
     user_level = effective_user_level(username=user_name, role=session.get("role"))
-    is_old_goat = (user_name or "").lower() == "old goat"
+    is_old_goat = can_access_private_costs(user_name, session.get("role"))
 
     if current_cat == 'Nicotine' and user_level < 3:
         flash("Unauthorized category access.", "warning")
@@ -125,6 +125,7 @@ def edit_item(item_id):
         body, status = update_item_from_form(
             actor_id=session.get("user_id"),
             actor_username=session.get("username"),
+            actor_role=session.get("role"),
             item_id=item_id,
             name=request.form.get("name"),
             brand=request.form.get("brand"),
@@ -139,7 +140,7 @@ def edit_item(item_id):
         flash(body.get("message", "Error"), "danger")
 
     item = get_edit_item_view(item_id=item_id)
-    return render_template("library_edit.html", item=item, is_old_goat=(user_name == 'old goat'))
+    return render_template("library_edit.html", item=item, is_old_goat=can_access_private_costs(user_name, session.get("role")))
 
 @library_bp.route("/library/merge", methods=["POST"])
 @login_required
