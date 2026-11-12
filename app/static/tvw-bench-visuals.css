@@ -37,3 +37,8 @@ body.tvw-bench-mode .tvw-ws-kicker,body.tvw-bench-mode .tvw-ws-version,body.tvw-
 @media(max-width:1099px){body.tvw-bench-mode .tvw-ws-bench-layout{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:'center center' 'used todo';gap:10px;padding:10px}.bench-bottle-tray{grid-template-columns:repeat(auto-fit,minmax(90px,1fr))}}
 @media(max-width:480px){body.tvw-bench-mode .tvw-ws-bench-layout .tvw-ws-used,body.tvw-bench-mode .tvw-ws-bench-layout .tvw-ws-todo{padding:12px}.bench-bottle-tray{grid-template-columns:1fr}.bench-rack-title{font-size:1.1rem}.bench-scene{gap:20px}}
 @media(prefers-reduced-motion:reduce){.bench-liquid{transition:none}}
+
+/* Live bench QA: keep helper text readable on the brighter work surface. */
+body.tvw-bench-mode .tvw-workstation :is(.tvw-ws-center-batch,.tvw-ws-face-role,.tvw-ws-face-brand,.tvw-ws-face-phase,.tvw-ws-face-why,.tvw-ws-pct,.tvw-ws-next,.tvw-ws-next strong){color:#d1d8e0}
+body.tvw-bench-mode .tvw-workstation .tvw-ws-goat-inline:not(.is-warn){color:#d1d8e0}
+body.tvw-bench-mode .tvw-workstation .tvw-ws-lcd-label{color:#b9dbea}
