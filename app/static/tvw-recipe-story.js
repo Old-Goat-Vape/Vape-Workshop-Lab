@@ -3,7 +3,7 @@
   if (!form) return;
   const cfg = window.TVW_RECIPE_BUILDER;
   const byId = id => document.getElementById(id);
-  const photo = byId('storyPreviewImage'), originalPhoto = photo.getAttribute('src') || '';
+  const photo = byId('storyPreviewImage'), originalPhoto = photo.dataset.uploaded === 'true' ? photo.getAttribute('src') : '';
   let photoUrl = null, dirty = false, submitting = false, pending = null, timer;
   const update = () => {
     byId('storyPreviewName').textContent = byId('recipeName').value.trim() || 'Your recipe name';
@@ -11,8 +11,18 @@
     byId('storyPreviewProfiles').textContent = Array.from(form.querySelectorAll('[name="profiles"]:checked')).map(x=>x.value).join(' · ');
     const days = byId('steepDays').value;
     byId('storyPreviewSteep').textContent = days === '' ? 'Steep time: Not set' : Number(days) === 0 ? 'Shake & vape' : `Recommended steep: ${days} days`;
-    photo.hidden = !photoUrl && (!originalPhoto || byId('removeImage')?.checked);
-    if (!photoUrl && originalPhoto && !byId('removeImage')?.checked) photo.src = originalPhoto;
+    const selected = Array.from(form.querySelectorAll('[name="profiles"]:checked')).map(x=>x.value);
+    const main = byId('mainProfile');
+    for (const option of main.options) option.disabled = !!option.value && !selected.includes(option.value);
+    if (main.value && !selected.includes(main.value)) main.value = '';
+    const tagArt = byId('recipeTags').value.split(',').map(t=>cfg.artworkOptions?.[t.trim().toLowerCase()]).find(Boolean);
+    const art = cfg.artworkOptions?.[main.value || selected[0]] || tagArt || cfg.defaultArtwork;
+    const uploaded = !!photoUrl || (!!originalPhoto && !byId('removeImage')?.checked);
+    photo.hidden = false;
+    const nextPhoto = photoUrl || (uploaded ? originalPhoto : art.url);
+    if (photo.getAttribute('src') !== nextPhoto) photo.src = nextPhoto;
+    photo.alt = uploaded ? 'Your recipe photo preview' : art.label;
+    byId('storyArtworkCaption').textContent = uploaded ? 'Your recipe photo' : `Using ${art.label} · Upload your own photo`;
   };
   byId('recipeImage').addEventListener('change', e => {
     if (photoUrl) URL.revokeObjectURL(photoUrl);
@@ -30,7 +40,7 @@
     byId('steepDays').value = value; byId('steepDays').dispatchEvent(new Event('input',{bubbles:true}));
   });
   const status = byId('draftStatus'), recovery = byId('draftRecovery');
-  const names = ['name','short_description','description','private_notes','steep_days','tags','notes','status','visibility'];
+  const names = ['name','short_description','description','private_notes','steep_days','tags','notes','status','visibility','main_profile'];
   const calcIds = ['calcTargetMl','calcTargetNic','calcPgRatio','calcVgRatio','calcNicBase','calcNicCarrier'];
   try { const saved = JSON.parse(localStorage.getItem(cfg.draftKey)); if (saved?.schema === 1 && Array.isArray(saved.rows)) pending = saved; }
   catch (_) { status.textContent = 'Browser draft storage is unavailable. Keep this page open until you save.'; }

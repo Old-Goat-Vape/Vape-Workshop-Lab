@@ -1,4 +1,5 @@
 {% extends "base_public.html" %}
+{% from "partials/tvw_recipe_picture.html" import recipe_picture %}
 {% block title %}Recipe Library | The Vape Workshop Calculator{% endblock %}
 {% block body_class %}tvw-recipe-library-route{% endblock %}
 {% block content %}
@@ -223,7 +224,7 @@
           </div>
         </div>
 
-        {% if recipe.has_recipe_image %}<img src="{{ url_for('tvw_recipes.tvw_recipe_image',version_id=recipe.current_version_id) }}" width="1200" height="675" loading="lazy" alt="{{ recipe.name }} recipe photo" style="width:100%;height:160px;object-fit:cover;border-radius:10px;margin:.5rem 0;">{% endif %}
+        {{ recipe_picture(recipe.recipe_profiles_json,recipe.tags_csv,recipe.has_recipe_image,recipe.current_version_id,recipe.name) }}
         {% if recipe.short_description %}<p style="color:var(--tvw-text-secondary);overflow-wrap:anywhere;">{{ recipe.short_description }}</p>{% endif %}
         <p class="tvw-lib-card-meta">
           {% if recipe.library_category %}

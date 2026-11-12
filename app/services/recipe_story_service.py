@@ -23,9 +23,10 @@ CREATE TABLE IF NOT EXISTS recipe_private_notebooks (
 def read(version_id):
     row = get_db().execute('SELECT short_description,description,profiles_json,steep_days,image_data IS NOT NULL AS has_image FROM recipe_stories WHERE version_id=?', (version_id,)).fetchone()
     if not row:
-        return dict(short_description='', description='', profiles=[], steep_days=None, has_image=False)
+        return dict(short_description='', description='', profiles=[], main_profile='', steep_days=None, has_image=False)
     result = dict(row)
     result['profiles'] = json.loads(result.pop('profiles_json'))
+    result['main_profile'] = result['profiles'][0] if result['profiles'] else ''
     return result
 
 
@@ -35,7 +36,7 @@ def private_notes(recipe_id, user_id):
 
 
 def parse(form):
-    values = {k: (form.get(k) or '').strip() for k in ('short_description','description','private_notes','steep_days')}
+    values = {k: (form.get(k) or '').strip() for k in ('short_description','description','private_notes','steep_days','main_profile')}
     values['profiles'] = form.getlist('profiles')
     errors = {}
     for key, limit in [('short_description',180),('description',10000),('private_notes',10000)]:
@@ -43,6 +44,11 @@ def parse(form):
             errors[key] = f'{key.replace("_", " ").capitalize()} must be {limit} characters or fewer.'
     if len(values['profiles']) > len(PROFILES) or any(p not in PROFILES for p in values['profiles']):
         errors['profiles'] = 'Choose flavour profiles from the available options.'
+    main = values['main_profile']
+    if main and main not in values['profiles']:
+        errors['main_profile'] = 'Choose a main profile from the profiles selected for this recipe.'
+    elif main:
+        values['profiles'] = [main] + [p for p in values['profiles'] if p != main]
     raw = values['steep_days']
     if raw and (len(raw) > 3 or not raw.isascii() or not raw.isdigit() or not 0 <= int(raw) <= 365):
         errors['steep_days'] = 'Steep time must be a whole number from 0 to 365 days, or blank for Not set.'

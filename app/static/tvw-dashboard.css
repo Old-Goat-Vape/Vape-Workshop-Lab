@@ -1421,3 +1421,10 @@ body[data-bs-theme="dark"] {
 @media (min-width: 992px) and (max-width: 1399px) { .tvw-header-inner { gap: .6rem; } .tvw-nav-link { padding-inline: .75rem; } .tvw-header-actions { gap: .6rem; } .tvw-header-search input[type="search"] { min-width: 8rem; width: 11rem; } }
 @media (max-width: 1099px) { .tvw-bench-grid { grid-template-columns: 1fr; } .tvw-bench-side { display: grid; grid-template-columns: minmax(0,1.5fr) minmax(0,1fr); } .tvw-create-shortcut { align-self: stretch; } .tvw-workshop-shortcuts { grid-template-columns: repeat(2,minmax(0,1fr)); } .tvw-flavour-inspiration { grid-template-columns: 1fr; } .tvw-flavour-inspiration img { height: 180px; min-height: 0; } }
 @media (max-width: 639px) { .tvw-bench-hero { grid-template-columns: 1fr; } .tvw-bench-hero .tvw-dashboard-photo { order: -1; height: 190px; min-height: 0; object-position: center 62%; } .tvw-bench-copy { padding: 1.4rem; } .tvw-bench-copy h2 br { display: none; } .tvw-bench-side, .tvw-inspiration-grid { display: grid; grid-template-columns: 1fr; } .tvw-workshop-shortcuts { gap: .65rem; margin-bottom: 1.5rem; } .tvw-workshop-shortcuts a { padding: 1rem .8rem; } .tvw-tool-number, .tvw-workshop-shortcuts a > span:last-child { display: none; } .tvw-bench-actions { align-items: stretch; } .tvw-bench-text-link { font-size: 1rem; } .tvw-inspiration-grid { gap: 1rem; } }
+
+/* Shared recipe artwork: every recipe has a complete, attributed visual. */
+.tvw-recipe-art { position:relative; margin:0 0 1rem; overflow:hidden; border-radius:12px; background:#1b242c; border:1px solid #ffffff18; }
+.tvw-recipe-art img { display:block; width:100%; height:auto; aspect-ratio:16/9; object-fit:cover; }
+.tvw-recipe-art figcaption { position:absolute; bottom:0; left:0; right:0; padding:.7rem .8rem .5rem; background:linear-gradient(transparent,#0d131beF); color:#f0e7d7; font:500 .8rem/1.4 var(--font-body,system-ui); text-align:right; }
+.tvw-recipe-art--detail img { max-height:420px; }
+.tvw-artwork-caption { color:#d4c8b4; font-size:.85rem; line-height:1.4; margin-top:.5rem; }

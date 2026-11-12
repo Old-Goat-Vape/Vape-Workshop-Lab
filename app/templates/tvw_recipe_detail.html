@@ -1,4 +1,5 @@
 {% extends "base_public.html" %}
+{% from "partials/tvw_recipe_picture.html" import recipe_picture %}
 {% block title %}{{ recipe.name }} | The Vape Workshop Calculator{% endblock %}
 
 {% block content %}
@@ -58,7 +59,7 @@
 
   {% if recipe_story %}
   <section class="tvw-rd-panel mb-3" aria-label="Recipe story">
-    {% if recipe_story.has_image %}<img src="{{ url_for('tvw_recipes.tvw_recipe_image',version_id=active_version.id) }}" width="1200" height="675" alt="{{ recipe.name }} recipe photo" style="width:100%;max-height:420px;object-fit:cover;border-radius:14px;margin-bottom:1rem;">{% endif %}
+    {{ recipe_picture(recipe_story.profiles,tags,recipe_story.has_image,active_version.id,recipe.name,'detail') }}
     {% if recipe_story.short_description %}<p class="lead">{{ recipe_story.short_description }}</p>{% endif %}
     {% for profile in recipe_story.profiles %}<span class="badge text-bg-secondary me-1">{{ profile }}</span>{% endfor %}
     <p class="mt-2 mb-0"><strong>Recommended steep:</strong> {% if recipe_story.steep_days is none %}Not set{% elif recipe_story.steep_days == 0 %}Shake &amp; vape{% else %}{{ recipe_story.steep_days }} days{% endif %}</p>

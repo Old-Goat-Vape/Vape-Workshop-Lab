@@ -1,3 +1,4 @@
+{% from "partials/tvw_recipe_picture.html" import recipe_picture %}
 {# Community dashboard discovery — featured recipe + tabbed collection #}
 {% from "partials/tvw_dashboard_illustrations.html" import discovery_featured_motif %}
 
@@ -13,7 +14,7 @@
 
 {% macro discover_recipe_card(recipe) -%}
   <article class="tvw-discover-card">
-    {% if recipe.has_recipe_image %}<img src="{{ url_for('tvw_recipes.tvw_recipe_image',version_id=recipe.current_version_id) }}" width="1200" height="675" loading="lazy" alt="{{ recipe.name }} recipe photo" style="width:100%;height:140px;object-fit:cover;border-radius:10px;">{% endif %}
+    {{ recipe_picture(recipe.recipe_profiles_json,recipe.tags_csv,recipe.has_recipe_image,recipe.current_version_id,recipe.name) }}
     <div class="tvw-discover-card-main">
       <h3 class="tvw-discover-card-title">
         <a href="{{ recipe.detail_href }}" class="tvw-discover-card-title-link">{{ recipe.name }}</a>
@@ -66,7 +67,7 @@
           </a>
         </h3>
         <p class="tvw-discover-featured-author">by {{ discovery_featured.owner_username }}</p>
-        {% if discovery_featured.has_recipe_image %}<img src="{{ url_for('tvw_recipes.tvw_recipe_image',version_id=discovery_featured.current_version_id) }}" width="1200" height="675" loading="lazy" alt="{{ discovery_featured.name }} recipe photo" style="width:100%;height:180px;object-fit:cover;border-radius:10px;">{% endif %}
+        {{ recipe_picture(discovery_featured.recipe_profiles_json,discovery_featured.tags_csv,discovery_featured.has_recipe_image,discovery_featured.current_version_id,discovery_featured.name,'featured') }}
         {% if discovery_featured.short_description %}<p class="tvw-discover-featured-desc">{{ discovery_featured.short_description }}</p>
         {% elif discovery_featured.version_notes %}
           <p class="tvw-discover-featured-desc">{{ discovery_featured.version_notes }}</p>

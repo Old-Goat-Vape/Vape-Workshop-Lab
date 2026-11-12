@@ -1,0 +1,7 @@
+{% macro recipe_picture(profiles=none,tags=none,has_image=false,version_id=none,name='',kind='card') -%}
+{% set art = recipe_artwork(profiles,tags,has_image,version_id) %}
+<figure class="tvw-recipe-art tvw-recipe-art--{{ kind }}">
+  <img src="{{ art.url }}" width="960" height="540" loading="lazy" alt="{{ art.label if art.automatic else name ~ ' recipe photo' }}">
+  {% if art.automatic %}<figcaption>{{ art.label }}</figcaption>{% endif %}
+</figure>
+{%- endmacro %}

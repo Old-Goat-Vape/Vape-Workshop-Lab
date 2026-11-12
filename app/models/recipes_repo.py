@@ -1110,9 +1110,9 @@ def _tvw_library_select_sql(*, viewer_user_id: int | None) -> tuple[str, list[An
         lead.append(int(viewer_user_id))
     else:
         fav_expr = "0 AS is_favorited"
-    story_select = "'' AS short_description, 0 AS has_recipe_image,"
+    story_select = "'' AS short_description, 0 AS has_recipe_image, '[]' AS recipe_profiles_json,"
     if _table_has_column('recipe_stories', 'short_description'):
-        story_select = "(SELECT short_description FROM recipe_stories WHERE version_id=rv.id) AS short_description, (SELECT image_data IS NOT NULL FROM recipe_stories WHERE version_id=rv.id) AS has_recipe_image,"
+        story_select = "(SELECT short_description FROM recipe_stories WHERE version_id=rv.id) AS short_description, (SELECT image_data IS NOT NULL FROM recipe_stories WHERE version_id=rv.id) AS has_recipe_image, (SELECT profiles_json FROM recipe_stories WHERE version_id=rv.id) AS recipe_profiles_json,"
     sql = f"""
     SELECT {story_select} r.id,
            r.name,

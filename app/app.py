@@ -255,6 +255,10 @@ def run_maintenance_tasks(args) -> int:
 # -----------------------------
 # GLOBAL CONTEXT PROCESSOR
 # -----------------------------
+from services.recipe_artwork_service import recipe_artwork
+app.jinja_env.globals['recipe_artwork'] = recipe_artwork
+
+
 @app.context_processor
 def inject_global_data():
     """
