@@ -84,6 +84,24 @@ class TestScraperRunStateReporting(unittest.TestCase):
         self.db.commit()
         return int(cur.lastrowid)
 
+    def test_vc_profile_alias_is_visible_in_source_health(self):
+        run_id = self._insert_run("vc_dtl_user_2078", "success", completed=datetime.now())
+        health = self.svc.scraper_health_report()["sources"]["vc_dtl"]
+        self.assertEqual(health["latest_run"]["run_id"], run_id)
+        self.assertEqual(health["last_success"]["run_id"], run_id)
+
+    def test_legacy_vc_trigger_queues_background_work(self):
+        from flask import Flask
+        from services import vc_import_job_service as jobs
+        with Flask(__name__).app_context(), mock.patch.object(jobs, "start_job", return_value={"id":123}) as start, mock.patch.object(jobs, "start_worker"), mock.patch.object(self.svc, "run_vc_dtl_scraper") as inline:
+            result, status = self.svc.trigger_scraper("vc_dtl_user_2078", actor_id=6)
+        self.assertEqual(status, 200)
+        self.assertEqual(result["job"]["id"],123)
+        start.assert_called_once_with(self.db,actor_id=6,source_user_id="2078")
+        inline.assert_not_called()
+        row=self.db.execute("SELECT scraper_name FROM scraper_runs WHERE id=?",(result["run_id"],)).fetchone()
+        self.assertEqual(row["scraper_name"],"vc_dtl")
+
     def test_success_after_failure_keeps_failure_historical(self):
         fail_id = self._insert_run(
             "blck",

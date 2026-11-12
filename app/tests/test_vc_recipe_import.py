@@ -99,7 +99,7 @@ class VCPrivateImportTests(unittest.TestCase):
         response=Mock(status_code=200,text=DETAIL,url='https://vceliquidrecipes.com/recipe/44389')
         client=Mock();client.get.return_value=response
         with fixtures.flask_app.app_context(),patch.object(vc.requests,'Session',return_value=client),patch.object(vc.time,'sleep'):
-            result=vc.run_vc_dtl_scraper(get_db(),mode='vc_targeted_ids',target_ids=['44389'],actor_id=1)
+            result=vc.run_vc_dtl_scraper(get_db(),mode='vc_targeted_ids',target_ids=['44389'],actor_id=1,maintenance=False)
             self.assertEqual(result.get('imported_to_recipe_library'),1,result)
             row=get_db().execute("SELECT * FROM recipes WHERE recipe_code='VCREF-44389'").fetchone()
             self.assertEqual(row['visibility'],'private')

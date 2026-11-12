@@ -209,6 +209,8 @@ def init_on_start():
                     is_reloader_parent = app.debug and os.environ.get("WERKZEUG_RUN_MAIN") != "true"
                     if not is_reloader_parent:
                         sched = master_admin_svc.start_scheduler(app, tick_seconds=900, run_on_start=False)
+                        from services.vc_import_job_service import start_worker
+                        start_worker(app)
                         print(
                             "🧭 Scheduler state: "
                             f"enabled={sched.get('monthly_job_enabled')} "

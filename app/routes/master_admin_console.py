@@ -6,7 +6,7 @@ import csv
 from datetime import datetime, timedelta
 from typing import Any, Dict
 
-from flask import Blueprint, Response, jsonify, redirect, render_template, request, session, url_for
+from flask import current_app, Blueprint, Response, jsonify, redirect, render_template, request, session, url_for
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
@@ -881,12 +881,52 @@ def reset_user_password():
         return jsonify({"status": "error", "message": str(exc)}), 400
 
 
+@master_admin_bp.route("/master-admin/vc-import/<int:job_id>/report")
+@login_required
+@role_required("Old Goat", "Master")
+def vc_import_report(job_id):
+    from db import get_db
+    from services import vc_import_job_service as jobs
+    db = get_db()
+    jobs.ensure_schema(db)
+    job = jobs.snapshot(db, job_id)
+    if not job:
+        return jsonify(status="error", message="Import not found"), 404
+    items = [dict(row) for row in db.execute("SELECT recipe_id,status,attempts,error FROM vc_import_job_items WHERE job_id=? ORDER BY recipe_id", (job_id,))]
+    return Response(json.dumps({"job": job, "recipes": items}, indent=2), mimetype="application/json",
+                    headers={"Content-Disposition": f'attachment; filename="vc-import-{job_id}.json"'})
+
+
+@master_admin_bp.route("/master-admin/vc-import", methods=["GET", "POST"])
+@login_required
+@role_required("Old Goat", "Master")
+def vc_import_job():
+    from db import get_db
+    from services import vc_import_job_service as jobs
+    db = get_db()
+    jobs.ensure_schema(db)
+    if request.method == "GET":
+        return jsonify(status="success", job=jobs.snapshot(db, request.args.get("job_id", type=int)))
+    body = request.get_json(silent=True) or {}
+    try:
+        action = body.get("action", "start")
+        if action == "start":
+            job = jobs.start_job(db, actor_id=int(session["user_id"]), source_user_id=str(body.get("source_user_id") or ""))
+        else:
+            job = jobs.control_job(db, int(body.get("job_id") or 0), action)
+        jobs.start_worker(current_app._get_current_object())
+        current_app.logger.warning("VC import job %s: %s requested by user %s", job["id"], action, session["user_id"])
+        return jsonify(status="success", job=job), 202
+    except ValueError as exc:
+        return jsonify(status="error", message=str(exc)), 400
+
+
 @master_admin_bp.route("/master-admin/scrapers/trigger/<string:scraper_name>", methods=["POST"])
 @login_required
 @role_required("Old Goat", "Master")
 def trigger_scraper(scraper_name: str):
     body, status = svc.trigger_scraper(scraper_name, actor_id=int(session.get("user_id") or 0))
-    print(
+    current_app.logger.warning(
         f"[scraper-response] name={scraper_name} status={body.get('status')} "
         f"fatal_stage={body.get('fatal_stage')} stop_reason={body.get('stop_reason')} "
         f"errors={len(body.get('errors') or [])}"

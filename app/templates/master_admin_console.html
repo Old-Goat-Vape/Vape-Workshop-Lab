@@ -91,41 +91,30 @@
         <div class="mb-3">
           <div class="d-grid gap-2">
             <button class="btn btn-success fw-semibold btn-lg" onclick="runAllScrapers()">Run All Scrapers</button>
-            <button class="btn btn-outline-primary fw-semibold" onclick="triggerScraper('vc_dtl_public_resume')">Resume Recovery Jobs</button>
+            <button class="btn btn-outline-primary fw-semibold" onclick="vcJobAction('start')">Import all VC recipes privately</button>
             <button class="btn btn-outline-info fw-semibold" onclick="checkSchedulerHealth()">Check Scheduler Health</button>
           </div>
         </div>
 
         <div class="accordion" id="scraperOpsAccordion">
-          <div class="accordion-item bg-dark text-light border-secondary">
-            <h2 class="accordion-header" id="headingVcImports">
-              <button class="accordion-button collapsed bg-dark text-light" type="button" data-bs-toggle="collapse" data-bs-target="#collapseVcImports" aria-expanded="false" aria-controls="collapseVcImports">
-                VC Imports
-              </button>
-            </h2>
-            <div id="collapseVcImports" class="accordion-collapse collapse" aria-labelledby="headingVcImports" data-bs-parent="#scraperOpsAccordion">
-              <div class="accordion-body">
-                <div class="d-grid gap-2 mb-3">
-                  <button class="btn btn-outline-primary fw-semibold" onclick="triggerScraper('vc_dtl_public_all')">Run VC Public Backfill</button>
-                  <button class="btn btn-outline-primary fw-semibold" onclick="triggerScraper('vc_dtl_public_resume')">Resume VC Public Backfill</button>
-                </div>
-                <div class="border rounded p-2 border-secondary-subtle">
-                  <div class="small text-secondary mb-2">VC User Imports</div>
-                  <div class="d-flex flex-wrap gap-2 align-items-center">
-                    <select id="vcUserSelect" class="form-select form-select-sm bg-black border-secondary" style="max-width:170px;">
-                      <option value="2078">User 2078</option>
-                      <option value="11">User 11</option>
-                      <option value="385">User 385</option>
-                    </select>
-                    <button class="btn btn-sm btn-outline-primary" onclick="runSelectedVcUser('run')">Run</button>
-                    <button class="btn btn-sm btn-outline-info" onclick="runSelectedVcUser('resume')">Resume</button>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="runSelectedVcUser('reset')">Reset Cursor</button>
-                  </div>
-                </div>
-              </div>
+          <div class="border border-secondary rounded p-3 my-3" id="vcJobPanel">
+            <h3 class="h5">VC Recipe Import</h3>
+            <p>Import every publicly accessible recipe listed on VC into the private reference library. Closing this page does not stop the import. Existing complete recipes are reused.</p>
+            <div class="d-flex flex-wrap gap-2 mb-3">
+              <button class="btn btn-primary" onclick="vcJobAction('start')">Import all VC recipes</button>
+              <label class="align-self-center" for="vcJobUser">Or a VC user ID:</label>
+              <input id="vcJobUser" type="text" inputmode="numeric" value="2078" class="form-control" style="max-width:120px;">
+              <button class="btn btn-outline-primary" onclick="vcJobAction('start', true)">Import user's recipes</button>
             </div>
+            <div class="d-flex flex-wrap gap-2 mb-2">
+              <button class="btn btn-outline-warning" id="vcJobPause" onclick="vcJobAction('pause')" disabled>Pause</button>
+              <button class="btn btn-outline-success" id="vcJobResume" onclick="vcJobAction('resume')" disabled>Resume</button>
+              <button class="btn btn-outline-info" id="vcJobRetry" onclick="vcJobAction('retry_failed')" disabled>Retry failed recipes</button>
+              <a id="vcJobReport" class="btn btn-outline-light d-none">Download report</a>
+            </div>
+            <pre id="vcJobStatus" class="text-light mb-0" style="white-space:pre-wrap;font:inherit;" aria-live="polite">Loading import progress…</pre>
+            <p id="vcJobError" class="text-danger mb-0" role="alert"></p>
           </div>
-
           <div class="accordion-item bg-dark text-light border-secondary">
             <h2 class="accordion-header" id="headingIdentityRepair">
               <button class="accordion-button collapsed bg-dark text-light" type="button" data-bs-toggle="collapse" data-bs-target="#collapseIdentityRepair" aria-expanded="false" aria-controls="collapseIdentityRepair">
@@ -164,12 +153,8 @@
                 <button class="btn btn-outline-warning fw-semibold" onclick="triggerScraper('clyrolinx')">Run Clyrolinx</button>
                 <button class="btn btn-outline-info fw-semibold" onclick="triggerScraper('vc_flavours')">Run VC Flavours</button>
                 <button class="btn btn-outline-primary fw-semibold" onclick="triggerScraper('vc_dtl')">Import VC recipes privately</button>
-                <p class="small text-secondary">Each run imports one source page into the private reference library. Resume continues saved progress. Author/source links are retained. POD, adapted and single-flavour recipes can be saved even when excluded from DTL benchmarks.</p>
+                <p class="small text-secondary">The background import continues through every listing page. Pause and resume using the progress panel above. Author/source links are retained. POD, adapted and single-flavour recipes can be saved even when excluded from DTL benchmarks.</p>
                 <hr class="my-2">
-                <button class="btn btn-outline-secondary fw-semibold" onclick="triggerScraper('vc_dtl_public_reset')">Reset VC Public Cursor</button>
-                <button class="btn btn-outline-secondary fw-semibold" onclick="triggerScraper('vc_dtl_user_reset_2078')">Reset VC User 2078 Cursor</button>
-                <button class="btn btn-outline-secondary fw-semibold" onclick="triggerScraper('vc_dtl_user_reset_11')">Reset VC User 11 Cursor</button>
-                <button class="btn btn-outline-secondary fw-semibold" onclick="triggerScraper('vc_dtl_user_reset_385')">Reset VC User 385 Cursor</button>
                 <div class="small text-warning">Maintenance tools: use only when recovery workflows are blocked.</div>
               </div>
             </div>
@@ -742,6 +727,64 @@ function renderScraperDiagnostics(name, data) {
   return html;
 }
 
+async function scraperResponse(res) {
+  if (res.redirected && /login/.test(res.url)) throw new Error('Your session expired. Sign in again.');
+  const raw = await res.text();
+  let data;
+  try { data = JSON.parse(raw); }
+  catch (_) { throw new Error(`Server returned HTTP ${res.status} instead of a JSON response. The request may still be running; check import progress before retrying.`); }
+  if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+  return data;
+}
+let vcCurrentJob = null;
+function renderVcJob(job) {
+  vcCurrentJob = job;
+  const status = document.getElementById('vcJobStatus');
+  if (!status) return;
+  if (!job) { status.textContent = 'No background import yet. Choose all recipes or a user above.'; return; }
+  const active = ['queued', 'running'].includes(job.status);
+  document.getElementById('vcJobPause').disabled = !active;
+  document.getElementById('vcJobResume').disabled = job.status !== 'paused';
+  document.getElementById('vcJobRetry').disabled = active || !job.failed;
+  const report = document.getElementById('vcJobReport');
+  report.classList.remove('d-none');
+  report.href = `/master-admin/vc-import/${job.id}/report`;
+  const lines = [
+    `Import #${job.id}: ${job.status.replaceAll('_', ' ')}`,
+    job.source_user_id ? `Source: VC user ${job.source_user_id}` : 'Source: all publicly listed VC recipes',
+    `Pages read: ${job.pages_read}${job.total_pages ? ` of ${job.total_pages}` : ''}. ${job.discovery_done ? 'Reached the end of the listing.' : (job.total_items != null ? `VC currently lists ${job.total_items} recipes.` : 'More pages will be checked; total is not known yet.')}`,
+    `Recipes discovered: ${job.discovered} · Available in library: ${job.imported} · Waiting: ${job.pending} · Failed: ${job.failed}`,
+    'Pausing finishes the current recipe or page first. Server restarts resume automatically (recovery may take up to 10 minutes).'
+  ];
+  if (job.last_error) lines.push(`Attention: ${job.last_error}`);
+  for (const item of job.failures || []) lines.push(`Recipe ${item.recipe_id}: ${item.error}`);
+  status.textContent = lines.join('\n');
+}
+async function refreshVcJob() {
+  if (!document.getElementById('vcJobPanel')) return;
+  try {
+    const data = await scraperResponse(await fetch('/master-admin/vc-import' + (vcCurrentJob ? `?job_id=${vcCurrentJob.id}` : '')));
+    renderVcJob(data.job);
+    document.getElementById('vcJobError').textContent = '';
+  } catch (e) { document.getElementById('vcJobError').textContent = `Progress unavailable: ${e.message}`; }
+  setTimeout(refreshVcJob, 5000);
+}
+async function vcJobAction(action, userOnly = false) {
+  try {
+    const body = {action, job_id: vcCurrentJob?.id};
+    if (action === 'start' && userOnly) {
+      body.source_user_id = document.getElementById('vcJobUser').value.trim();
+      if (!/^\d+$/.test(body.source_user_id)) throw new Error('Enter a numeric VC user ID.');
+    }
+    const data = await scraperResponse(await fetch('/master-admin/vc-import', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+    }));
+    renderVcJob(data.job);
+    document.getElementById('vcJobError').textContent = '';
+  } catch(e) { document.getElementById('vcJobError').textContent = e.message; }
+}
+refreshVcJob();
+
 async function triggerScraper(name) {
   const box = document.getElementById('scraperResult');
   if (!box) return;
@@ -749,7 +792,7 @@ async function triggerScraper(name) {
   box.textContent = `Running ${name}...`;
   try {
     const res = await fetch(`/master-admin/scrapers/trigger/${name}`, { method: 'POST' });
-    const data = await res.json();
+    const data = await scraperResponse(res);
     if (!res.ok || data.status !== 'success') {
       box.className = 'mt-3 small text-danger';
       box.innerHTML = renderScraperDiagnostics(name, data);
@@ -757,11 +800,10 @@ async function triggerScraper(name) {
     }
     box.className = 'mt-3 small text-success';
     box.innerHTML = renderScraperDiagnostics(name, data);
-    // Refresh health panel so Latest Runs / Health match this run_id.
-    setTimeout(() => location.reload(), 800);
+    if (data.job) { renderVcJob(data.job); }
   } catch (e) {
     box.className = 'mt-3 small text-danger';
-    box.textContent = 'Request failed';
+    box.textContent = `Request failed: ${e.message || e}. Check the server log for details.`;
   }
 }
 
