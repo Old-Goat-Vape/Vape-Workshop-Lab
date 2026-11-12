@@ -1263,9 +1263,29 @@ def _repair_private_vc_library_metadata(db, actor_id=None):
     """,(actor_id,))
 
 
+def _source_has_empty_formula(html):
+    soup = BeautifulSoup(html, 'html.parser')
+    table = soup.select_one('#recipe-flavour-table')
+    if table is None:
+        return False
+    text = table.get_text(' ', strip=True).lower()
+    return bool(re.search(r'\bno flavou?rs\b', text)) and not table.select('a[href]')
+
+
+def _source_access_restricted(soup):
+    # Access notices are not prose describing restricted-direct-lung devices.
+    for node in soup.select('h1, h2, [role="alert"], .alert'):
+        text = node.get_text(' ', strip=True).lower()
+        if re.match(r'^(?:this )?recipe is private\b', text) or text in {'private recipe', 'access denied', 'members only'}:
+            return True
+        if re.search(r'you (?:must|need to) (?:log|sign) in to (?:view|access) (?:this|the) recipe', text):
+            return True
+    return False
+
+
 def _parse_recipe_page(url: str, html: str) -> dict[str, Any] | None:
     soup = BeautifulSoup(html, "html.parser")
-    if soup.select_one("#recipe-flavour-table") is None:
+    if soup.select_one("#recipe-flavour-table") is None or _source_has_empty_formula(html):
         return None
     title = ""
     if soup.select_one("h1"):
@@ -1302,12 +1322,12 @@ def _parse_recipe_page(url: str, html: str) -> dict[str, Any] | None:
 
     lowered = visible_text.lower()
     is_adapted = detect_has_any_token([title, lowered], ["adapted", "adaptation", "clone of"])
-    is_public = not detect_has_any_token([lowered], ["private recipe", "members only", "restricted"])
+    is_public = not _source_access_restricted(soup)
 
     flavor_rows: list[dict[str, Any]] = []
     excluded_summary_row_count = 0
     excluded_rows_sample: list[str] = []
-    for tr in (soup.select("#recipe-flavour-table tr.flavour-name") or soup.select("table tr")):
+    for tr in (soup.select("#recipe-flavour-table tr.flavour-name") or soup.select("#recipe-flavour-table tr")):
         row_txt = tr.get_text(" ", strip=True)
         if "%" not in row_txt:
             continue
@@ -1317,7 +1337,7 @@ def _parse_recipe_page(url: str, html: str) -> dict[str, Any] | None:
                 excluded_rows_sample.append(row_txt[:180])
             continue
         pct = _extract_positive_pct(row_txt)
-        if pct is None:
+        if pct is None or pct <= 0:
             continue
         cells = [c.get_text(" ", strip=True) for c in tr.select("td,th")]
         candidate = cells[0].strip() if cells else ""
@@ -1342,29 +1362,6 @@ def _parse_recipe_page(url: str, html: str) -> dict[str, Any] | None:
                 "percentage": pct,
             }
         )
-
-    if not flavor_rows:
-        # light fallback from bullet-like lines
-        for line in visible_text.split("  "):
-            if "%" not in line:
-                continue
-            if _is_summary_or_meta_row(line):
-                excluded_summary_row_count += 1
-                if len(excluded_rows_sample) < 8:
-                    excluded_rows_sample.append(line[:180])
-                continue
-            pct = _extract_positive_pct(line)
-            if pct is None:
-                continue
-            n = re.sub(r"\b\d+(?:\.\d+)?\s*%\b", "", line).strip(" -:")
-            if len(n) < 2:
-                continue
-            if _is_summary_or_meta_row(n):
-                excluded_summary_row_count += 1
-                if len(excluded_rows_sample) < 8:
-                    excluded_rows_sample.append(n[:180])
-                continue
-            flavor_rows.append({"brand_raw": "", "flavour_name_raw": n, "percentage": pct})
 
     if not flavor_rows:
         return None
@@ -2343,6 +2340,7 @@ def _run_vc_dtl_scraper_impl(
     db_rollback_count = 0
     persistence_trace_sample: list[dict[str, Any]] = []
     successful_recipe_ids: list[str] = []
+    empty_formula_ids: list[str] = []
     import_sum_check_sample: list[dict[str, Any]] = []
     post_store_verification_sample: list[dict[str, Any]] = []
     imported_flavour_rows = 0
@@ -2498,6 +2496,11 @@ def _run_vc_dtl_scraper_impl(
                         trace_ref["last_step"] = "HTTP_ERROR"
                 continue
 
+            if _source_has_empty_formula(body):
+                empty_formula_ids.append(rid)
+                if trace_ref is not None:
+                    trace_ref.update(reason='source_has_no_formula', last_step='NOT_A_FORMULA')
+                continue
             parser_entered = True
             if trace_ref is not None:
                 trace_ref["parser_entered"] = True
@@ -2967,6 +2970,7 @@ def _run_vc_dtl_scraper_impl(
         "queued_after_completed_filter": queued_after_completed_filter,
         "unique_recipe_ids": unique_ids,
         "stored_recipes": stored,
+        "empty_formula_ids": empty_formula_ids,
         "stored_flavour_rows": stored_flavour_rows,
         "imported_flavour_rows": imported_flavour_rows,
         "exact_matched_rows": exact_matched_rows,

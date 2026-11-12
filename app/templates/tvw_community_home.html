@@ -8,7 +8,7 @@
   <header class="tvw-dashboard-welcome">
     <p class="tvw-dashboard-kicker">The mixing bench</p>
     <h1 class="tvw-dashboard-title">Welcome back, {{ user.username if user else 'mixer' }}</h1>
-    <p class="tvw-dashboard-lead">What would you like to do?</p>
+    <p class="tvw-dashboard-lead">Your recipes. Your flavours. Your next great mix.</p>
   </header>
 
   <div class="tvw-action-grid">
@@ -40,7 +40,7 @@
           </div>
         </div>
         <div class="tvw-card-mix-art">
-          {{ mix_bench_illustration() }}
+          <img class="tvw-dashboard-photo" src="{{ url_for('static', filename='img/dashboard/mixing-bench.webp') }}" width="1536" height="1024" alt="A precision scale, mixing bottle, concentrates and recipe notebook on a workbench" fetchpriority="high">
         </div>
       </div>
     </article>

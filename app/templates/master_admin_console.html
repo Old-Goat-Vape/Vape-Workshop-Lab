@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Master Admin Console - Old Goat Lab{% endblock %}
+{% block title %}Lab tools - Old Goat Lab{% endblock %}
 
 {% block content %}
 {% set summary = summary if summary is defined else {'total_users': 0, 'active_users': 0, 'recent_scraper_runs': 0, 'low_stock_items': 0} %}
@@ -10,8 +10,8 @@
       {% with logo_href = url_for('master_admin.console'), show_wordmark = false %}{% include "partials/og_brand.html" %}{% endwith %}
     </div>
     <div>
-      <h1 class="h3 mb-1">Master Admin Console</h1>
-      <div class="text-secondary small">Scrapers, flavor intelligence, users, audit, shopping — use tabs below.</div>
+      <h1 class="h3 mb-1">Lab tools</h1>
+      <div class="text-secondary small">Recipes, shop prices, people and stock. Choose a section below.</div>
     </div>
   </div>
 
@@ -35,19 +35,19 @@
 
 <ul class="nav nav-tabs mb-3">
   <li class="nav-item">
-    <a class="nav-link {% if tab == 'scrapers' %}active{% endif %}" href="{{ url_for('master_admin.console', tab='scrapers') }}">Scrapers</a>
+    <a class="nav-link {% if tab == 'scrapers' %}active{% endif %}" href="{{ url_for('master_admin.console', tab='scrapers') }}">Imports &amp; prices</a>
   </li>
   <li class="nav-item">
-    <a class="nav-link {% if tab == 'flavor_intel' %}active{% endif %}" href="{{ url_for('master_admin.console', tab='flavor_intel') }}">Flavor Intelligence</a>
+    <a class="nav-link {% if tab == 'flavor_intel' %}active{% endif %}" href="{{ url_for('master_admin.console', tab='flavor_intel') }}">Recipe data</a>
   </li>
   <li class="nav-item">
-    <a class="nav-link {% if tab == 'users' %}active{% endif %}" href="{{ url_for('master_admin.console', tab='users') }}">Users</a>
+    <a class="nav-link {% if tab == 'users' %}active{% endif %}" href="{{ url_for('master_admin.console', tab='users') }}">People</a>
   </li>
   <li class="nav-item">
-    <a class="nav-link {% if tab == 'audit' %}active{% endif %}" href="{{ url_for('master_admin.console', tab='audit') }}">Audit Logs</a>
+    <a class="nav-link {% if tab == 'audit' %}active{% endif %}" href="{{ url_for('master_admin.console', tab='audit') }}">Activity</a>
   </li>
   <li class="nav-item">
-    <a class="nav-link {% if tab == 'shopping' %}active{% endif %}" href="{{ url_for('master_admin.console', tab='shopping') }}">Shopping List</a>
+    <a class="nav-link {% if tab == 'shopping' %}active{% endif %}" href="{{ url_for('master_admin.console', tab='shopping') }}">Restock</a>
   </li>
 </ul>
 
@@ -59,11 +59,12 @@
       <div class="card-body">
         <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2">
           <div>
-            <h2 class="h5 mb-1">Scheduler Status</h2>
-            <div class="text-secondary small">Monthly automation health and diagnostics.</div>
+            <h2 class="h5 mb-1">Automatic monthly updates</h2>
+            <div class="text-secondary small">Shop prices and recipe imports can run automatically each month.</div>
           </div>
           <button class="btn btn-outline-info btn-sm" onclick="checkSchedulerHealth()">Check Scheduler Health</button>
         </div>
+        <details class="mt-2"><summary>Schedule details and diagnostics</summary>
         <div class="row g-2 mt-1 small">
           <div class="col-12 col-md-4">enabled: <strong>{{ 'yes' if sched.get('monthly_job_enabled') else 'no' }}</strong></div>
           <div class="col-12 col-md-4">job registered: <strong>{{ 'yes' if sched.get('monthly_job_registered') else 'no' }}</strong></div>
@@ -78,6 +79,7 @@
         <div class="mt-2">
           <button class="btn btn-outline-light btn-sm" onclick="previewMonthlyPlan()">Preview Monthly Scraper Plan</button>
         </div>
+        </details>
         <div id="schedulerHealthResult" class="small mt-2 text-secondary"></div>
       </div>
     </div>
@@ -85,17 +87,17 @@
   <div class="col-12 col-lg-7">
     <div class="card border-0" style="background:#151515; border:1px solid #333 !important;">
       <div class="card-body">
-        <h2 class="h5 mb-1">Scraper Operations</h2>
-        <div class="text-secondary small mb-3">Primary actions first. Advanced workflows are grouped below.</div>
+        <h2 class="h5 mb-1">Import recipes and update prices</h2>
+        <div class="text-secondary small mb-3">Start here for everyday updates. Repair tools are tucked away below.</div>
 
-        <div class="mb-3">
-          <div class="d-grid gap-2">
-            <button class="btn btn-success fw-semibold btn-lg" onclick="runAllScrapers()">Run All Scrapers</button>
-            <button class="btn btn-outline-primary fw-semibold" onclick="vcJobAction('start')">Import all VC recipes privately</button>
-            <button class="btn btn-outline-info fw-semibold" onclick="checkSchedulerHealth()">Check Scheduler Health</button>
+        <section class="border border-secondary rounded p-3 my-3" aria-labelledby="shopPricesHeading">
+          <h3 class="h5" id="shopPricesHeading">Update shop prices</h3>
+          <p class="text-secondary">Refresh concentrate prices used for recipe costing. These updates can take a few minutes.</p>
+          <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-outline-warning" onclick="triggerScraper('blck')">Update BLCK prices</button>
+            <button class="btn btn-outline-warning" onclick="triggerScraper('clyrolinx')">Update Clyrolinx prices</button>
           </div>
-        </div>
-
+        </section>
         <div class="accordion" id="scraperOpsAccordion">
           <div class="border border-secondary rounded p-3 my-3" id="vcJobPanel">
             <h3 class="h5">VC Recipe Import</h3>
@@ -118,23 +120,21 @@
           <div class="accordion-item bg-dark text-light border-secondary">
             <h2 class="accordion-header" id="headingIdentityRepair">
               <button class="accordion-button collapsed bg-dark text-light" type="button" data-bs-toggle="collapse" data-bs-target="#collapseIdentityRepair" aria-expanded="false" aria-controls="collapseIdentityRepair">
-                Identity & Repair
+                Fix flavour matches
               </button>
             </h2>
             <div id="collapseIdentityRepair" class="accordion-collapse collapse" aria-labelledby="headingIdentityRepair" data-bs-parent="#scraperOpsAccordion">
               <div class="accordion-body d-grid gap-2">
-                <button class="btn btn-outline-info fw-semibold" onclick="triggerScraper('vc_flavour_identity_backfill')">Backfill Imported Flavour Matches</button>
-                <button class="btn btn-outline-info fw-semibold" onclick="triggerScraper('vc_flavour_identity_unresolved')">Re-run Unresolved Only</button>
-                <button class="btn btn-outline-danger fw-semibold" onclick="triggerScraper('vc_flavour_identity_force')">Force Rematch All Imported Flavours</button>
-                <button class="btn btn-outline-light fw-semibold" onclick="triggerScraper('vc_imported_display_resync')">Resync Imported Recipe Display Names</button>
+                <button class="btn btn-outline-info fw-semibold" onclick="triggerScraper('vc_flavour_identity_backfill')">Match imported flavours</button>
+                <button class="btn btn-outline-info fw-semibold" onclick="triggerScraper('vc_flavour_identity_unresolved')">Retry unmatched flavours</button>
+                <button class="btn btn-outline-danger fw-semibold" onclick="triggerScraper('vc_flavour_identity_force')">Recheck all flavour matches</button>
+                <button class="btn btn-outline-light fw-semibold" onclick="triggerScraper('vc_imported_display_resync')">Refresh imported flavour names</button>
                 <div class="small text-secondary mt-1 mb-1">
                   <strong>Canonical library repair:</strong> canonical brand + cleaned flavor name, safe duplicate merge (same identity key; never mixes Flavor vs Hardware/Base/Nicotine buckets), category correction, <code>is_nicotine</code> sync, then FK repoint on merged ids.
-                  After <em>Apply</em>, run <strong>Fix Recipe Flavor Links</strong>, then recompute recipe analytics. Bulk flavor <em>trait classification</em> stays under Flavor Intelligence → Reclassify All Flavors.
+                  After <em>Apply</em>, run <strong>Fix Recipe Flavor Links</strong>, then recompute recipe analytics. Bulk flavor <em>trait classification</em> stays under Flavor Intelligence → Update flavour labels.
                 </div>
                 <button class="btn btn-outline-secondary fw-semibold" onclick="triggerScraper('canonical_library_repair_preview')">Preview Canonical Library Repair</button>
                 <button class="btn btn-outline-success fw-semibold" onclick="triggerScraper('canonical_library_repair_apply')">Apply Canonical Library Repair</button>
-                <button class="btn btn-outline-secondary btn-sm" onclick="triggerScraper('canonicalize_flavor_brands_preview')">Legacy: preview (same repair)</button>
-                <button class="btn btn-outline-success btn-sm" onclick="triggerScraper('canonicalize_flavor_brands_apply')">Legacy: apply (same repair)</button>
                 <button class="btn btn-outline-warning fw-semibold" onclick="triggerScraper('fix_recipe_flavor_links')">Fix Recipe Flavor Links</button>
               </div>
             </div>
@@ -143,19 +143,20 @@
           <div class="accordion-item bg-dark text-light border-danger">
             <h2 class="accordion-header" id="headingDangerZone">
               <button class="accordion-button collapsed bg-dark text-warning" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDangerZone" aria-expanded="false" aria-controls="collapseDangerZone">
-                Advanced / Danger Zone
+                Advanced maintenance
               </button>
             </h2>
             <div id="collapseDangerZone" class="accordion-collapse collapse" aria-labelledby="headingDangerZone" data-bs-parent="#scraperOpsAccordion">
               <div class="accordion-body d-grid gap-2">
-                <div class="small text-secondary">Individual scraper tools</div>
+                <div class="small text-secondary">Other import tools</div>
                 <button class="btn btn-outline-warning fw-semibold" onclick="triggerScraper('blck')">Run BLCK</button>
                 <button class="btn btn-outline-warning fw-semibold" onclick="triggerScraper('clyrolinx')">Run Clyrolinx</button>
                 <button class="btn btn-outline-info fw-semibold" onclick="triggerScraper('vc_flavours')">Run VC Flavours</button>
                 <button class="btn btn-outline-primary fw-semibold" onclick="triggerScraper('vc_dtl')">Import VC recipes privately</button>
                 <p class="small text-secondary">The background import continues through every listing page. Pause and resume using the progress panel above. Author/source links are retained. POD, adapted and single-flavour recipes can be saved even when excluded from DTL benchmarks.</p>
                 <hr class="my-2">
-                <div class="small text-warning">Maintenance tools: use only when recovery workflows are blocked.</div>
+                <button class="btn btn-outline-warning" onclick="runAllScrapers()">Run every source update</button>
+                <p class="text-secondary">Maintenance tools can change many catalogue entries. Preview a repair before applying it.</p>
               </div>
             </div>
           </div>
@@ -169,42 +170,13 @@
   <div class="col-12 col-lg-5">
     <div class="card border-0" style="background:#151515; border:1px solid #333 !important;">
       <div class="card-body">
-        <h2 class="h5 mb-1">Run Status</h2>
+        <details><summary class="h5">Technical run history</summary>
         <div class="text-secondary small">
           - Actions are logged to <span class="font-monospace">audit_logs</span>.<br>
           - Clyrolinx respects <span class="font-monospace">robots.txt</span> crawl-delay (10s).<br>
           - “Non-blocking” here means the browser won’t freeze; the request still runs server-side.
         </div>
         <hr>
-        <h3 class="h6 mb-2">Latest Runs</h3>
-        <div class="small text-secondary mb-2">
-          Same source of truth as Scraper Health (<span class="font-monospace">scraper_runs.id</span>).
-          Historical failures are labeled separately and do not override a successful latest run.
-        </div>
-        <div class="small text-secondary">
-          {% set runs = scraper_last_runs or {} %}
-          {% for label, key in [('BLCK','blck'),('Clyrolinx','clyrolinx'),('VC Flavours','vc_flavours'),('VC Recipes DTL','vc_dtl'),('Run All','all')] %}
-            {% set r = runs.get(key, {}) %}
-            <div>
-              {{ label }}:
-              {% if r.get('run_id') %}
-                run #{{ r.get('run_id') }} —
-                <span class="{% if r.get('status')=='success' or r.get('status')=='partial' %}text-success{% elif r.get('status')=='started' %}text-warning{% elif r.get('status') in ['error','failed'] %}text-danger{% else %}text-secondary{% endif %}">
-                  {{ r.get('status') or 'n/a' }}
-                </span>
-                {% if r.get('completed_at') %} @ {{ r.get('completed_at') }}{% elif r.get('started_at') %} since {{ r.get('started_at') }}{% endif %}
-                {% if r.get('updated') or r.get('added') %}
-                  (added {{ r.get('added') or 0 }}, updated {{ r.get('updated') or 0 }})
-                {% endif %}
-              {% else %}
-                Never
-              {% endif %}
-            </div>
-          {% endfor %}
-          {% if runs.get('all', {}).get('run_type') %}
-            <div>Latest monthly type: {{ runs.get('all', {}).get('run_type') }}</div>
-          {% endif %}
-        </div>
         {% set health = scraper_health or {} %}
         {% if health.get('sources') %}
         <hr>
@@ -295,6 +267,7 @@
         </div>
         <div id="scraperVerifyResult" class="mt-2 small font-monospace"></div>
         {% endif %}
+        </details>
       </div>
     </div>
   </div>
@@ -305,15 +278,15 @@
   <div class="col-12 col-lg-7">
     <div class="card border-0" style="background:#151515; border:1px solid #333 !important;">
       <div class="card-body">
-        <h2 class="h5 mb-1">Flavor Intelligence</h2>
-        <div class="text-secondary small mb-3">Classification tools: preview dry runs, apply bulk or single flavor updates. Manual overrides are never overwritten.</div>
+        <h2 class="h5 mb-1">Recipe data</h2>
+        <div class="text-secondary small mb-3">Review flavour labels and matching. Preview changes first; your manual corrections are kept.</div>
         <div class="d-grid gap-2">
           <button class="btn btn-outline-light fw-semibold" onclick="runFlavorClassifyDryRun()">Preview Classification (Dry Run)</button>
-          <button class="btn btn-outline-primary fw-semibold" onclick="runFlavorClassifyApply()">Reclassify All Flavors</button>
+          <button class="btn btn-outline-primary fw-semibold" onclick="runFlavorClassifyApply()">Update flavour labels</button>
           <div class="d-flex flex-wrap gap-2 align-items-center mt-1">
             <input id="singleFlavorId" class="form-control form-control-sm bg-black border-secondary" placeholder="Flavor reference ID…" style="max-width:160px;">
             <button class="btn btn-sm btn-outline-light" onclick="previewSingleFlavorClassification()">Preview Single Flavor</button>
-            <button class="btn btn-sm btn-outline-primary" onclick="applySingleFlavorClassification()">Reclassify Single Flavor</button>
+            <button class="btn btn-sm btn-outline-primary" onclick="applySingleFlavorClassification()">Update this flavour</button>
           </div>
         </div>
         <div id="classificationResult" class="mt-3 small font-monospace"></div>
@@ -405,7 +378,7 @@
           <input id="uqSearch" class="form-control form-control-sm bg-black border-secondary" placeholder="Search raw/normalized..." style="max-width:260px;">
           <input id="uqMinOcc" class="form-control form-control-sm bg-black border-secondary" type="number" min="1" value="2" style="max-width:90px;">
           <button type="button" class="btn btn-sm btn-outline-light" onclick="loadUnresolvedQueue()">Load Queue</button>
-          <button type="button" class="btn btn-sm btn-outline-info" onclick="triggerScraper('vc_flavour_identity_unresolved')">Re-run Unresolved Only</button>
+          <button type="button" class="btn btn-sm btn-outline-info" onclick="triggerScraper('vc_flavour_identity_unresolved')">Retry unmatched flavours</button>
           <button type="button" class="btn btn-sm btn-outline-danger" onclick="triggerScraper('vc_flavour_identity_force')">Force Rematch All</button>
         </div>
         <div id="unresolvedMetrics" class="small text-secondary mb-2">Load queue to view metrics.</div>
@@ -753,7 +726,7 @@ function renderVcJob(job) {
     `Import #${job.id}: ${job.status.replaceAll('_', ' ')}`,
     job.source_user_id ? `Source: VC user ${job.source_user_id}` : 'Source: all publicly listed VC recipes',
     `Pages read: ${job.pages_read}${job.total_pages ? ` of ${job.total_pages}` : ''}. ${job.discovery_done ? 'Reached the end of the listing.' : (job.total_items != null ? `VC currently lists ${job.total_items} recipes.` : 'More pages will be checked; total is not known yet.')}`,
-    `Recipes discovered: ${job.discovered} · Available in library: ${job.imported} · Waiting: ${job.pending} · Failed: ${job.failed}`,
+    `Recipes discovered: ${job.discovered} · Available in library: ${job.imported} · Waiting: ${job.pending} · Failed: ${job.failed} · No formula: ${job.skipped || 0}`,
     'Pausing finishes the current recipe or page first. Server restarts resume automatically (recovery may take up to 10 minutes).'
   ];
   if (job.last_error) lines.push(`Attention: ${job.last_error}`);

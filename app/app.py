@@ -89,6 +89,7 @@ app.config["RUN_STARTUP_VC_SYNC"] = _bool_env("RUN_STARTUP_VC_SYNC", False)
 app.config["RUN_STARTUP_IDENTITY_BACKFILL"] = _bool_env("RUN_STARTUP_IDENTITY_BACKFILL", False)
 app.config["RUN_STARTUP_MONTHLY_CATCHUP"] = _bool_env("RUN_STARTUP_MONTHLY_CATCHUP", False)
 app.config["TVW_ENABLE_LAB_MODULES"] = _bool_env("TVW_ENABLE_LAB_MODULES", False)
+app.config["VC_IMPORT_WORKER_ENABLED"] = _bool_env("VC_IMPORT_WORKER_ENABLED", True)
 master_admin_bp = None
 master_admin_svc = None
 if bool(app.config["TVW_ENABLE_LAB_MODULES"]):

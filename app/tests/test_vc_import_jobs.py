@@ -78,6 +78,15 @@ class ImportQueueTests(unittest.TestCase):
         self.step()
         self.assertEqual(jobs.snapshot(self.db)['status'],'completed')
 
+    def test_review_post_is_skipped_without_retry(self):
+        with patch.object(jobs.vc,'_fetch_links_via_public_controller',side_effect=[self.page([42]), []]):
+            self.step()
+            with patch.object(jobs.vc,'run_vc_dtl_scraper',return_value={'empty_formula_ids':['42']}):self.step()
+            self.step();self.step()
+        job=jobs.snapshot(self.db)
+        self.assertEqual((job['status'],job['skipped'],job['failed'],job['imported']),('completed',1,0,0))
+        self.assertIn('no ingredient formula',job['failures'][0]['error'])
+
     def test_rate_limit_pauses_without_consuming_recipe_or_cursor(self):
         with patch.object(jobs.vc, '_fetch_links_via_public_controller', return_value=self.page([1])): self.step()
         with patch.object(jobs.vc, 'run_vc_dtl_scraper', return_value={'stop_reason':'source_http_429; pause before resuming'}): self.step()
