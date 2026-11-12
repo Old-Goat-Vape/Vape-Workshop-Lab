@@ -1,0 +1,11 @@
+# Guided mixing: physical bench presentation
+
+12 November 2026. Visual-only change to the guided session template with scoped CSS and a separate DOM renderer. No server mixing rules, step ordering, scale input handling, tolerances, stock deduction, completion or recovery actions change.
+
+Desktop: finished bottles left, active ingredient beside a receiving bottle and the existing scale readout in the centre, waiting bottles right in existing pour order. Bottle nodes use step numbers as stable identities, preserve brand labels and move between trays using short position animations. Movement honours the existing bottle_moved state: an accepted pour stays in the centre through the put-away transition until the session confirms physical movement. A pending recovery remains in use rather than appearing put away. Re-weigh/undo rerenders the authoritative state.
+
+The receiver fill is an estimate based on completed, recorded pours and existing volume/weight information. Unresolved overpour-recovery pours are excluded from the illustration. It does not respond to unsaved typing or pretend to be a live scale sensor. Fill is bounded visually at 0–100%; caption retains estimated ml against the current batch target. Existing numeric readouts and controls remain authoritative. The illustration represents the batch, not the number of physical bottles chosen for recovery.
+
+Tablet/phone: centre first, then left/right trays below; small screens use a single bottle column per tray. Long names wrap. Larger desktop trays scroll for long recipes. Text labels provide state as well as colour; decorative bottle shapes are hidden from screen readers. Reduced-motion preference disables bottle travel and liquid animation. Bottle art is CSS-native, not generated photography or a manufacturer product image.
+
+Validation: Node regression covers stable node movement right→centre→left, undo, brand/identity separation, safe text labels, fill bounds, reduced motion, preparation, put-away transition and pending recovery. Existing setup/template, scale input, bench rules documentation and Pauly feedback tests run. The rendered session has unique IDs and all original control hooks; inline and external JavaScript pass syntax checks. Final browser appearance and live interactions require server deployment.
