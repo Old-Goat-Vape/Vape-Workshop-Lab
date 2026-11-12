@@ -172,8 +172,10 @@ def parse_imported_source_from_notes(notes: Any) -> dict[str, str | None]:
     if "Imported VC DTL reference" not in text:
         return {"label": None, "url": None}
     url = None
-    if "(" in text and ")" in text:
-        url = text.rsplit("(", 1)[-1].rstrip(")").strip() or None
+    import re
+    match = re.search(r"Imported VC DTL reference \((https://vceliquidrecipes\.com/recipe/\d+)\)", text)
+    if match:
+        url = match.group(1)
     return {"label": "VC DTL Reference", "url": url}
 
 
@@ -255,7 +257,9 @@ def build_recipe_detail_presentation(
     if notes_preview and not (is_imported and imported_source.get("label") and "Imported VC DTL reference" in notes_preview):
         creator_notes_body = notes_preview
     elif is_imported and imported_source.get("label"):
-        creator_notes_is_source_only = True
+        remaining_notes = "\n".join(notes_preview.splitlines()[1:]).strip()
+        creator_notes_body = remaining_notes
+        creator_notes_is_source_only = not bool(remaining_notes)
 
     enriched_notes: list[dict[str, Any]] = []
     for note in mixer_notes_preview:

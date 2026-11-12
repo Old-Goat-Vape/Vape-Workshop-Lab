@@ -16,7 +16,7 @@ VC_DTL_CONFIG = {
         "max_runtime_seconds": 90,
         "discovery_runtime_budget_seconds": 75,
         "detail_runtime_budget_seconds": 55,
-        "min_detail_attempts_before_runtime_stop": 10,
+        "min_detail_attempts_before_runtime_stop": 1,
         # Admin debug override: disable runtime stop guards.
         "vc_dtl_disable_runtime_guard": False,
         # Admin diagnostics: queue already-completed IDs and bypass completed filter.
@@ -28,7 +28,7 @@ VC_DTL_CONFIG = {
         "seed_scan_timeout_seconds": 6,
         "id_scan_end_hint_offset": 20000,
         "id_scan": {
-            "enabled": True,
+            "enabled": False,
             "start_id": 1,
             # Keep fallback scan in a historically active range to reduce private-page churn.
             "end_id": 70000,

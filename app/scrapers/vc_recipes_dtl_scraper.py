@@ -229,76 +229,49 @@ def _fetch_links_via_sitemap(session: requests.Session, headers: dict[str, str],
 
 
 def _fetch_links_via_public_controller(
-    session: requests.Session, headers: dict[str, str], max_recipes: int, start_page: int = 1
-) -> list[str]:
-    """
-    VC released recipes controller discovered in page scripts:
-    controllers/publicRecipesPageControl.php
-    """
-    endpoint = urljoin(VC_RECIPES_URL, "controllers/publicRecipesPageControl.php")
-    links: list[str] = []
-    for page in range(max(1, int(start_page)), 250):
-        try:
-            r = session.get(
-                endpoint,
-                params={"page": page, "search": ""},
-                headers={**headers, "X-Requested-With": "XMLHttpRequest"},
-                timeout=30,
-            )
-            if r.status_code >= 300:
-                break
-            body = r.text or ""
-            extracted: list[str] = []
-            try:
-                data = r.json()
-                # Typical VC payload includes HTML field.
-                html_blob = str(data.get("html") or data.get("recipes") or "")
-                if html_blob:
-                    extracted = _extract_recipe_links(html_blob)
-                _json_extract_recipe_links(data, extracted)
-            except Exception:
-                extracted = _extract_recipe_links(body)
-            before = len(links)
-            for lk in extracted:
-                if lk not in links:
-                    links.append(lk)
-            if len(links) >= max_recipes:
-                return links[:max_recipes]
-            if page > 1 and len(links) == before:
-                break
-        except Exception:
-            break
-    return links[:max_recipes]
+    session, headers, max_recipes, start_page=1, progress=None,
+):
+    """Read one real released-list page; never guess recipe IDs."""
+    page = max(1,int(start_page))
+    response = session.get(
+        "https://vceliquidrecipes.com/controllers/publicRecipesPageControl.php",
+        params={"page":page,"search":""}, headers={**headers,"X-Requested-With":"XMLHttpRequest"}, timeout=20,
+    )
+    response.raise_for_status()
+    data=response.json()
+    if not isinstance(data,dict) or "html" not in data:
+        raise ValueError("VC public recipe list returned an unexpected response; no cursor was advanced.")
+    links=_extract_recipe_links(str(data['html']))
+    if progress is not None:
+        progress.update(next_page=page+1 if links else 1, pages=1)
+    return links
 
 
 def _fetch_links_for_user_profile(
-    session: requests.Session,
-    headers: dict[str, str],
-    *,
-    user_id: str,
-    max_recipes: int,
-    start_page: int = 1,
-) -> list[str]:
-    links: list[str] = []
-    base = f"https://vceliquidrecipes.com/user/{user_id}"
-    for page in range(max(1, int(start_page)), 220):
-        try:
-            url = base if page == 1 else f"{base}?page={page}"
-            r = session.get(url, headers=headers, timeout=30)
-            if r.status_code >= 300:
-                break
-            found = _extract_recipe_links(r.text or "")
-            before = len(links)
-            for lk in found:
-                if lk not in links:
-                    links.append(lk)
-            if len(links) >= max_recipes:
-                return links[:max_recipes]
-            if page > 1 and len(links) == before:
-                break
-        except Exception:
-            break
-    return links[:max_recipes]
+    session, headers, *, user_id, max_recipes, start_page=1, progress=None,
+):
+    """VC's profile recipe table is a server-side DataTable, not static links."""
+    page=max(1,int(start_page))
+    response=session.post(
+        "https://vceliquidrecipes.com/controllers/userPageControl.php",
+        data={"getUsersRecipes":"true","userID":str(user_id),"draw":page,
+              "start":(page-1)*50,"length":50,"search[value]":"","search[regex]":"false",
+              "year":"all","month":"all","time":"all","period":"all", "original":0,"single":0,"total":"all","pod":0},
+        headers={**headers,"Referer":f"https://vceliquidrecipes.com/user/{user_id}","X-Requested-With":"XMLHttpRequest"},timeout=20,
+    )
+    response.raise_for_status()
+    data=response.json()
+    if not isinstance(data,dict) or not isinstance(data.get('data'),list):
+        raise ValueError("VC profile recipe list returned an unexpected response; no cursor was advanced.")
+    links=[]
+    for row in data['data']:
+        rid=row[0] if isinstance(row,list) and row else row.get('recipe_id') if isinstance(row,dict) else None
+        if str(rid or '').isdigit():
+            link=f"https://vceliquidrecipes.com/recipe/{rid}"
+            if link not in links:links.append(link)
+    if progress is not None:
+        progress.update(next_page=page+1 if links else 1,pages=1)
+    return links
 
 
 def _fetch_links_via_id_scan(
@@ -1228,77 +1201,68 @@ def _sync_into_recipe_library(
     reference_lookup: dict[tuple[str, str], int],
     actor_id: int | None = None,
 ) -> dict[str, Any]:
-    # Additive import into internal recipe library for visibility/benchmarking.
+    if int(recipe.get("is_public",1)) != 1:
+        raise ValueError("VC recipe is not publicly accessible at the source.")
     recipe_code = f"VCREF-{recipe['source_recipe_id']}"
-    existing = db.execute("SELECT id FROM recipes WHERE recipe_code = ?", (recipe_code,)).fetchone()
-    # Cleanup guard for accidental prior duplicates by same recipe_code.
-    dupes = db.execute("SELECT id FROM recipes WHERE recipe_code = ? ORDER BY id ASC", (recipe_code,)).fetchall()
-    if len(dupes) > 1:
-        keep = int(dupes[0]["id"])
-        for d in dupes[1:]:
-            db.execute("UPDATE recipes SET active = 0 WHERE id = ?", (int(d["id"]),))
-        existing = {"id": keep}
+    existing = db.execute("SELECT id FROM recipes WHERE recipe_code=? ORDER BY id LIMIT 1",(recipe_code,)).fetchone()
+    if actor_id is None:
+        owner=db.execute("SELECT id FROM users WHERE role='Old Goat' ORDER BY id LIMIT 1").fetchone()
+        actor_id=int(owner['id']) if owner else None
+    if actor_id is None:
+        raise ValueError("Choose an importing owner before adding private VC recipes.")
+    items=[]
+    for fl in recipe.get('flavours') or []:
+        matched=fl.get('matched_flavor_id')
+        ref_id=int(matched) if str(matched or '').isdigit() else _ensure_reference_for_flavor(
+            db,reference_lookup=reference_lookup,brand_raw=str(fl.get('brand_raw') or ''),flavor_raw=str(fl.get('flavour_name_raw') or ''))
+        pct=float(fl.get('percentage') or 0)
+        if not ref_id or not 0<pct<=100:
+            raise ValueError("VC flavour could not be imported completely; existing recipe is unchanged.")
+        items.append((int(ref_id),pct))
+    if not items or sum(pct for _,pct in items)>100:
+        raise ValueError("VC recipe has missing or invalid flavour percentages.")
     if existing:
-        recipe_id = int(existing["id"])
-        db.execute(
-            "UPDATE recipes SET name = ?, status = ?, active = 1 WHERE id = ?",
-            (recipe.get("title") or recipe_code, "Reference", recipe_id),
-        )
+        recipe_id=int(existing['id'])
+        db.execute("UPDATE recipes SET name=?,status='Reference',visibility='private',library_type='reference',created_by=COALESCE(created_by,?),active=1 WHERE id=?",
+                   (recipe.get('title') or recipe_code,actor_id,recipe_id))
     else:
-        cur = db.execute(
-            "INSERT INTO recipes (name, recipe_code, status, created_by, active) VALUES (?, ?, ?, ?, 1)",
-            (recipe.get("title") or recipe_code, recipe_code, "Reference", (int(actor_id) if actor_id else None)),
-        )
-        recipe_id = int(cur.lastrowid)
+        cur=db.execute("INSERT INTO recipes(name,recipe_code,status,created_by,active,visibility,library_type) VALUES(?,?,'Reference',?,1,'private','reference')",
+                       (recipe.get('title') or recipe_code,recipe_code,actor_id))
+        recipe_id=int(cur.lastrowid)
+    notes=f"Imported VC DTL reference ({recipe.get('source_url')})\nOriginal author: {recipe.get('author') or 'Unknown'}"
+    if recipe.get('description_notes'):notes+='\n'+str(recipe['description_notes'])
+    latest=db.execute('SELECT id,notes FROM recipe_versions WHERE recipe_id=? ORDER BY id DESC LIMIT 1',(recipe_id,)).fetchone()
+    old_items=[(int(r['ingredient_id']),float(r['amount_percent'])) for r in db.execute('SELECT ingredient_id,amount_percent FROM recipe_items WHERE version_id=?',(latest['id'],))] if latest else []
+    if latest and sorted(old_items)==sorted(items) and latest['notes']==notes:
+        version_id=int(latest['id'])
+    else:
+        count=db.execute('SELECT COUNT(*) FROM recipe_versions WHERE recipe_id=?',(recipe_id,)).fetchone()[0]
+        cur=db.execute("INSERT INTO recipe_versions(recipe_id,version_number,target_vg_pg_ratio,total_flavor_percent,notes,is_locked,created_at) VALUES(?,?,'70/30',?,?,1,?)",
+                       (recipe_id,f'{count+1}.0',sum(pct for _,pct in items),notes,datetime.now()))
+        version_id=int(cur.lastrowid)
+        db.executemany('INSERT INTO recipe_items(version_id,ingredient_id,amount_percent) VALUES(?,?,?)',[(version_id,ref,pct) for ref,pct in items])
+    db.execute('UPDATE recipes SET current_version_id=? WHERE id=?',(version_id,recipe_id))
+    return {'recipe_id':recipe_id,'attempted_items':len(items),'written_items':len(items)}
 
-    # Replace latest reference version each run to keep deterministic snapshot.
-    row_v = db.execute("SELECT id FROM recipe_versions WHERE recipe_id = ? ORDER BY id DESC LIMIT 1", (recipe_id,)).fetchone()
-    if row_v:
-        db.execute("DELETE FROM recipe_items WHERE version_id = ?", (int(row_v["id"]),))
-        db.execute("DELETE FROM recipe_versions WHERE id = ?", (int(row_v["id"]),))
 
-    cur_v = db.execute(
-        """
-        INSERT INTO recipe_versions (recipe_id, version_number, target_vg_pg_ratio, total_flavor_percent, notes, is_locked, created_at)
-        VALUES (?, '1.0', '70/30', ?, ?, 1, ?)
-        """,
-        (
-            recipe_id,
-            abs(float(recipe.get("total_flavour_pct") or 0.0)),
-            f"Imported VC DTL reference ({recipe.get('source_url')})",
-            datetime.now(),
-        ),
-    )
-    version_id = int(cur_v.lastrowid)
-    attempted_items = 0
-    written_items = 0
-    for fl in recipe.get("flavours") or []:
-        attempted_items += 1
-        matched_id = fl.get("matched_flavor_id")
-        ref_id = int(matched_id) if str(matched_id or "").isdigit() else None
-        if not ref_id:
-            ref_id = _ensure_reference_for_flavor(
-                db,
-                reference_lookup=reference_lookup,
-                brand_raw=str(fl.get("brand_raw") or ""),
-                flavor_raw=str(fl.get("flavour_name_raw") or ""),
-            )
-        if not ref_id:
-            continue
-        db.execute(
-            "INSERT INTO recipe_items (version_id, ingredient_id, amount_percent) VALUES (?, ?, ?)",
-            (version_id, int(ref_id), abs(float(fl.get("percentage") or 0.0))),
-        )
-        written_items += 1
-    return {
-        "recipe_id": recipe_id,
-        "attempted_items": attempted_items,
-        "written_items": written_items,
-    }
+def _repair_private_vc_library_metadata(db, actor_id=None):
+    """Repair legacy imports without changing any stored recipe versions/items."""
+    if actor_id is None:
+        owner=db.execute("SELECT id FROM users WHERE role='Old Goat' ORDER BY id LIMIT 1").fetchone()
+        actor_id=int(owner['id']) if owner else None
+    db.execute("""
+        UPDATE recipes SET visibility='private',library_type='reference',
+            created_by=COALESCE(created_by,?),
+            current_version_id=COALESCE(current_version_id,
+                (SELECT id FROM recipe_versions WHERE recipe_id=recipes.id ORDER BY id DESC LIMIT 1))
+        WHERE recipe_code LIKE 'VCREF-%'
+    """,(actor_id,))
 
 
 def _parse_recipe_page(url: str, html: str) -> dict[str, Any] | None:
     soup = BeautifulSoup(html, "html.parser")
+    if soup.select_one("#recipe-flavour-table") is None:
+        return None
     title = ""
     if soup.select_one("h1"):
         title = soup.select_one("h1").get_text(" ", strip=True)
@@ -1309,9 +1273,10 @@ def _parse_recipe_page(url: str, html: str) -> dict[str, Any] | None:
         return None
 
     visible_text = soup.get_text(" ", strip=True)
-    author = ""
+    author_link = soup.select_one('h3 a[href*="user/"]')
+    author = author_link.get_text(" ",strip=True) if author_link else ""
     m_author = re.search(r"(?:author|by)\s*[:\-]?\s*([A-Za-z0-9 _\-\.]{2,60})", visible_text, re.IGNORECASE)
-    if m_author:
+    if m_author and not author:
         author = m_author.group(1).strip()
     m_created = re.search(r"(?:created|posted|published)\s*[:\-]?\s*([A-Za-z0-9,\-\/ ]{4,40})", visible_text, re.IGNORECASE)
     created_text = m_created.group(1).strip() if m_created else ""
@@ -1338,7 +1303,7 @@ def _parse_recipe_page(url: str, html: str) -> dict[str, Any] | None:
     flavor_rows: list[dict[str, Any]] = []
     excluded_summary_row_count = 0
     excluded_rows_sample: list[str] = []
-    for tr in soup.select("table tr"):
+    for tr in (soup.select("#recipe-flavour-table tr.flavour-name") or soup.select("table tr")):
         row_txt = tr.get_text(" ", strip=True)
         if "%" not in row_txt:
             continue
@@ -1351,7 +1316,7 @@ def _parse_recipe_page(url: str, html: str) -> dict[str, Any] | None:
         if pct is None:
             continue
         cells = [c.get_text(" ", strip=True) for c in tr.select("td,th")]
-        candidate = " ".join(cells).strip()
+        candidate = cells[0].strip() if cells else ""
         candidate = re.sub(r"\b\d+(?:\.\d+)?\s*%\b", "", candidate).strip(" -:")
         if len(candidate) < 2:
             continue
@@ -1462,6 +1427,8 @@ def _is_benchmark_eligible(recipe: dict[str, Any], *, include_adapted: bool) -> 
     if int(recipe.get("is_public") or 0) != 1:
         return 0
     if int(recipe.get("is_single_flavour") or 0) == 1:
+        return 0
+    if detect_has_any_token([recipe.get("title", ""),recipe.get("profile_raw", "")],["pod", "dispo"]):
         return 0
     if not include_adapted and int(recipe.get("is_adapted") or 0) == 1:
         return 0
@@ -2172,6 +2139,7 @@ def _run_vc_dtl_scraper_impl(
     db,
     *,
     mode: str = "vc_public_all",
+    actor_id: int | None = None,
     source_user_id: str = "",
     target_ids: list[str] | None = None,
     resume: bool = True,
@@ -2182,6 +2150,7 @@ def _run_vc_dtl_scraper_impl(
     max_recipes: int = 300,
 ) -> dict[str, Any]:
     _ensure_reference_tables(db)
+    _repair_private_vc_library_metadata(db, actor_id)
     repair_stats = _repair_existing_vc_import_signs(db)
     resolver_ctx_bootstrap = _build_identity_resolver_context(db)
     identity_repair_stats = _backfill_flavour_identity_matches(db, resolver_ctx=resolver_ctx_bootstrap, limit=5000)
@@ -2192,7 +2161,7 @@ def _run_vc_dtl_scraper_impl(
     include_adapted = bool(VC_DTL_CONFIG.get("include_adapted_recipes", include_adapted))
     delay_s = float(crawl_cfg.get("delay_s", delay_s))
     max_pages = int(crawl_cfg.get("max_pages", max_pages))
-    max_recipes = int(crawl_cfg.get("max_recipes", max_recipes))
+    max_recipes = max(50, int(crawl_cfg.get("max_recipes", max_recipes)))
     run_started_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     started_ts = time.time()
     max_runtime_seconds = int(crawl_cfg.get("max_runtime_seconds", 90))
@@ -2256,139 +2225,21 @@ def _run_vc_dtl_scraper_impl(
     except Exception:
         known_completed_numeric_ids = []
 
+    feed_progress = {}
+    start_page = int(checkpoint.get("cursor_page") or 1) if checkpoint_used else 1
     if mode == "vc_targeted_ids":
-        for rid in (target_ids or []):
-            rid_s = str(rid or "").strip()
-            if rid_s.isdigit():
-                discovered.append(f"https://vceliquidrecipes.com/recipe/{rid_s}")
-        source_discovery_counts["listing_pages"] = len(discovered)
+        discovered = [f"https://vceliquidrecipes.com/recipe/{rid}" for rid in (target_ids or []) if str(rid).isdigit()]
         discovery_stop_reason = "targeted_ids_supplied"
-    elif mode == "vc_user_profile" and source_user_id:
-        start_page = int(checkpoint.get("cursor_page") or 1) if checkpoint_used else 1
-        links = _fetch_links_for_user_profile(
-            session, headers, user_id=source_user_id, max_recipes=max_recipes, start_page=start_page
-        )
-        for lk in links:
-            if lk not in discovered:
-                discovered.append(lk)
-        source_discovery_counts["public_controller"] = len(discovered)
-        discovery_pages_visited = max(1, len(links) // 10)
-        discovery_stop_reason = "user_profile_discovery_complete" if links else "user_profile_no_links"
     else:
-        empty_pages_streak = 0
-        for page in range(1, max_pages + 1):
-            if (not runtime_guard_disabled) and ((time.time() - discovery_started_ts) > discovery_runtime_budget_seconds):
-                discovery_stop_reason = "discovery_runtime_budget_reached"
-                break
-            try:
-                time.sleep(max(0.1, delay_s))
-                url = VC_RECIPES_URL if page == 1 else f"{VC_RECIPES_URL}?page={page}"
-                res = session.get(url, headers=headers, timeout=35)
-                discovery_pages_visited += 1
-                if res.status_code >= 300:
-                    continue
-                links = _extract_recipe_links(res.text)
-                for lk in links:
-                    if lk not in discovered:
-                        discovered.append(lk)
-                source_discovery_counts["listing_pages"] = len(discovered)
-                if not links:
-                    empty_pages_streak += 1
-                    if empty_pages_streak >= 3 and page > 1:
-                        discovery_stop_reason = "listing_three_consecutive_empty_pages"
-                        break
-                else:
-                    empty_pages_streak = 0
-                if len(discovered) >= max_recipes:
-                    discovery_stop_reason = "max_recipes_reached_from_listing"
-                    break
-            except Exception as exc:
-                page_errors.append(f"list_page_{page}: {exc}")
-
-    if mode == "vc_public_all" and len(discovered) < max_recipes and (runtime_guard_disabled or (time.time() - discovery_started_ts) <= discovery_runtime_budget_seconds):
-        before_len = len(discovered)
-        controller_links = _fetch_links_via_public_controller(session, headers, max_recipes=max_recipes)
-        for lk in controller_links:
-            if lk not in discovered:
-                discovered.append(lk)
-        source_discovery_counts["public_controller"] = max(0, len(discovered) - before_len)
-        if source_discovery_counts["public_controller"] > 0:
-            stage_debug.append(f"controller_discovery_added={source_discovery_counts['public_controller']}")
-
-    if mode == "vc_public_all" and len(discovered) < max_recipes and (runtime_guard_disabled or (time.time() - discovery_started_ts) <= discovery_runtime_budget_seconds):
-        # Ajax/datatable fallback for full released recipe feed.
-        try:
-            before_len = len(discovered)
-            base_html = session.get(VC_RECIPES_URL, headers=headers, timeout=35).text
-            ajax_links = _fetch_links_via_ajax(session, headers, base_html, max_recipes=max_recipes)
-            for lk in ajax_links:
-                if lk not in discovered:
-                    discovered.append(lk)
-            source_discovery_counts["ajax"] = max(0, len(discovered) - before_len)
-        except Exception as exc:
-            page_errors.append(f"ajax_discovery: {exc}")
-
-    if mode == "vc_public_all" and len(discovered) < max_recipes and (runtime_guard_disabled or (time.time() - discovery_started_ts) <= discovery_runtime_budget_seconds):
-        before_len = len(discovered)
-        sitemap_links = _fetch_links_via_sitemap(session, headers, max_recipes=max_recipes)
-        for lk in sitemap_links:
-            if lk not in discovered:
-                discovered.append(lk)
-        source_discovery_counts["sitemap"] = max(0, len(discovered) - before_len)
-
-    if mode == "vc_public_all" and len(discovered) < max_recipes and (runtime_guard_disabled or (time.time() - discovery_started_ts) <= discovery_runtime_budget_seconds):
-        id_scan_cfg = crawl_cfg.get("id_scan", {}) if isinstance(crawl_cfg.get("id_scan"), dict) else {}
-        if bool(id_scan_cfg.get("enabled", True)):
-            configured_end = int(id_scan_cfg.get("end_id", 120000))
-            if known_completed_numeric_ids:
-                hinted_end = max(known_completed_numeric_ids) + int(crawl_cfg.get("id_scan_end_hint_offset", 20000))
-                dynamic_end = min(configured_end, hinted_end)
-            else:
-                dynamic_end = configured_end
-            before_len = len(discovered)
-            scan_links = _fetch_links_via_id_scan(
-                session,
-                headers,
-                max_recipes=max_recipes,
-                start_id=int(id_scan_cfg.get("start_id", 1)),
-                end_id=max(1, int(dynamic_end)),
-                request_budget=int(id_scan_cfg.get("request_budget", 400)),
-                max_consecutive_misses=int(id_scan_cfg.get("max_consecutive_misses", 120)),
-                timeout_seconds=int(id_scan_cfg.get("timeout_seconds", 8)),
-            )
-            for lk in scan_links:
-                if lk not in discovered:
-                    discovered.append(lk)
-            source_discovery_counts["id_scan"] = max(0, len(discovered) - before_len)
-
-    # Seed-neighborhood fallback runs last and only with remaining discovery budget.
-    if (
-        mode == "vc_public_all"
-        and
-        len(discovered) < max_recipes
-        and len(discovered) > 0
-        and (runtime_guard_disabled or (time.time() - discovery_started_ts) <= discovery_runtime_budget_seconds)
-    ):
-        seed_ids = []
-        for lk in discovered[:120]:
-            rid = _extract_recipe_id(lk)
-            if rid.isdigit():
-                seed_ids.append(int(rid))
-        if seed_ids:
-            before_len = len(discovered)
-            near_links = _fetch_links_near_seed_ids(
-                session,
-                headers,
-                seed_ids=seed_ids,
-                max_recipes=max_recipes,
-                scan_radius=int(crawl_cfg.get("seed_scan_radius", 1200)),
-                request_budget=int(crawl_cfg.get("seed_scan_request_budget", 220)),
-                timeout_seconds=int(crawl_cfg.get("seed_scan_timeout_seconds", 6)),
-            )
-            for lk in near_links:
-                if lk not in discovered:
-                    discovered.append(lk)
-            source_discovery_counts["id_scan"] += max(0, len(discovered) - before_len)
+        if mode == "vc_user_profile" and source_user_id:
+            discovered = _fetch_links_for_user_profile(session,headers,user_id=source_user_id,
+                max_recipes=max_recipes,start_page=start_page,progress=feed_progress)
+        else:
+            discovered = _fetch_links_via_public_controller(session,headers,max_recipes=max_recipes,
+                start_page=start_page,progress=feed_progress)
+        discovery_pages_visited = feed_progress.get("pages",0)
+        source_discovery_counts["public_controller"] = len(discovered)
+        discovery_stop_reason = "controller_page_loaded" if discovered else "controller_end_reached"
 
     discovered = discovered[:max_recipes]
     discovered_recipe_links_total = len(discovered)
@@ -2430,7 +2281,12 @@ def _run_vc_dtl_scraper_impl(
             WHERE source = 'vc'
               AND source_type = 'vc_dtl'
               AND COALESCE(parse_failed, 0) = 0
-              AND COALESCE(needs_review, 0) = 0
+              AND recipe_id IS NOT NULL
+              AND EXISTS (SELECT 1 FROM recipes r JOIN recipe_versions v ON v.id=r.current_version_id
+                          WHERE r.id=recipe_references.recipe_id AND v.recipe_id=r.id
+                            AND EXISTS (SELECT 1 FROM recipe_items ri WHERE ri.version_id=v.id)
+                            AND (SELECT COUNT(*) FROM recipe_items ri WHERE ri.version_id=v.id)=
+                                (SELECT COUNT(*) FROM recipe_reference_flavours rf WHERE rf.recipe_reference_id=recipe_references.id))
             """
         ).fetchall()
         if r["source_recipe_id"] is not None
@@ -2439,7 +2295,7 @@ def _run_vc_dtl_scraper_impl(
     skipped_already_completed = 0
     discovered_recipe_links_existing = sum(1 for q in normalized_queue if str(q.get("source_recipe_id") or "") in completed_ids)
     discovered_recipe_links_new = max(0, len(normalized_queue) - discovered_recipe_links_existing)
-    if completed_ids and not ignore_completed_filter:
+    if completed_ids and not ignore_completed_filter and mode != "vc_targeted_ids":
         pre_len = len(normalized_queue)
         normalized_queue = [q for q in normalized_queue if str(q.get("source_recipe_id") or "") not in completed_ids]
         skipped_already_completed = max(0, pre_len - len(normalized_queue))
@@ -2580,8 +2436,13 @@ def _run_vc_dtl_scraper_impl(
             if trace_ref is not None:
                 trace_ref["fetch_started"] = True
                 trace_ref["last_step"] = "FETCH_STARTING"
-            res = session.get(link, headers=headers, timeout=35)
+            res = session.get(link, headers=headers, timeout=15)
             http_status = int(res.status_code)
+            if http_status in {403,429,503}:
+                stop_reason = f"source_http_{http_status}; pause before resuming"
+                runtime_stop_triggered_at_index = idx
+                detail_skipped_due_to_global_stop = max(0,queued_detail_pages-idx+1)
+                break
             body = res.text or ""
             body_len = len(body)
             if trace_ref is not None:
@@ -2717,14 +2578,12 @@ def _run_vc_dtl_scraper_impl(
             parsed_ok += 1
             detail_succeeded += 1
 
-            # DTL filter AFTER detail parsing (reliable stage)
+            # Benchmark flags do not prevent private library recovery.
             blob = " ".join([parsed.get("title", ""), parsed.get("profile_raw", "")]).lower()
             if detect_has_any_token([blob], ["pod", "dispo", "salt nic pod"]):
                 excluded_pod += 1
-                continue
             if int(parsed.get("is_single_flavour") or 0) == 1:
                 excluded_single += 1
-                continue
 
             content_hash = compute_content_hash(
                 {
@@ -2818,7 +2677,7 @@ def _run_vc_dtl_scraper_impl(
             # protect library import: only valid parsed recipes
             try:
                 library_import_attempted += 1
-                lib_sync = _sync_into_recipe_library(db, parsed, reference_lookup=reference_lookup, actor_id=None)
+                lib_sync = _sync_into_recipe_library(db, parsed, reference_lookup=reference_lookup, actor_id=actor_id)
                 lib_recipe_id = int(lib_sync.get("recipe_id") or 0)
                 # More accurate count of persisted recipe_items in library versions.
                 p_trace["flavour_rows_written"] = int(lib_sync.get("written_items") or p_trace["flavour_rows_written"])
@@ -3042,7 +2901,7 @@ def _run_vc_dtl_scraper_impl(
         db,
         mode=checkpoint_key_mode,
         source_user_id=checkpoint_key_user,
-        cursor_page=int(checkpoint.get("cursor_page") or 1) + 1,
+        cursor_page=(start_page if runtime_stop_triggered_at_index or detail_skipped_due_to_global_stop else int(feed_progress.get("next_page",start_page))),
         last_recipe_id=(first_20_recipe_ids[0] if first_20_recipe_ids else ""),
         total_discovered=int(discovered_recipe_links_total),
         total_imported=total_completed_ids,
@@ -3197,6 +3056,7 @@ def run_vc_dtl_scraper(
     db,
     *,
     mode: str = "vc_public_all",
+    actor_id: int | None = None,
     source_user_id: str = "",
     target_ids: list[str] | None = None,
     resume: bool = True,
@@ -3210,6 +3070,7 @@ def run_vc_dtl_scraper(
         return _run_vc_dtl_scraper_impl(
             db,
             mode=mode,
+            actor_id=actor_id,
             source_user_id=source_user_id,
             target_ids=target_ids,
             resume=resume,

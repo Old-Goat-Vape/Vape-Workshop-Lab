@@ -361,6 +361,7 @@
         <div class="mt-3">
           <p class="small text-secondary mb-1">Creator notes</p>
           <div class="small" style="white-space: pre-wrap;">{{ detail.creator_notes_body }}</div>
+          {% if detail.is_imported and detail.imported_source_url %}<a class="link-info" href="{{ detail.imported_source_url }}" target="_blank" rel="noopener noreferrer">View original recipe</a>{% endif %}
         </div>
       {% endif %}
 
