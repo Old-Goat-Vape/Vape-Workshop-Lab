@@ -403,3 +403,8 @@
     width: 100%;
   }
 }
+
+/* Suggestions remain readable beside each editable percentage on desktop and mobile. */
+.row-usage { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; text-align: left; font-size: 1rem; line-height: 1.4; color: #d4e5f4; }
+.row-use-average { white-space: normal; min-height: 36px; }
+.row-use-average[hidden] { display: none; }

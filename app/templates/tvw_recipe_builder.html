@@ -101,7 +101,7 @@
           <div class="tvw-rb-flavours-head">
             <div>
               <h2 class="tvw-rb-section-title" id="rbFlavoursHeading">Flavours</h2>
-              <p class="tvw-rb-section-lead mb-0">Search your flavour library, add each concentrate and set its percentage.</p>
+              <p class="tvw-rb-section-lead mb-0">Search your flavour library, add each concentrate and set its percentage. A blank percentage starts at the average from current recipes, including private recipes. You can change it.</p>
             </div>
             <button type="button" class="btn btn-outline-light tvw-rb-add-flavour" id="addFlavourBtn">Add flavour</button>
           </div>
@@ -233,12 +233,16 @@
       <div class="small text-secondary row-carrier mt-1">—</div>
     </div>
     <div class="tvw-rb-col-num tvw-rb-pct-col">
-      <input name="ingredient_percent[]" type="number" min="0" step="0.01" class="tvw-rb-input ingredient-pct" placeholder="0.00" inputmode="decimal">
+      <input name="ingredient_percent[]" type="number" min="0" max="100" step="any" aria-label="Flavour percentage" class="tvw-rb-input ingredient-pct" placeholder="0.00" inputmode="decimal">
     </div>
     <div class="tvw-rb-col-num tvw-rb-ml-col"><span class="row-out-ml">0.00</span></div>
     <div class="tvw-rb-col-num tvw-rb-g-col"><span class="row-out-g">0.00</span></div>
     <div>
       <button type="button" class="btn btn-sm btn-outline-danger w-100 remove-row" style="min-height:44px;">Remove</button>
+    </div>
+    <div class="row-usage" aria-live="polite">
+      <span class="row-usage-text"></span>
+      <button type="button" class="row-use-average btn btn-sm btn-outline-info" hidden>Use average</button>
     </div>
   </div>
 </template>
@@ -264,6 +268,7 @@
     hasErrors: {{ (form_errors|length > 0)|tojson }}
   };
 </script>
+<script src="{{ url_for('static', filename='tvw-flavour-usage.js') }}"></script>
 <script src="{{ url_for('static', filename='tvw-recipe-builder.js') }}"></script>
 <script>
 (() => {

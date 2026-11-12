@@ -862,6 +862,19 @@ def recipe_builder_flavour_search():
     return jsonify({"status": "success", "query": query, "items": items}), 200
 
 
+@tvw_api_bp.route("/recipes/flavour-usage/<int:reference_id>", methods=["GET"])
+@login_required
+def recipe_builder_flavour_usage(reference_id):
+    from services.public_flavour_insights_service import builder_flavour_usage
+    usage = builder_flavour_usage(reference_id)
+    if usage is None:
+        return jsonify(status="error", message="Flavour not available."), 404
+    response = jsonify(status="success", usage=usage)
+    # Refresh on selection while the importer adds recipes; no stale catalogue hint.
+    response.headers["Cache-Control"] = "no-store"
+    return response, 200
+
+
 @tvw_api_bp.route("/recipes/live-calc", methods=["POST"])
 @login_required
 def recipe_builder_live_calc():

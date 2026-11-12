@@ -1,0 +1,13 @@
+# Recipe average usage suggestions
+
+When a mixer selects a flavour in the TVW recipe builder, an empty percentage is filled from that exact ingredient's average usage in current recipes. The row explains the percentage and recipe count, with an explicit **Use average** button. Mixers can change the value freely. Existing percentages, explicit zeroes, and values typed while a request is in flight are preserved. Changing flavours removes only a percentage previously supplied automatically; a manual percentage is retained. Empty or failed statistics leave the percentage for manual entry.
+
+The average includes public, private, unlisted and imported private reference recipes. Each eligible recipe's `current_version_id` is counted once; repeated lines for the same ingredient are summed within that version. Nonpositive and over-100 values, and per-flavour sums above 100, are excluded. Hidden, removed, moderated-archived and inactive recipes use the same exclusions as the existing recipe insights. No private recipe identities or formulations are returned.
+
+`GET /api/recipes/flavour-usage/<reference_id>` requires login and returns only the ingredient ID, recipe count and average. It validates the ingredient against the recipe catalogue policy, including hidden catalogue entries and noningredients. Matching uses exact reference IDs; CAP Vanilla Custard V1, CAP V2 and another manufacturer's flavour never share samples. The endpoint is uncached, so recipe/import changes are visible on the next selection. It does not use a scraped catalogue average or invent a fallback percentage.
+
+The shared cohort query is also used by the existing flavour detail insights. The selected-row lookup calculates only count and average, without building pairing lists or loading all recipe percentages into Python. Suggestions use two decimals normally, retaining small positive values that would otherwise round to zero. The percentage input permits arbitrary decimal steps.
+
+The frontend uses per-row request sequencing, edit revisions and connected-row checks to prevent delayed responses from replacing newer selections, manual input or removed rows. The suggestion is a recipe usage example; a small-sample notice appears below five recipes.
+
+Validation includes backend coverage for all visibility levels, current versions, exact manufacturer/formulation separation, duplicate lines, exclusions, live updates, no-data states, login, aggregate-only payloads and builder script/control rendering. Node behaviour tests cover automatic/editable values, saved values, explicit zero, delayed responses, switching flavours, removed rows, fetch failures and tiny percentages. Production verification follows deployment with `tvw-update`.
