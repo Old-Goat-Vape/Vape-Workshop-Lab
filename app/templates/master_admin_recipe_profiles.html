@@ -41,7 +41,7 @@
 <p>Undo restores the previous profiles only where this batch’s assignment is still current. Later edits are preserved.</p>
 {% for batch in batches %}<form method="post" class="d-flex flex-wrap gap-3 align-items-center mb-2">
 <input type="hidden" name="preview_token" value="{{ batch.token }}"><input type="hidden" name="action" value="undo">
-<span>{{ batch.created_at }} UTC · {{ batch.count }} recipes</span><button class="btn btn-outline-secondary btn-sm">Undo this batch</button>
+<span>{{ batch.created_at }} UTC · {{ batch.count }} recipes{% if batch.automatic %} · Automatic second pass{% endif %}</span><button class="btn btn-outline-secondary btn-sm">Undo this batch</button>
 </form>{% endfor %}
 {% endif %}
 {% endblock %}

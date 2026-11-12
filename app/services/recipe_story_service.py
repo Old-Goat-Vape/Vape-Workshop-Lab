@@ -13,6 +13,10 @@ CREATE TABLE IF NOT EXISTS recipe_stories (
  profiles_json TEXT NOT NULL DEFAULT '[]', steep_days INTEGER CHECK(steep_days IS NULL OR steep_days BETWEEN 0 AND 365),
  image_data BLOB
 );
+CREATE TABLE IF NOT EXISTS recipe_profile_backfills (
+ name TEXT PRIMARY KEY, assigned_count INTEGER NOT NULL,
+ batch_id TEXT, completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 CREATE TABLE IF NOT EXISTS recipe_profile_audit (
  id INTEGER PRIMARY KEY, batch_id TEXT NOT NULL, recipe_id INTEGER NOT NULL,
  version_id INTEGER NOT NULL, actor_id INTEGER NOT NULL,

@@ -1184,7 +1184,7 @@ def recipe_profiles():
     visible = filtered[(page-1)*50:page*50]
     for row in visible:
         row['token'] = signer.dumps(dict(actor=actor,kind='apply',recipe_id=row['id'],digest=profiles.selection_digest([row])))
-    batches = [dict(r) for r in get_db().execute("SELECT batch_id,MIN(created_at) AS created_at,COUNT(*) AS count FROM recipe_profile_audit WHERE undone=0 GROUP BY batch_id ORDER BY MIN(id) DESC LIMIT 5")]
+    batches = [dict(r) for r in get_db().execute("SELECT batch_id,MIN(created_at) AS created_at,COUNT(*) AS count,MAX(actor_id)=0 AS automatic FROM recipe_profile_audit WHERE undone=0 GROUP BY batch_id ORDER BY MIN(id) DESC LIMIT 5")]
     for batch in batches:
         batch['token'] = signer.dumps(dict(actor=actor,kind='undo',batch=batch['batch_id']))
     return render_template('master_admin_recipe_profiles.html', rows=visible, counts=counts, bulk_token=bulk_token,
