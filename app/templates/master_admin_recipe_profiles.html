@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Recipe profiles - Old Goat Lab{% endblock %}
+{% block content %}
+<a href="{{ url_for('master_admin.console', tab='flavor_intel') }}">← Lab recipe data</a>
+<h1 class="mt-3">Give recipes their flavour profiles</h1>
+<p>Suggestions use recipe names, descriptions, tags and ingredient percentages. These are matching rules, not tasting results. Existing profiles are kept. Private recipes stay private.</p>
+<div class="row g-3 mb-3">
+{% for key,label in [('high','Clear matches'),('review','Needs review'),('unknown','Choose a profile')] %}
+<div class="col-sm-4"><a class="card card-body text-decoration-none" href="{{ url_for('master_admin.recipe_profiles',view=key) }}"><strong class="h3">{{ counts[key] }}</strong>{{ label }}</a></div>
+{% endfor %}
+</div>
+<form method="post" class="card card-body mb-4">
+<input type="hidden" name="preview_token" value="{{ bulk_token }}"><input type="hidden" name="action" value="apply">
+<p>Apply all {{ counts.high }} clear matches across the catalogue. Only recipes without a saved profile are included. Ingredient amounts, visibility, photos and steep times stay as saved. You can undo this batch below.</p>
+<button class="btn btn-warning align-self-start" {% if not counts.high %}disabled{% endif %}>Apply {{ counts.high }} clear matches</button>
+</form>
+<div class="d-flex flex-wrap gap-3 mb-3">
+<a href="{{ url_for('master_admin.recipe_profiles') }}">All unprofiled recipes</a>
+<span>Page {{ page }} of {{ pages }}</span>
+{% if page > 1 %}<a href="{{ url_for('master_admin.recipe_profiles',view=view,page=page-1) }}">Previous</a>{% endif %}
+{% if page < pages %}<a href="{{ url_for('master_admin.recipe_profiles',view=view,page=page+1) }}">Next</a>{% endif %}
+</div>
+{% for row in rows %}
+<article class="card card-body mb-3">
+<div class="d-flex flex-wrap justify-content-between gap-2"><h2 class="h4">{{ row.name }}</h2><span>{{ {'high':'Clear match','review':'Needs review','unknown':'Choose a profile'}[row.confidence] }} · {{ row.visibility }}</span></div>
+<p>Main profile: <strong>{{ row.profiles[0] if row.profiles else 'Not enough evidence' }}</strong>{% if row.profiles|length > 1 %} · Also: {{ row.profiles[1:]|join(', ') }}{% endif %}</p>
+<details><summary>Why this suggestion?</summary><ul>{% for reason in row.reasons %}<li>{{ reason }}</li>{% endfor %}</ul>
+<p>{{ row.short_description }} {{ row.description[:500] }}</p>
+<ul>{% for ingredient in row.ingredients %}<li>{{ ingredient.name or 'Unrecognised ingredient' }} · {{ ingredient.amount_percent }}%</li>{% endfor %}</ul>
+</details>
+<form method="post" class="d-flex flex-wrap gap-2 align-items-end mt-3">
+<input type="hidden" name="preview_token" value="{{ row.token }}"><input type="hidden" name="action" value="apply">
+<div><label class="form-label" for="profile-{{ row.id }}">Main profile</label><select id="profile-{{ row.id }}" name="main_profile" class="form-select" required>
+<option value="">Choose…</option>{% for profile in profiles %}<option {% if row.profiles and profile == row.profiles[0] %}selected{% endif %}>{{ profile }}</option>{% endfor %}</select></div>
+<button class="btn btn-outline-warning">Apply to this recipe</button>
+</form>
+</article>
+{% else %}<p>No recipes in this group need a profile.</p>{% endfor %}
+{% if batches %}
+<h2 class="h4 mt-4">Recent profile batches</h2>
+<p>Undo restores the previous profiles only where this batch’s assignment is still current. Later edits are preserved.</p>
+{% for batch in batches %}<form method="post" class="d-flex flex-wrap gap-3 align-items-center mb-2">
+<input type="hidden" name="preview_token" value="{{ batch.token }}"><input type="hidden" name="action" value="undo">
+<span>{{ batch.created_at }} UTC · {{ batch.count }} recipes</span><button class="btn btn-outline-secondary btn-sm">Undo this batch</button>
+</form>{% endfor %}
+{% endif %}
+{% endblock %}
