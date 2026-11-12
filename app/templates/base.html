@@ -9,6 +9,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='industrial.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='responsive.css') }}">
     <style>
+        .lab-return-link { min-height: 44px; display: inline-flex; align-items: center; }
+        @media(max-width:575px) { .navbar > .container-fluid { flex-wrap: wrap; gap: .5rem; } .navbar .ms-auto { width: 100%; flex-wrap: wrap; } .lab-return-link { flex: 1 1 100%; order: -1; } }
         .app-shell { display: flex; min-height: 100vh; }
         .flash-messages { position: fixed; top: 1rem; right: 1rem; z-index: 10000; width: min(420px, calc(100vw - 2rem)); }
         .table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -33,10 +35,10 @@
                 <span class="me-2">🧪</span> My Inventory
             </a>
             <a href="{{ url_for('library.index', view='reference') }}" class="nav-link goat-nav">
-                <span class="me-2">📡</span> Reference Library
+                <span class="me-2">📡</span> Flavour catalogue
             </a>
             <a href="{{ url_for('mix.history') }}" class="nav-link goat-nav">
-                <span class="me-2">📜</span> Production Logs
+                <span class="me-2">📜</span> Batch history
             </a>
             {% if lab_bridge_enabled and can_access_production_jobs %}
             <a href="{{ url_for('production_jobs.index') }}" class="nav-link goat-nav">
@@ -50,7 +52,7 @@
             {% if session.get('role') in ['Old Goat', 'Master'] %}
                 <div class="px-3 pt-4 pb-1 small text-uppercase" style="color:#444; letter-spacing: 1px;">Admin</div>
                 <a href="{{ url_for('master_admin.console') }}" class="nav-link goat-nav">
-                    <span class="me-2">🛠️</span> Master Admin Console
+                    <span class="me-2">🛠️</span> Lab tools
                 </a>
             {% endif %}
         </nav>
@@ -69,6 +71,7 @@
                 </button>
                 <span class="navbar-brand d-lg-none ms-2 py-0">{% include "partials/og_brand.html" %}</span>
                 <div class="ms-auto d-flex align-items-center gap-2">
+                    <a class="btn btn-warning lab-return-link" href="{{ url_for('tvw_community.community_feed') }}">← Back to TVW Calculator</a>
                     {% if session.get('user_id') %}
                         <span class="badge text-bg-secondary">{{ session.get('role') }}</span>
                         <span class="fw-semibold d-none d-sm-inline">{{ session.get('username') }}</span>
@@ -89,14 +92,14 @@
                     <a href="{{ url_for('dashboard_index') }}" class="nav-link goat-nav">📊 Dashboard</a>
                     <a href="{{ url_for('recipes.library') }}" class="nav-link goat-nav">📖 Recipe Library</a>
                     <a href="{{ url_for('library.index', view='inventory') }}" class="nav-link goat-nav">🧪 My Inventory</a>
-                    <a href="{{ url_for('library.index', view='reference') }}" class="nav-link goat-nav">📡 Reference Library</a>
-                    <a href="{{ url_for('mix.history') }}" class="nav-link goat-nav">📜 Production Logs</a>
+                    <a href="{{ url_for('library.index', view='reference') }}" class="nav-link goat-nav">📡 Flavour catalogue</a>
+                    <a href="{{ url_for('mix.history') }}" class="nav-link goat-nav">📜 Batch history</a>
                     {% if lab_bridge_enabled and can_access_production_jobs %}
                     <a href="{{ url_for('production_jobs.index') }}" class="nav-link goat-nav">🏭 Production Jobs</a>
                     {% endif %}
                     {% if session.get('role') in ['Old Goat', 'Master'] %}
                         <hr class="border-secondary">
-                        <a href="{{ url_for('master_admin.console') }}" class="nav-link goat-nav">🛠️ Master Admin Console</a>
+                        <a href="{{ url_for('master_admin.console') }}" class="nav-link goat-nav">🛠️ Lab tools</a>
                     {% endif %}
                 </div>
             </div>

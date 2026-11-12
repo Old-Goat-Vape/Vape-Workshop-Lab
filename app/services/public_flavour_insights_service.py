@@ -44,7 +44,8 @@ def builder_flavour_usage(reference_id):
                          AND {visible_flavour_sql('f')}))""", (reference_id,)).fetchone()
     if not eligible:
         return None
-    ids, cohort = _usage_cohort([reference_id])
+    from config.catalogue_identity import equivalent_recipe_reference_ids
+    ids, cohort = _usage_cohort(equivalent_recipe_reference_ids(db, reference_id))
     row = db.execute(f"SELECT COUNT(*) AS count, AVG(pct) AS average FROM ({cohort})", ids).fetchone()
     return dict(ingredient_id=int(reference_id), count=int(row['count']), average=row['average'])
 

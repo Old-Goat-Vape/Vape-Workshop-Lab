@@ -59,6 +59,13 @@ def canonical_item(brand, name, category="Flavor"):
         ):
             series = "SL"
         cb = f"CAP ({series})" if series else "CAP"
+    # Capella lists the original as Vanilla Custard and the reformulation as V2.
+    # Retailers call the original V1. This exception is product-specific, never a
+    # general rule equating unversioned flavours with V1.
+    # https://capellaflavors.com/products/vanilla-custard
+    # https://capellaflavors.com/products/vanilla-custard-v2
+    if cb == 'CAP' and normalize_flavor_identity_name(clean) in {'vanilla custard', 'vanilla custard v1', 'vanilla custard (v1)'}:
+        clean = 'Vanilla Custard V1'
     normalized = normalize_flavor_identity_name(clean)
     key = (
         json.dumps([kind, cb.casefold(), normalized], separators=(",", ":"))
@@ -126,3 +133,17 @@ def visible_flavour_sql(alias="f"):
         f"AND NOT EXISTS (SELECT 1 FROM flavor_reference cr WHERE cr.id={alias}.source_flavor_ref_id "
         f"AND (NOT ({recipe_flavour_sql('cr')}) OR COALESCE(cr.is_nicotine,0)=1 OR COALESCE(cr.active,1)=0))"
     )
+
+
+def equivalent_recipe_reference_ids(db, reference_id):
+    """Read verified equivalent identities without rewriting stock, prices or versions."""
+    row = db.execute('SELECT brand,name,category FROM flavor_reference WHERE id=?', (reference_id,)).fetchone()
+    if not row:
+        return []
+    key = canonical_item(row['brand'], row['name'], row['category'])[2]
+    if key is None:
+        return [int(reference_id)]
+    return [int(r['id']) for r in db.execute(f"""SELECT fr.id FROM flavor_reference fr
+        WHERE COALESCE(fr.active,1)=1 AND COALESCE(fr.is_nicotine,0)=0
+          AND {recipe_flavour_sql('fr')}
+          AND tvw_catalogue_key(fr.brand,fr.name,fr.category)=? ORDER BY fr.id""", (key,))]

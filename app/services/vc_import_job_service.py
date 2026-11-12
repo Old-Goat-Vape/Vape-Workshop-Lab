@@ -53,9 +53,9 @@ def snapshot(db, job_id=None):
     counts = {r['status']: r['n'] for r in db.execute(
         'SELECT status,COUNT(*) n FROM vc_import_job_items WHERE job_id=? GROUP BY status', (job['id'],))}
     job.update(discovered=sum(counts.values()), imported=counts.get('done', 0),
-               pending=counts.get('pending', 0), failed=counts.get('failed', 0))
+               pending=counts.get('pending', 0), failed=counts.get('failed', 0), skipped=counts.get('skipped',0))
     job['failures'] = [dict(r) for r in db.execute(
-        "SELECT recipe_id,error,attempts FROM vc_import_job_items WHERE job_id=? AND error!='' ORDER BY recipe_id LIMIT 20", (job['id'],))]
+        "SELECT recipe_id,error,attempts,status FROM vc_import_job_items WHERE job_id=? AND error!='' ORDER BY recipe_id LIMIT 20", (job['id'],))]
     return job
 
 
@@ -192,6 +192,8 @@ def process_step(db, owner):
             reason = str(result.get('stop_reason') or '')
             if reason.startswith('source_http_'):
                 db.execute("UPDATE vc_import_jobs SET status='paused',last_error=? WHERE id=?", (reason, job_id))
+            elif rid in [str(value) for value in result.get('empty_formula_ids', [])]:
+                db.execute("UPDATE vc_import_job_items SET status='skipped',error='Source page has no ingredient formula (testing/review post).' WHERE job_id=? AND recipe_id=?", (job_id, rid))
             elif done:
                 db.execute("UPDATE vc_import_job_items SET status='done',error='' WHERE job_id=? AND recipe_id=?", (job_id, rid))
             else:

@@ -615,7 +615,7 @@ def search_flavour_reference_for_builder(*, query: str, limit: int = 100) -> Lis
     rows = []
     for fuzzy in (0, 1):
         rows = db.execute(f"""
-            SELECT fr.id, fr.brand, fr.name, COALESCE(fr.density,1.036) AS density,
+            SELECT fr.id, fr.brand, fr.name, COALESCE(fr.price_per_ml,0) AS price_per_ml, COALESCE(fr.density,1.036) AS density,
                    MIN(fv.canonical_name) AS catalogue_name,
                    MAX(MAX(tvw_flavour_search_score(fr.brand,fr.name,?,?),
                            tvw_flavour_search_score(fv.brand,fv.canonical_name,?,?))) AS search_score
@@ -628,8 +628,19 @@ def search_flavour_reference_for_builder(*, query: str, limit: int = 100) -> Lis
             LIMIT ?
         """, (q,fuzzy,q,fuzzy,lim)).fetchall()
         if rows: break
-    out: list[dict[str, Any]] = []
+    from config.catalogue_identity import canonical_item
+    grouped = {}
     for row in rows:
+        item = dict(row)
+        cb, clean, key = canonical_item(item['brand'], item['name'], 'Flavor')
+        identity = key or str(item['id'])
+        old = grouped.get(identity)
+        rank = (item['price_per_ml'] > 0, item['name'] == clean, -item['id'])
+        if old is None or rank > old[0]:
+            item.update(brand=cb, name=clean)
+            grouped[identity] = (rank, item)
+    out: list[dict[str, Any]] = []
+    for _, row in grouped.values():
         d = dict(row)
         brand = unescape(str(d.get("brand") or "Unknown"))
         name = unescape(str(d.get("name") or f"Flavor #{d.get('id')}"))
@@ -833,7 +844,8 @@ def tvw_flavour_ingredient_ref_ids(flavour: Dict[str, Any]) -> list[int]:
     db = get_db()
     ref = flavour.get("source_flavor_ref_id")
     if ref is not None and int(ref) != 0:
-        return [int(ref)]
+        from config.catalogue_identity import equivalent_recipe_reference_ids
+        return equivalent_recipe_reference_ids(db, int(ref))
     rows = db.execute(
         """
         SELECT id

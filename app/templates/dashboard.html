@@ -8,8 +8,8 @@
         {% with logo_href = url_for('dashboard_index'), show_wordmark = false %}{% include "partials/og_brand.html" %}{% endwith %}
     </div>
     <div>
-        <div class="og-page-eyebrow mb-1">Control center</div>
-        <h1 class="h3 fw-bold mb-0">OLD GOAT LAB <span class="text-secondary fw-light">// OVERVIEW</span></h1>
+        <div class="og-page-eyebrow mb-1">Your private workspace</div>
+        <h1 class="h3 fw-bold mb-0">Old Goat Lab</h1>
     </div>
 </div>
 
@@ -17,7 +17,7 @@
     <div class="col-12 col-md-4">
         <div class="card h-100 border-secondary-subtle">
             <div class="card-body">
-                <div class="text-secondary small text-uppercase">Inventory Assets</div>
+                <div class="text-secondary small text-uppercase">Items in catalogue</div>
                 <div class="display-6 fw-bold">{{ stats.total_items }}</div>
             </div>
         </div>
@@ -25,7 +25,7 @@
     <div class="col-12 col-md-4">
         <div class="card h-100 border-secondary-subtle">
             <div class="card-body">
-                <div class="text-secondary small text-uppercase">Low Stock Signals</div>
+                <div class="text-secondary small text-uppercase">Items running low</div>
                 <div class="display-6 fw-bold text-warning">{{ stats.low_stock_count }}</div>
             </div>
         </div>
@@ -33,7 +33,7 @@
     <div class="col-12 col-md-4">
         <div class="card h-100 border-secondary-subtle">
             <div class="card-body">
-                <div class="text-secondary small text-uppercase">Daily Volume (ml)</div>
+                <div class="text-secondary small text-uppercase">Mixed today (ml)</div>
                 <div class="display-6 fw-bold text-info">{{ stats.recent_mixes }}</div>
             </div>
         </div>
@@ -43,26 +43,37 @@
 <section class="card shadow-sm">
     <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h2 class="h6 mb-0">Launch Actions</h2>
-            <span class="small text-secondary">Production shortcuts only</span>
+            <h2 class="h6 mb-0">What would you like to do?</h2>
+            <span class="small text-secondary">Mixing, stock and administration</span>
         </div>
         <div class="row g-2">
-            <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('recipes.library') }}" class="btn btn-outline-warning">Start Mix</a></div>
+            <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('recipes.library') }}" class="btn btn-outline-warning">Mix a recipe</a></div>
             {% if (session.get('username') or '')|lower == 'old goat' %}
             <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('recipes.pricing_sheet') }}" class="btn btn-outline-warning">Price List Worksheet</a></div>
             <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('recipes.cost_calculator') }}" class="btn btn-outline-warning">Recipe Cost Calculator</a></div>
             {% endif %}
-            <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('recipes.create_recipe') }}" class="btn btn-outline-light">Recipe Creator</a></div>
-            <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('library.index') }}" class="btn btn-outline-light">Inventory / Library</a></div>
-            <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('mix.history') }}" class="btn btn-outline-light">Batch Logs</a></div>
+            <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('recipes.create_recipe') }}" class="btn btn-outline-light">Create a recipe</a></div>
+            <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('library.index') }}" class="btn btn-outline-light">Manage stock</a></div>
+            <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('mix.history') }}" class="btn btn-outline-light">Batch history</a></div>
             {% if can_access_production_jobs %}
             <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('production_jobs.index') }}" class="btn btn-outline-info">Production Jobs</a></div>
             {% endif %}
-            {% if session.get('role') in ['Old Goat', 'Master', 'Manager'] %}
-            <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('master_admin.console') }}" class="btn btn-outline-danger">Admin / Reports</a></div>
+            {% if session.get('role') in ['Old Goat', 'Master'] %}
+            <div class="col-12 col-md-6 col-xl-4 d-grid"><a href="{{ url_for('master_admin.console') }}" class="btn btn-outline-danger">Imports &amp; Lab tools</a></div>
             {% endif %}
         </div>
     </div>
 </section>
 
+{% if session.get('role') in ['Old Goat', 'Master'] %}
+<section class="card shadow-sm mt-3"><div class="card-body">
+  <h2 class="h5">Keep the library up to date</h2>
+  <p class="text-secondary">Import recipes privately, update shop prices, or review recipe data.</p>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-info" href="{{ url_for('master_admin.console', tab='scrapers') }}">Recipe imports &amp; prices</a>
+    <a class="btn btn-outline-light" href="{{ url_for('master_admin.console', tab='flavor_intel') }}">Recipe data &amp; flavour matches</a>
+    <a class="btn btn-outline-light" href="{{ url_for('master_admin.console', tab='users') }}">Manage people</a>
+  </div>
+</div></section>
+{% endif %}
 {% endblock %}
