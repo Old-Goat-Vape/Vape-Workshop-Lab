@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from db import SQLITE_BUSY_USER_MESSAGE, is_sqlite_busy_error, sqlite_retry
 from models import recipes_repo
-from utils.auth import ROLE_HIERARCHY
+from utils.auth import ROLE_HIERARCHY, can_access_private_costs
 
 
 @dataclass(frozen=True)
@@ -33,7 +33,7 @@ def user_context_from_session(session: Dict[str, Any]) -> UserContext:
         role=role,
         level=level,
         is_old_goat=is_old_goat,
-        show_cost=is_old_goat,
+        show_cost=can_access_private_costs(username, role),
     )
 
 
@@ -192,7 +192,7 @@ def pricing_sheet_view(
     """Lab costing worksheet — concentrate cost/ml from catalog; overhead + margins in browser."""
     user = user_context_from_session(session)
     if not user.show_cost:
-        return None, "Recipe costing is restricted to the Old Goat account.", "danger"
+        return None, "Recipe costing is restricted to the Old Goat account or Old Goat role.", "danger"
 
     try:
         uid_int = int(session.get("user_id")) if session.get("user_id") is not None else None
@@ -245,7 +245,7 @@ def cost_calculator_view(
     """Focused single-recipe batch profit calculator — Old Goat only."""
     user = user_context_from_session(session)
     if not user.show_cost:
-        return None, "Recipe costing is restricted to the Old Goat account.", "danger"
+        return None, "Recipe costing is restricted to the Old Goat account or Old Goat role.", "danger"
 
     try:
         uid_int = int(session.get("user_id")) if session.get("user_id") is not None else None

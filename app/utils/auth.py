@@ -44,6 +44,11 @@ def is_old_goat_role(role: str | None) -> bool:
     return str(role or "").strip() == "Old Goat"
 
 
+def can_access_private_costs(username: str | None, role: str | None) -> bool:
+    """Keep the original owner account and extend costing to the exact owner role."""
+    return str(username or '').strip().lower() == 'old goat' or is_old_goat_role(role)
+
+
 def can_perform_destructive_tvw_admin_actions(role: str | None) -> bool:
     return has_min_role(role, "Master")
 
