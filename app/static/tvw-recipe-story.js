@@ -24,17 +24,43 @@
     photo.alt = uploaded ? 'Your recipe photo preview' : art.label;
     byId('storyArtworkCaption').textContent = uploaded ? 'Your recipe photo' : `Using ${art.label} · Upload your own photo`;
   };
-  byId('recipeImage').addEventListener('change', e => {
+  let photoSequence = 0, photoBusy = false;
+  // Capture before the calculator's submit listener so a resize cannot lock Save.
+  form.addEventListener('submit', e => {
+    if (photoBusy) {
+      e.preventDefault(); e.stopImmediatePropagation();
+      byId('imageMessage').textContent = 'Preparing your photo… Please save once it is ready.';
+    }
+  }, true);
+  byId('recipeImage').addEventListener('change', async e => {
+    const sequence = ++photoSequence;
     if (photoUrl) URL.revokeObjectURL(photoUrl);
     photoUrl = null;
-    const file = e.target.files[0], message = byId('imageMessage');
-    if (file && (file.size > 5*1024*1024 || !['image/jpeg','image/png','image/webp'].includes(file.type))) {
-      message.textContent = 'Choose a JPG, PNG or WebP smaller than 5 MB.'; e.target.value = '';
-    } else if (file) {
-      photoUrl = URL.createObjectURL(file); photo.src = photoUrl;
-      message.textContent = 'Landscape centre crop. Select this photo again if you reopen a draft or a save fails.';
-    } else message.textContent = '';
-    update();
+    const input=e.target,file=input.files[0],message=byId('imageMessage');
+    photoBusy=!!file;
+    if (!file) { message.textContent='';update();return; }
+    if (!['image/jpeg','image/png','image/webp'].includes(file.type) || file.size > 50*1024*1024) {
+      message.textContent='Choose a JPG, PNG or WebP photo up to 50 MB. Large photos are resized automatically.';
+      input.value='';photoBusy=false;update();return;
+    }
+    message.textContent='Preparing your photo… Large images are resized automatically.';
+    try {
+      const optimized=await window.TVWPhotoUpload.resize(file);
+      if (sequence !== photoSequence) return;
+      if (optimized !== file) {
+        const transfer=new DataTransfer();transfer.items.add(optimized);input.files=transfer.files;
+      }
+      photoUrl=URL.createObjectURL(optimized);
+      const reduced=optimized.size<file.size;
+      message.textContent=reduced ? `Photo ready · resized from ${(file.size/1048576).toFixed(1)} MB to ${Math.ceil(optimized.size/1024)} KB. Your original is unchanged.` : 'Photo ready. We optimise the saved copy automatically.';
+    } catch (_) {
+      if (sequence !== photoSequence) return;
+      // The server can also resize originals; do not force an external editor.
+      photoUrl=URL.createObjectURL(file);
+      message.textContent='Browser resizing was unavailable. The server will try to optimise this photo when you save.';
+    } finally {
+      if(sequence===photoSequence){photoBusy=false;update();input.dispatchEvent(new Event('input',{bubbles:true}));}
+    }
   });
   for (const [id,value] of [['shakeVape','0'],['clearSteep','']]) byId(id).addEventListener('click',()=>{
     byId('steepDays').value = value; byId('steepDays').dispatchEvent(new Event('input',{bubbles:true}));
