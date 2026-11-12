@@ -1,0 +1,39 @@
+/* Bench illustration: scoped to guided mixing; existing controls retain their IDs. */
+body.tvw-bench-mode .tvw-workstation{background:radial-gradient(ellipse at 50% 20%,#26313a,#171b20 48%,#101215)}
+body.tvw-bench-mode .tvw-ws-bench-layout{gap:16px;padding:18px;background:linear-gradient(#1e242b,#181a1b);border:0;align-items:start}
+body.tvw-bench-mode .tvw-ws-bench-layout .tvw-ws-panel{border-radius:18px;background:linear-gradient(145deg,#252a31,#181d23);border:1px solid #49505a}
+body.tvw-bench-mode .tvw-ws-bench-layout .tvw-ws-face{background:radial-gradient(ellipse at 50% 20%,#303333,#1b2027 70%);border-color:#876138;box-shadow:0 15px 45px #0005}
+.bench-rack-kicker{color:#d3b98e;font-size:.85rem;letter-spacing:.09em;margin:0 0 .4rem}
+.bench-rack-title{color:#f4f0e9;font-size:1.4rem;margin:0 0 1.25rem}
+.bench-bottle-tray{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 10px}
+.bench-ingredient{display:flex;flex-direction:column;align-items:center;text-align:center;min-width:0;padding:.65rem .3rem .85rem;border-bottom:2px solid #84623c;background:linear-gradient(transparent,#a37a3510);border-radius:8px}
+.bench-mini-bottle{width:48px;height:83px;position:relative;margin:18px 0 10px;border:1px solid #dca253;border-radius:13px 13px 8px 8px;background:linear-gradient(90deg,#4b2815,#a96b28 26%,#653c16 65%,#342415);box-shadow:inset 4px 0 6px #ffd28c25,5px 8px 10px #0005}
+.bench-mini-bottle:before{content:'';position:absolute;width:22px;height:14px;left:12px;top:-12px;background:#a1763f;border:1px solid #c8a570}
+.bench-bottle-cap{position:absolute;width:32px;height:20px;top:-28px;left:7px;border-radius:4px 4px 0 0;background:repeating-linear-gradient(90deg,#15181c 0 3px,#34383c 3px 5px);border:1px solid #62656b}
+.bench-bottle-label{position:absolute;top:31px;left:3px;right:3px;padding:5px 0;background:#eee4cf;color:#3c3024;font:700 12px system-ui;letter-spacing:1px;border-radius:2px}
+.bench-ingredient-name{color:#f3f4f7;font-size:1.125rem;line-height:1.35;overflow-wrap:anywhere}
+.bench-ingredient-brand{color:#c8cbd2;font-size:1rem;margin:.25rem 0;overflow-wrap:anywhere}
+.bench-ingredient-state{color:#efc58b;font-size:.95rem}
+.bench-ingredient[data-position=done] .bench-ingredient-state{color:#a5e3b6}
+.bench-ingredient[data-position=done] .bench-mini-bottle{filter:saturate(.55)}
+.bench-ingredient[data-kind=nicotine] .bench-bottle-label{background:#f2c3bc}
+.bench-ingredient[data-kind=pg] .bench-bottle-label,.bench-ingredient[data-kind=vg] .bench-bottle-label{background:#c0dce2}
+.bench-rack-empty{color:#bec7d0;font-size:1rem;line-height:1.5}
+.bench-scene{position:relative;display:flex;align-items:flex-end;justify-content:center;gap:clamp(22px,5vw,70px);padding:12px 10px 24px;margin:.5rem 0 0;background:radial-gradient(ellipse at bottom,#c68f3220,transparent 70%);border-bottom:10px solid #666f78;border-radius:0 0 18px 18px}
+.bench-scene:after{content:'';position:absolute;bottom:-19px;left:12%;right:12%;height:9px;background:linear-gradient(#414850,#252a30);border-radius:0 0 10px 10px}
+#benchCurrentBottle{width:130px;min-height:180px}
+#benchCurrentBottle .bench-ingredient{border:1px solid #b6884c;background:#a0782520}
+#benchCurrentEmpty{color:#d3c6b3;font-size:.95rem;max-width:130px;text-align:center;align-self:center}
+#benchCurrentBottle:empty{display:none}
+.bench-receiver-wrap{text-align:center;width:145px}
+.bench-receiver{width:110px;height:166px;position:relative;margin:26px auto 8px;background:linear-gradient(90deg,#ffffff14,#ffffff04 35%,#ffffff12);border:2px solid #a3c4cb;border-radius:24px 24px 14px 14px;overflow:hidden;box-shadow:inset 6px 0 7px #fff1,7px 8px 16px #0005}
+.bench-receiver-neck{width:44px;height:24px;margin:0 auto -26px;border:2px solid #a3c4cb;border-bottom:0;background:repeating-linear-gradient(0deg,#7b919b 0 2px,#263942 2px 5px);border-radius:5px 5px 0 0}
+.bench-liquid{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(90deg,#ad6b19bb,#e5b252cc,#a86d20cc);transition:height .6s ease;border-top:2px solid #ffe1a1}
+.bench-receiver-label{position:absolute;left:9px;right:9px;top:65px;padding:9px 2px;border:1px solid #ffffff50;border-radius:4px;color:#edf6f9;background:#17232cdd;font:700 .9rem system-ui;letter-spacing:.08em}
+.bench-scene-note{text-align:center;color:#c2d7e2;font-size:.9rem;margin:25px 0 8px}
+body.tvw-bench-mode .tvw-ws-lcd{background:linear-gradient(145deg,#131c24,#152b36);border-color:#6b8794;border-radius:10px 10px 20px 20px}
+body.tvw-bench-mode .tvw-ws-kicker,body.tvw-bench-mode .tvw-ws-version,body.tvw-bench-mode .tvw-ws-counter,body.tvw-bench-mode .tvw-ws-batch{color:#c4cbd3}
+@media(min-width:1100px){body.tvw-bench-mode .tvw-ws-bench-layout{grid-template-columns:minmax(210px,1fr) minmax(480px,2.2fr) minmax(210px,1fr);grid-template-areas:'used center todo'}.bench-bottle-tray{max-height:65vh;overflow:auto;padding:4px}}
+@media(max-width:1099px){body.tvw-bench-mode .tvw-ws-bench-layout{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:'center center' 'used todo';gap:10px;padding:10px}.bench-bottle-tray{grid-template-columns:repeat(auto-fit,minmax(90px,1fr))}}
+@media(max-width:480px){body.tvw-bench-mode .tvw-ws-bench-layout .tvw-ws-used,body.tvw-bench-mode .tvw-ws-bench-layout .tvw-ws-todo{padding:12px}.bench-bottle-tray{grid-template-columns:1fr}.bench-rack-title{font-size:1.1rem}.bench-scene{gap:20px}}
+@media(prefers-reduced-motion:reduce){.bench-liquid{transition:none}}

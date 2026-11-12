@@ -6,6 +6,8 @@
 
 <link rel="stylesheet" href="{{ url_for('static', filename='tvw.css') }}">
 
+<link rel="stylesheet" href="{{ url_for('static', filename='tvw-bench-visuals.css') }}">
+<script src="{{ url_for('static', filename='tvw-bench-visuals.js') }}"></script>
 <script>document.body.classList.add("tvw-bench-mode");</script>
 
 
@@ -126,6 +128,11 @@
 
 
 
+      <div class="bench-scene" aria-label="Mixing bench illustration">
+        <div id="benchCurrentBottle"></div><p id="benchCurrentEmpty">Your next ingredient will move here.</p>
+        <div class="bench-receiver-wrap" aria-hidden="true"><div class="bench-receiver-neck"></div><div class="bench-receiver"><div id="benchLiquid" class="bench-liquid" style="height:0%"></div><span class="bench-receiver-label">YOUR MIX</span></div></div>
+      </div>
+      <p class="bench-scene-note"><span id="benchFillCaption">Estimated fill · 0 ml</span><br>From recorded pours · use your real scale for measurements</p>
       <div class="tvw-ws-lcd" id="scaleHero">
 
         <div class="tvw-ws-lcd-cell tvw-ws-lcd-target">
@@ -1008,6 +1015,9 @@
 
         return {
 
+          key: s.step_no,
+          brand: p.brand || p.manufacturer || '',
+          category: p.category || '',
           label: ingredientLabel(p),
 
           shortName,
@@ -1030,7 +1040,7 @@
 
         done: [],
 
-        toAdd: plan.map((x) => ({ label: x.label, shortName: x.shortName })),
+        toAdd: plan.map((x) => ({ ...x })),
 
       };
 
@@ -1597,69 +1607,18 @@
     const bench = benchStatusFor(steps, current, stepType);
 
     const isPrep = stepType === "instruction";
-
-    const doneLines = bench.done.length
-
-      ? bench.done.map((x) => `<li class="tvw-ws-side-item is-done">✓ ${esc(x.shortName)}</li>`).join("")
-
-      : `<li class="tvw-ws-side-item is-empty">—</li>`;
-
-    if (usedPanel) {
-
-      usedPanel.innerHTML = `
-
-        <div class="tvw-ws-side-head">
-
-          <span class="tvw-ws-kicker">USED</span>
-
-          <h2 class="tvw-ws-side-title">LEFT SIDE</h2>
-
-        </div>
-
-        <ul class="tvw-ws-side-list">${doneLines}</ul>
-
-      `;
-
-    }
-
-    const todoLines = bench.toAdd.length
-
-      ? bench.toAdd.map((x) => `<li class="tvw-ws-side-item">○ ${esc(x.shortName)}</li>`).join("")
-
-      : `<li class="tvw-ws-side-item is-empty">—</li>`;
-
-    const setupCopy = isPrep
-
-      ? `<p class="tvw-ws-side-hint">Arrange these bottles on the RIGHT side of your bench. After each pour, move the bottle to the LEFT.</p>`
-
-      : "";
-
-    if (todoPanel) {
-
-      todoPanel.innerHTML = `
-
-        <div class="tvw-ws-side-head">
-
-          <span class="tvw-ws-kicker">TO ADD</span>
-
-          <h2 class="tvw-ws-side-title">RIGHT SIDE</h2>
-
-        </div>
-
-        ${setupCopy}
-
-        <ul class="tvw-ws-side-list">${todoLines}</ul>
-
-      `;
-
-    }
-
+    const linked = linkedPourStepFor(steps, current) || (stepType === 'recovery' ? steps.find(s => s.payload?.overpour_recovery_pending) : null);
+    const p = linked?.payload || {};
+    const hand = linked && !isBottlePhysicallyLeft(p) && !isPrep ? {
+      key: linked.step_no, shortName: cleanDisplayName(p.name || p.ingredient_name || ingredientLabel(p)),
+      brand: p.brand || p.manufacturer || '', category: p.category || '',
+    } : null;
+    const confirmed = steps.map(s => s.payload?.overpour_recovery_pending ? {...s, completed_at:null} : s);
+    const ready = hand ? bench.toAdd.filter(x => x.key !== hand.key) : bench.toAdd;
+    window.TVWBenchVisuals?.render({done:bench.done,ready,current:hand,fill:computeBottleFill(confirmed,sessionBatchMl(sess))});
     if (isPrep) {
-
       goatLine.textContent = "Arrange these bottles on the RIGHT side of your bench. After each pour, move the bottle to the LEFT.";
-
       goatLine.className = "tvw-ws-goat-inline";
-
     }
 
   };
