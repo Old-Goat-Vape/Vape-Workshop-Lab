@@ -180,21 +180,17 @@ def fetch_stash_quick_add_options(*, limit: int = 50, query: str = "") -> list[d
     """Lightweight flavour picker rows for stash quick-add UX."""
     from config.catalogue_identity import visible_flavour_sql
     db = get_db()
-    rows = db.execute(
-        f"""
-        SELECT id, canonical_name, brand, source_flavor_ref_id
-        FROM flavours f
-        WHERE {visible_flavour_sql('f')}
-          AND COALESCE(is_hidden, 0) = 0
-          AND COALESCE(is_invalid, 0) = 0
-          AND (canonical_name LIKE ? ESCAPE '!' OR brand LIKE ? ESCAPE '!')
-        ORDER BY brand COLLATE NOCASE ASC, canonical_name COLLATE NOCASE ASC, id ASC
-        LIMIT ?
-        """,
-        (*(["%" + str(query or "").replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%"] * 2),
-         max(1, min(int(limit or 50), 100))),
-    ).fetchall()
-    return [dict(r) for r in rows]
+    for fuzzy in (0,1):
+        rows = db.execute(f"""
+            SELECT id, canonical_name, brand, source_flavor_ref_id,
+                   tvw_flavour_search_score(brand,canonical_name,?,?) AS search_score
+            FROM flavours f WHERE {visible_flavour_sql('f')}
+              AND (?='' OR tvw_flavour_search_score(brand,canonical_name,?,?)>0)
+            ORDER BY search_score DESC, brand COLLATE NOCASE, canonical_name COLLATE NOCASE, id
+            LIMIT ?
+        """,(query,fuzzy,query,query,fuzzy,max(1,min(limit,100)))).fetchall()
+        if rows: return [dict(r,suggestion=bool(query) and r['search_score']<60) for r in rows]
+    return []
 
 
 def fetch_stash_binding_for_flavour(

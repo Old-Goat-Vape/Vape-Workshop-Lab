@@ -903,6 +903,8 @@ def tvw_flavour_detail(flavour_id: int):
         abort(404)
     recipes_repo.attach_tvw_flavour_usage_display(flavour)
     ref_ids = recipes_repo.tvw_flavour_ingredient_ref_ids(flavour)
+    from services.public_flavour_insights_service import flavour_insights
+    insights = flavour_insights(ref_ids)
     community_counts = recipes_repo.fetch_tvw_flavour_community_counts(flavour_id)
     recipes_total = recipes_repo.count_tvw_public_current_recipes_using_refs(ref_ids)
     rp_raw = (request.args.get("recipes_page") or "1").strip()
@@ -939,6 +941,7 @@ def tvw_flavour_detail(flavour_id: int):
         flavour=flavour,
         notes=notes,
         reviews=reviews,
+        insights=insights,
         recipes_using=recipes_using,
         recipes_total=recipes_total,
         recipes_page=recipes_page,

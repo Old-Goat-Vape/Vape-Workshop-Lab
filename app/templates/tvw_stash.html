@@ -251,7 +251,7 @@
           option.dataset.referenceId = item.source_flavor_ref_id || "";
           datalist.append(option);
         }
-        quickHint.textContent = datalist.options.length ? "Choose a flavour from the suggestions." : "No matching flavours.";
+        quickHint.textContent = datalist.options.length ? ((body.items || []).some(item => item.suggestion) ? "Similar spellings — check the flavour and manufacturer before choosing." : "Choose a flavour from the suggestions.") : "No matching flavours.";
       } catch (error) {
         if (version === searchVersion) quickHint.textContent = error.message;
       }

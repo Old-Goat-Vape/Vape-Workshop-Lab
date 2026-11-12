@@ -3476,7 +3476,7 @@ class TVWApiTests(unittest.TestCase):
         r = self.client.get("/flavours/1")
         self.assertEqual(r.status_code, 200)
         self.assertIn(b"Recipe1", r.data)
-        self.assertIn(b"Catalogue data", r.data)
+        self.assertIn(b"Imported catalogue hint", r.data)
         self.assertIn(b"4.25", r.data)
         self.assertIn(b"Recipes using this flavour", r.data)
 
@@ -3501,7 +3501,7 @@ class TVWApiTests(unittest.TestCase):
             db.commit()
         r = self.client.get("/flavours/1")
         self.assertEqual(r.status_code, 200)
-        self.assertIn(b"Catalogue default", r.data)
+        self.assertIn(b"Stored as a default percentage", r.data)
         self.assertIn(b"2.50", r.data)
 
     def test_what_can_i_make_old_goat_lab_holdings(self):
