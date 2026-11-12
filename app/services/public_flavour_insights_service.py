@@ -1,6 +1,7 @@
-"""Public flavour insights from current, community-visible TVW recipe versions.
+"""Aggregate flavour insights from current TVW recipes at every visibility level.
 
-Never use the Lab analytics cache: it may contain private formulations.
+Private recipe identities and formulations are never returned; only aggregates.
+The separate Lab cache is not used because its current-version rules differ.
 """
 from collections import Counter
 from math import ceil
@@ -16,7 +17,7 @@ def flavour_insights(ref_ids):
     if not ids: return empty
     db = get_db()
     placeholders = ','.join('?' for _ in ids)
-    public = recipes_repo.tvw_recipe_public_list_predicate_sql('r')
+    public = recipes_repo.tvw_recipe_analytics_predicate_sql('r')
     cohort = f"""
         SELECT r.id AS recipe_id, rv.id AS version_id, SUM(ri.amount_percent) AS pct
         FROM recipes r JOIN recipe_versions rv ON rv.id=r.current_version_id AND rv.recipe_id=r.id

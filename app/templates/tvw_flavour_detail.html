@@ -47,8 +47,8 @@
   <section class="card shadow-sm mb-3" id="usage-insights" aria-labelledby="usageHeading">
     <div class="card-body">
       <h2 class="h4" id="usageHeading">How mixers use this flavour</h2>
-      <p>Based on <strong>{{ insights.count }} public TVW recipe{{ 's' if insights.count != 1 else '' }}</strong>, using each recipe’s current version once.</p>
-      <p class="text-secondary">These are percentages used in recipes, not single-flavour testing recommendations. The median is the middle value; the average can be pulled up by unusually high percentages. Private and hidden recipes are excluded.</p>
+      <p>Based on <strong>{{ insights.count }} eligible TVW recipe{{ 's' if insights.count != 1 else '' }}</strong>, using each recipe’s current version once.</p>
+      <p class="text-secondary">These are percentages used in recipes, not single-flavour testing recommendations. The median is the middle value; the average can be pulled up by unusually high percentages. Public, private and unlisted recipes contribute to these aggregate figures. Hidden, removed and inactive recipes are excluded. Private recipe details stay private.</p>
       {% if insights.count %}
         {% if insights.count < 5 %}<p class="text-warning">Small sample — treat these figures as examples, rather than an established usage range.</p>{% endif %}
         <dl class="row g-3 mb-3">
@@ -62,19 +62,19 @@
             <tbody>{% for bin in insights.distribution %}<tr><th scope="row">{{ bin.low }}% {{ 'to' if bin.last else 'to below' }} {{ bin.high }}%</th><td>{{ bin.count }}</td></tr>{% endfor %}</tbody>
           </table>
         </details>
-      {% else %}<p>No usable percentages from public current recipes yet. Add a public recipe to help build this information.</p>{% endif %}
+      {% else %}<p>No usable percentages from current recipes yet.</p>{% endif %}
     </div>
   </section>
 
   <section class="card shadow-sm mb-3" aria-labelledby="pairingHeading">
     <div class="card-body">
       <h2 class="h4" id="pairingHeading">Often used in the same recipe</h2>
-      <p class="text-secondary">Observed combinations in the same {{ insights.count }} public recipes. This shows what people combined, rather than a guarantee that flavours work well together.</p>
+      <p class="text-secondary">Observed combinations in the same {{ insights.count }} eligible recipes, including private and unlisted recipes. This shows what people combined, rather than a guarantee that flavours work well together.</p>
       <ul class="list-unstyled mb-0">
         {% for partner in insights.pairings %}<li class="py-2 border-bottom border-secondary">
           <a class="link-info" href="{{ url_for('tvw_recipes.tvw_flavour_detail',flavour_id=partner.flavour_id) }}">{{ partner.name }} — {{ partner.brand }}</a>
           <span> · {{ partner.recipe_count }} recipe{{ 's' if partner.recipe_count != 1 else '' }}</span>
-        </li>{% else %}<li>No pairings from public recipes yet.</li>{% endfor %}
+        </li>{% else %}<li>No pairings from eligible recipes yet.</li>{% endfor %}
       </ul>
     </div>
   </section>
@@ -103,7 +103,7 @@
     <div class="card-body">
       <h2 class="h6 mb-1">Recipes using this flavour</h2>
       <p class="small text-secondary mb-3">
-        {{ recipes_total }} public recipe{{ 's' if recipes_total != 1 else '' }} whose <strong>current version</strong> includes this canonical reference (same visibility rules as the recipe library).
+        {{ recipes_total }} public recipe{{ 's' if recipes_total != 1 else '' }} whose <strong>current version</strong> includes this canonical reference (same visibility rules as the recipe library). The statistics above also include private and unlisted recipes, so their sample count can be larger.
       </p>
       <div class="vstack gap-2">
         {% for recipe in recipes_using %}

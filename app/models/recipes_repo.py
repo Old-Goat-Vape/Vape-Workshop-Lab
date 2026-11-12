@@ -8,14 +8,18 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 from db import get_db
 
 
-def tvw_recipe_public_list_predicate_sql(alias: str = "r") -> str:
-    """SQL fragment: recipe rows visible to non-owners in community lists/feeds."""
-    a = alias
+def tvw_recipe_analytics_predicate_sql(alias: str = "r") -> str:
+    """Eligible aggregate source, independent of recipe visibility."""
     return (
-        f"COALESCE({a}.active, 1) = 1 AND COALESCE({a}.is_hidden, 0) = 0 AND "
-        f"LOWER(COALESCE({a}.moderation_status, 'active')) NOT IN ('hidden', 'archived', 'removed') AND "
-        f"LOWER(COALESCE({a}.visibility, 'private')) = 'public'"
+        f"COALESCE({alias}.active, 1) = 1 AND COALESCE({alias}.is_hidden, 0) = 0 AND "
+        f"LOWER(COALESCE({alias}.moderation_status, 'active')) NOT IN ('hidden', 'archived', 'removed')"
     )
+
+
+def tvw_recipe_public_list_predicate_sql(alias: str = "r") -> str:
+    """Recipe identities/content visible in public lists, distinct from aggregate data."""
+    return (tvw_recipe_analytics_predicate_sql(alias) +
+            f" AND LOWER(COALESCE({alias}.visibility, 'private')) = 'public'")
 
 
 def recipe_dict_visible_in_public_lists(recipe: dict | None) -> bool:
@@ -669,7 +673,7 @@ def fetch_tvw_flavours(
     """Paginated TVW flavour catalog for discovery (excludes merged targets).
 
     Metrics (no N+1):
-      - ``used_in_count``: distinct community-visible recipes (same rules as recipe library)
+      - ``used_in_count``: distinct eligible recipes across all visibility levels
         using this flavour's ``source_flavor_ref_id`` in the current version.
       - ``avg_rating``: mean of visible flavour_reviews only; NULL if none.
       - ``avg_usage_percent``: ``avg_usage`` else ``default_percent`` from import/catalog;
@@ -704,7 +708,7 @@ def fetch_tvw_flavours(
     sort_expr = sort_map.get(sort_key, sort_map["name"])
     sort_order = "DESC" if (sort_dir or "").strip().lower() == "desc" else "ASC"
 
-    pub = tvw_recipe_public_list_predicate_sql("r")
+    pub = tvw_recipe_analytics_predicate_sql("r")
 
     rows = db.execute(
         f"""
