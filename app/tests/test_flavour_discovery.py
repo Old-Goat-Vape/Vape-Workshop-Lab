@@ -56,7 +56,7 @@ class PublicInsightsTests(unittest.TestCase):
 
     def seed(self):
         db=get_db()
-        db.execute("UPDATE recipes SET visibility='private' WHERE id=1")
+        db.execute("UPDATE recipes SET visibility='private', current_version_id=1 WHERE id=1")
         db.execute("INSERT INTO flavor_reference(id,brand,name,category,active) VALUES(102,'Test','Cream','Flavor',1)")
         db.execute("INSERT INTO flavours(id,brand,canonical_name,category,source_flavor_ref_id) VALUES(2,'Test','Cream','Flavor',102)")
         for rid,pct,visibility,hidden in ((2,1,'public',0),(3,3,'public',0),(4,5,'public',0),(5,90,'private',0),(6,80,'unlisted',0),(7,70,'public',1)):
@@ -68,24 +68,25 @@ class PublicInsightsTests(unittest.TestCase):
             db.execute('INSERT INTO recipe_items(version_id,ingredient_id,amount_percent) VALUES(?,102,2)',(vid,))
         db.commit()
 
-    def test_public_current_once_and_pair_counts(self):
+    def test_all_visibility_current_once_and_pair_counts(self):
         with api_fixtures.flask_app.app_context():
             self.seed()
             stats=flavour_insights([101])
-            self.assertEqual(stats['count'],3)
-            self.assertEqual(stats['median'],3)
-            self.assertEqual(stats['average'],3)
-            self.assertEqual((stats['minimum'],stats['maximum']),(1,5))
-            self.assertEqual(sum(b['count'] for b in stats['distribution']),3)
-            self.assertEqual([(r['flavour_id'],r['recipe_count']) for r in stats['pairings']],[(2,3)])
+            self.assertEqual(stats['count'],6)
+            self.assertEqual(stats['median'],5)
+            self.assertAlmostEqual(stats['average'],184/6)
+            self.assertEqual((stats['minimum'],stats['maximum']),(1,90))
+            self.assertEqual(sum(b['count'] for b in stats['distribution']),6)
+            self.assertEqual([(r['flavour_id'],r['recipe_count']) for r in stats['pairings']],[(2,5)])
             self.assertEqual(recipes_repo.count_tvw_public_current_recipes_using_refs([101]),3)
             row=next(r for r in recipes_repo.fetch_tvw_flavours()[0] if r['id']==1)
-            self.assertEqual(row['used_in_count'],3)
+            self.assertEqual(row['used_in_count'],6)
 
     def test_duplicate_lines_sum_once_and_bad_values_not_reported(self):
         with api_fixtures.flask_app.app_context():
             self.seed()
             db=get_db()
+            db.execute("UPDATE recipes SET active=0 WHERE id IN (1,5,6)")
             db.execute('INSERT INTO recipe_items(version_id,ingredient_id,amount_percent) VALUES(20,101,1)')
             db.execute('UPDATE recipe_items SET amount_percent=-2 WHERE version_id=30 AND ingredient_id=101')
             db.execute('UPDATE recipe_items SET amount_percent=101 WHERE version_id=40 AND ingredient_id=101')
@@ -102,8 +103,9 @@ class PublicInsightsTests(unittest.TestCase):
         response=self.client.get('/flavours/1')
         self.assertEqual(response.status_code,200)
         html=response.get_data(as_text=True)
-        self.assertIn('3 public TVW recipes',html)
-        self.assertIn('Small sample',html)
+        self.assertIn('6 eligible TVW recipes',html)
+        self.assertIn('Public, private and unlisted recipes contribute',html)
+        self.assertNotIn('Small sample',html)
         self.assertIn('not single-flavour testing recommendations',html)
         self.assertIn('Often used in the same recipe',html)
         self.assertNotIn('Recipe 5',html)
