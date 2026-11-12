@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from models import recipes_repo
-from services import tvw_mix_service
+from services import tvw_mix_service, recipe_story_service
 
 
 class RecipeBuilderFormError(ValueError):
@@ -32,6 +32,7 @@ class RecipeBuilderPayload:
     total_pct: float
     recipe_id: int | None = None
     calc: dict[str, Any] = field(default_factory=dict)
+    story: dict[str, Any] = field(default_factory=dict)
 
 
 _ALLOWED_VISIBILITY = {"private", "public", "unlisted"}
@@ -99,7 +100,9 @@ def parse_flavour_rows(form) -> list[dict[str, Any]]:
 
 
 def form_values_from_request(form) -> dict[str, Any]:
+    story, _ = recipe_story_service.parse(form)
     return {
+        **story,
         "name": (form.get("name") or "").strip(),
         "visibility": (form.get("visibility") or "private").strip().lower(),
         "status": (form.get("status") or "wip").strip().lower(),
@@ -158,7 +161,7 @@ def parse_recipe_builder_form(form, *, is_edit: bool = False) -> RecipeBuilderPa
     values["calc_nic_base"] = str(values.get("calc_nic_base") if str(values.get("calc_nic_base") or "").strip() != "" else "100").strip()
 
     rows = parse_flavour_rows(form)
-    errors: dict[str, str] = {}
+    story, errors = recipe_story_service.parse(form)
 
     name = values["name"]
     if not name:
@@ -292,4 +295,5 @@ def parse_recipe_builder_form(form, *, is_edit: bool = False) -> RecipeBuilderPa
         total_pct=total_pct,
         recipe_id=recipe_id if is_edit or recipe_id else None,
         calc=calc,
+        story=story,
     )
