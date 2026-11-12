@@ -1371,3 +1371,53 @@ body[data-bs-theme="dark"] {
   .tvw-dashboard-photo { max-height: 220px; }
   .tvw-dashboard-welcome { padding-bottom: 0.75rem; }
 }
+
+/* Workshop home: purposeful actions, generous imagery, no empty hero rows. */
+.tvw-skip-link { position: fixed; top: -100px; left: 1rem; z-index: 1100; padding: .8rem 1rem; background: #ff9800; color: #17120a; border-radius: .5rem; }
+.tvw-skip-link:focus { top: 1rem; }
+.tvw-dashboard-route .tvw-dashboard-welcome { padding: .25rem 0 1rem; }
+.tvw-dashboard-route .tvw-dashboard-title { font-size: clamp(1.8rem, 3vw, 2.6rem); overflow-wrap: anywhere; }
+.tvw-bench-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr); gap: 1.25rem; }
+.tvw-bench-hero { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); overflow: hidden; border: 1px solid #5c4930; border-radius: 20px; background: linear-gradient(135deg,#29241d,#191e23); }
+.tvw-bench-copy { padding: clamp(1.5rem, 2.5vw, 2.5rem); align-self: center; min-width: 0; }
+.tvw-bench-copy h2 { font-family: var(--font-body, "Segoe UI", sans-serif); font-size: clamp(2.1rem, 3.5vw, 3.7rem); line-height: 1.06; letter-spacing: -.04em; margin: .8rem 0 1rem; }
+.tvw-bench-copy > p { font-size: 1.05rem; color: var(--tvw-text-secondary); line-height: 1.6; }
+.tvw-bench-hero .tvw-dashboard-photo { width: 100%; height: 100%; min-height: 340px; max-height: none; aspect-ratio: auto; object-fit: cover; object-position: 60% center; border: 0; border-radius: 0; box-shadow: none; }
+.tvw-bench-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 1rem; margin-top: 1.4rem; }
+.tvw-bench-text-link { display: inline-flex; align-items: center; min-height: 44px; color: #ffd08a; font-weight: 600; text-decoration: none; line-height: 1.4; }
+.tvw-bench-text-link:hover { color: #ffe4b9; text-decoration: underline; }
+.tvw-bench-side { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+.tvw-dashboard-resume { flex: 1; border-radius: 20px; }
+.tvw-create-shortcut { display: flex; align-items: center; gap: 1rem; border: 1px solid var(--tvw-border-subtle); border-radius: 16px; padding: 1.2rem; background: #20232a; color: var(--tvw-text-primary); text-decoration: none; }
+.tvw-create-shortcut > span:nth-child(2) { flex: 1; }
+.tvw-create-shortcut strong { display: block; font-size: 1.2rem; }
+.tvw-create-shortcut span span { display: block; color: var(--tvw-text-secondary); margin-top: .25rem; }
+.tvw-shortcut-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: #382d1e; color: #ffc66b; font-size: 2rem; flex-shrink: 0; }
+.tvw-first-mix { display: flex; flex: 1; flex-direction: column; gap: .9rem; border-radius: 20px; }
+.tvw-workshop-shortcuts { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: .9rem; margin: 1.25rem 0 2.5rem; }
+.tvw-workshop-shortcuts a { display: flex; align-items: flex-start; gap: .7rem; padding: 1.2rem 1rem; border: 1px solid var(--tvw-border-subtle); background: #1b1e24; border-radius: 14px; text-decoration: none; color: var(--tvw-text-primary); min-width: 0; }
+.tvw-workshop-shortcuts a > span:nth-child(2) { flex: 1; min-width: 0; }
+.tvw-workshop-shortcuts strong { display: block; font-size: 1.05rem; }
+.tvw-workshop-shortcuts span span { display: block; font-size: .95rem; color: var(--tvw-text-secondary); margin-top: .35rem; line-height: 1.4; }
+.tvw-tool-number { font-size: .8rem; color: #e6ad5c; padding-top: .2rem; }
+.tvw-inspiration-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 1.25rem; align-items: stretch; }
+.tvw-flavour-inspiration { display: grid; grid-template-columns: 42% minmax(0,1fr); border: 1px solid var(--tvw-border-subtle); border-radius: 20px; overflow: hidden; color: var(--tvw-text-primary); background: #1d2227; text-decoration: none; }
+.tvw-flavour-inspiration img { width: 100%; height: 100%; min-height: 290px; object-fit: cover; }
+.tvw-flavour-inspiration > div { padding: 1.6rem; align-self: center; }
+.tvw-flavour-inspiration h2, .tvw-section-heading h2 { font-size: clamp(1.45rem, 1.8vw, 1.85rem); line-height: 1.2; margin: .4rem 0 .75rem; }
+.tvw-flavour-inspiration p:not(.tvw-dashboard-kicker), .tvw-section-heading > p:last-child { color: var(--tvw-text-secondary); line-height: 1.5; }
+.tvw-community-help { padding: 1.5rem; border: 1px solid #514534; background: linear-gradient(130deg,#25221c,#1c2026); border-radius: 20px; }
+.tvw-help-request { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .9rem 0; border-top: 1px solid var(--tvw-border-subtle); color: var(--tvw-text-primary); text-decoration: none; }
+.tvw-help-request strong { display: block; font-size: 1.1rem; }
+.tvw-help-request span span { display: block; color: var(--tvw-text-secondary); font-size: .95rem; margin-top: .25rem; }
+.tvw-help-empty { color: var(--tvw-text-secondary); line-height: 1.6; }
+.tvw-create-shortcut:hover, .tvw-workshop-shortcuts a:hover, .tvw-flavour-inspiration:hover { color: #fff; border-color: #bf873c; background-color: #25282e; }
+.tvw-help-request:hover strong { color: #ffd08a; }
+.tvw-dashboard-route :is(.tvw-create-shortcut,.tvw-workshop-shortcuts a,.tvw-flavour-inspiration,.tvw-help-request,.tvw-bench-text-link):focus-visible { outline: 3px solid #ffb74d; outline-offset: 4px; }
+.tvw-dashboard-route .tvw-discover-featured { grid-template-columns: 1fr; }
+.tvw-dashboard-route .tvw-discover-featured-art { display: none; }
+.tvw-dashboard-route .tvw-discover-card-category { display: none; }
+.tvw-dashboard-route .tvw-discover-featured-name { overflow-wrap: anywhere; }
+@media (min-width: 992px) and (max-width: 1399px) { .tvw-header-inner { gap: .6rem; } .tvw-nav-link { padding-inline: .75rem; } .tvw-header-actions { gap: .6rem; } .tvw-header-search input[type="search"] { min-width: 8rem; width: 11rem; } }
+@media (max-width: 1099px) { .tvw-bench-grid { grid-template-columns: 1fr; } .tvw-bench-side { display: grid; grid-template-columns: minmax(0,1.5fr) minmax(0,1fr); } .tvw-create-shortcut { align-self: stretch; } .tvw-workshop-shortcuts { grid-template-columns: repeat(2,minmax(0,1fr)); } .tvw-flavour-inspiration { grid-template-columns: 1fr; } .tvw-flavour-inspiration img { height: 180px; min-height: 0; } }
+@media (max-width: 639px) { .tvw-bench-hero { grid-template-columns: 1fr; } .tvw-bench-hero .tvw-dashboard-photo { order: -1; height: 190px; min-height: 0; object-position: center 62%; } .tvw-bench-copy { padding: 1.4rem; } .tvw-bench-copy h2 br { display: none; } .tvw-bench-side, .tvw-inspiration-grid { display: grid; grid-template-columns: 1fr; } .tvw-workshop-shortcuts { gap: .65rem; margin-bottom: 1.5rem; } .tvw-workshop-shortcuts a { padding: 1rem .8rem; } .tvw-tool-number, .tvw-workshop-shortcuts a > span:last-child { display: none; } .tvw-bench-actions { align-items: stretch; } .tvw-bench-text-link { font-size: 1rem; } .tvw-inspiration-grid { gap: 1rem; } }

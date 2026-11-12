@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='tvw-dashboard.css') }}">
 </head>
 <body data-bs-theme="dark" class="{% block body_class %}{% endblock %}">
+    <a class="tvw-skip-link" href="#mainContent">Skip to content</a>
     {% if session.get('user_id') %}
     {% set ep = request.endpoint or '' %}
     {% set nav_home_active = ep == 'tvw_community.community_feed' %}
@@ -51,7 +52,7 @@
                    {% if nav_recipes_active %}aria-current="page"{% endif %}>Recipes</a>
                 <a class="tvw-nav-link{% if nav_mix_active %} is-active{% endif %}"
                    href="{{ url_for('tvw_recipes.tvw_my_mixes') }}"
-                   {% if nav_mix_active %}aria-current="page"{% endif %}>Mix</a>
+                   {% if nav_mix_active %}aria-current="page"{% endif %}>My mixes</a>
                 <a class="tvw-nav-link{% if nav_flavours_active %} is-active{% endif %}"
                    href="{{ url_for('tvw_recipes.tvw_flavours') }}"
                    {% if nav_flavours_active %}aria-current="page"{% endif %}>Flavours</a>
@@ -71,7 +72,6 @@
                         <a class="tvw-user-menu-link" href="{{ url_for('tvw_recipes.tvw_stash') }}">My stash</a>
                         <a class="tvw-user-menu-link" href="{{ url_for('tvw_recipes.tvw_what_can_i_make') }}">What can I make</a>
                         <a class="tvw-user-menu-link" href="{{ url_for('tvw_recipes.tvw_my_mixes') }}">My mixes</a>
-                        <a class="tvw-user-menu-link" href="{{ url_for('tvw_recipes.tvw_my_mixes') }}">Batch records</a>
                         {% if can_access_tvw_admin %}
                         <div class="tvw-user-menu-divider" role="presentation"></div>
                         <a class="tvw-user-menu-link" href="{{ url_for('tvw_admin.dashboard') }}">Admin</a>
@@ -87,7 +87,7 @@
         </div>
     </header>
     {% endif %}
-    <main class="tvw-main min-vh-100 d-flex flex-column py-4">
+    <main id="mainContent" class="tvw-main min-vh-100 d-flex flex-column py-4">
         <div class="tvw-shell">
             {% with messages = get_flashed_messages(with_categories=true) %}
               {% if messages %}
