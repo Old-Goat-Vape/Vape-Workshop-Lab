@@ -17,8 +17,9 @@
   <header class="tvw-rb-header">
     <div>
       <h1 class="tvw-rb-title">{% if mode == 'edit' %}Edit recipe{% else %}Create a recipe{% endif %}</h1>
-      <p class="tvw-rb-subtitle">Build your recipe, check the mix and save it to your library.</p>
+      <p class="tvw-rb-subtitle">Name it. Build it. Make it yours.</p>
     </div>
+    <a class="btn btn-outline-info tvw-rb-mobile-preview" href="#rbSummaryHeading">Preview &amp; mix settings</a>
     <a class="btn btn-outline-light tvw-rb-back" href="{{ url_for('tvw_recipes.tvw_recipe_library') }}">Back to recipes</a>
   </header>
 
@@ -33,8 +34,9 @@
   </div>
   {% endif %}
 
-  <form method="post" action="{{ url_for('tvw_recipes.tvw_recipe_save') }}" id="recipeBuilderForm" novalidate>
+  <form enctype="multipart/form-data" method="post" action="{{ url_for('tvw_recipes.tvw_recipe_save') }}" id="recipeBuilderForm" novalidate>
     {% if recipe %}<input type="hidden" name="recipe_id" value="{{ recipe.id }}">{% endif %}
+    <div class="tvw-rb-draft-bar"><span id="draftStatus" role="status">Drafts save in this browser on this device.</span><span id="draftRecovery" hidden><button type="button" id="restoreDraft" class="btn btn-outline-info">Restore draft</button> <button type="button" id="discardDraft" class="btn btn-outline-secondary">Discard draft</button></span></div>
     <input type="hidden" name="target_ratio" id="targetRatioField" value="{{ ratio_val }}">
     <input type="hidden" name="calc_target_ml" id="calcTargetMlHidden" value="{{ fv.get('calc_target_ml', '60') }}">
     <input type="hidden" name="calc_target_nic" id="calcTargetNicHidden" value="{{ fv.get('calc_target_nic', '3') }}">
@@ -46,7 +48,7 @@
     <div class="tvw-rb-layout">
       <div class="tvw-rb-main">
         <section class="tvw-rb-panel" aria-labelledby="rbDetailsHeading">
-          <h2 class="tvw-rb-section-title" id="rbDetailsHeading">Recipe details</h2>
+          <h2 class="tvw-rb-section-title" id="rbDetailsHeading">1 · The idea</h2>
           <div class="tvw-rb-details-grid">
             <div class="tvw-rb-span-2">
               <label class="tvw-rb-label" for="recipeName">Recipe name</label>
@@ -86,21 +88,18 @@
               {% if form_errors.get('status') %}<div class="tvw-rb-field-error">{{ form_errors.status }}</div>{% endif %}
             </div>
             <div class="tvw-rb-span-2">
-              <label class="tvw-rb-label" for="recipeTags">Tags</label>
-              <input id="recipeTags" name="tags" class="tvw-rb-input" value="{{ tags_val }}" placeholder="dessert, custard">
-              <div class="tvw-rb-field-error" style="color: var(--tvw-text-muted); margin-top:0.25rem;">Separate tags with commas.</div>
+              <label class="tvw-rb-label" for="shortDescription">Describe it in a sentence <small>(optional)</small></label>
+              <input id="shortDescription" name="short_description" maxlength="180" class="tvw-rb-input" value="{{ fv.get('short_description','') }}" placeholder="Warm vanilla custard, toasted biscuit and a caramel finish.">
+              <small class="text-secondary">A quick introduction to your recipe. Up to 180 characters.</small>
             </div>
-            <div class="tvw-rb-span-2">
-              <label class="tvw-rb-label" for="recipeNotes">Notes</label>
-              <textarea id="recipeNotes" name="notes" class="tvw-rb-textarea" rows="3" placeholder="Steep time, pairing ideas, or mixing notes…">{{ notes_val }}</textarea>
-            </div>
+
           </div>
         </section>
 
         <section class="tvw-rb-panel" aria-labelledby="rbFlavoursHeading">
           <div class="tvw-rb-flavours-head">
             <div>
-              <h2 class="tvw-rb-section-title" id="rbFlavoursHeading">Flavours</h2>
+              <h2 class="tvw-rb-section-title" id="rbFlavoursHeading">2 · Build your recipe</h2>
               <p class="tvw-rb-section-lead mb-0">Search your flavour library, add each concentrate and set its percentage. A blank percentage starts at the average from current recipes, including private recipes. You can change it.</p>
             </div>
             <button type="button" class="btn btn-outline-light tvw-rb-add-flavour" id="addFlavourBtn">Add flavour</button>
@@ -119,10 +118,28 @@
             <button type="button" class="btn btn-outline-light tvw-rb-add-flavour" id="addFlavourBtnBottom">Add flavour</button>
           </div>
         </section>
+        <section class="tvw-rb-panel" aria-labelledby="rbPersonalityHeading">
+          <h2 class="tvw-rb-section-title" id="rbPersonalityHeading">3 · Make it yours <small>(optional)</small></h2>
+          <p class="text-secondary">Add as much or as little detail as you like.</p>
+          <fieldset class="tvw-rb-profiles"><legend class="tvw-rb-label">Flavour profile</legend>
+            {% for profile in profile_options %}<label><input type="checkbox" name="profiles" value="{{ profile }}" {% if profile in fv.get('profiles',[]) %}checked{% endif %}><span>{{ profile }}</span></label>{% endfor %}
+          </fieldset>
+          <div class="tvw-rb-story-grid">
+            <div><label class="tvw-rb-label" for="steepDays">Recommended steep time (days)</label><input id="steepDays" name="steep_days" type="number" min="0" max="365" step="1" placeholder="Not set" class="tvw-rb-input" value="{{ fv.get('steep_days','') }}"><small class="text-secondary">Blank means Not set. Zero means Shake &amp; vape. This is your recommendation; reminders will come later.</small><div class="mt-2"><button type="button" id="shakeVape" class="btn btn-outline-light btn-sm">Shake &amp; vape</button> <button type="button" id="clearSteep" class="btn btn-outline-secondary btn-sm">Not set</button></div></div>
+            <div><label class="tvw-rb-label" for="recipeImage">Recipe photo</label><input id="recipeImage" name="recipe_image" type="file" accept="image/jpeg,image/png,image/webp" class="tvw-rb-input"><small class="text-secondary">Your own JPG, PNG or WebP, up to 5 MB. Centre-cropped to landscape. Photos are optional and follow recipe visibility.</small>{% if fv.get('has_image') %}<label class="d-block mt-2"><input type="checkbox" name="remove_image" id="removeImage" value="1"> Remove existing photo</label>{% endif %}<p id="imageMessage" role="status" class="text-secondary"></p></div>
+          </div>
+          <details class="tvw-rb-extra" {% if fv.get('description') or notes_val %}open{% endif %}><summary>The story &amp; mixing notes</summary>
+            <label class="tvw-rb-label" for="recipeDescription">Full description</label><textarea id="recipeDescription" name="description" maxlength="10000" class="tvw-rb-textarea" rows="4" placeholder="What inspired this recipe? What should it taste like?">{{ fv.get('description','') }}</textarea>
+            <label class="tvw-rb-label mt-3" for="recipeNotes">Mixing notes &amp; version changes</label><textarea id="recipeNotes" name="notes" maxlength="20000" class="tvw-rb-textarea" rows="3" placeholder="Substitutions, steeping advice, or what changed this time…">{{ notes_val }}</textarea><small class="text-secondary">These notes are visible to anyone who can view your recipe. Community comments live on the saved recipe page.</small>
+            <label class="tvw-rb-label mt-3" for="recipeTags">Extra tags</label><input id="recipeTags" name="tags" class="tvw-rb-input" value="{{ tags_val }}" placeholder="Separate tags with commas">
+          </details>
+          <details class="tvw-rb-extra" {% if fv.get('private_notes') %}open{% endif %}><summary>My private notebook</summary><label class="tvw-rb-label" for="privateNotes">Only visible to you</label><textarea id="privateNotes" name="private_notes" maxlength="10000" class="tvw-rb-textarea" rows="3" placeholder="Experiments and ideas you want to keep to yourself…">{{ fv.get('private_notes','') }}</textarea></details>
+        </section>
       </div>
 
       <aside class="tvw-rb-summary tvw-rb-panel" aria-labelledby="rbSummaryHeading">
         <h2 class="tvw-rb-section-title" id="rbSummaryHeading">Recipe summary</h2>
+        <div class="tvw-rb-preview" aria-label="Live recipe preview"><img id="storyPreviewImage" {% if fv.get('has_image') and active_version %}src="{{ url_for('tvw_recipes.tvw_recipe_image',version_id=active_version.id) }}"{% else %}hidden{% endif %} alt="Your recipe photo preview"><p class="tvw-rb-preview-kicker">Your next creation</p><h3 id="storyPreviewName">Your recipe name</h3><p id="storyPreviewDescription">Give your recipe a little personality.</p><p id="storyPreviewProfiles"></p><span id="storyPreviewSteep">Steep time: Not set</span></div>
         <div class="row g-2 mb-3">
           <div class="col-6">
             <label class="tvw-rb-label" for="calcTargetMl">Batch size (ml)</label>
@@ -251,6 +268,7 @@
 <script>
   window.TVW_RECIPE_BUILDER = {
     mode: {{ mode|tojson }},
+    draftKey: {{ ('tvw-recipe-draft:' ~ session.get('user_id') ~ ':' ~ (recipe.id if recipe else 'new'))|tojson }},
     flavourCatalog: {{ flavour_options|tojson }},
     initialRows: [
       {% if flavour_rows %}
@@ -270,6 +288,7 @@
 </script>
 <script src="{{ url_for('static', filename='tvw-flavour-usage.js') }}"></script>
 <script src="{{ url_for('static', filename='tvw-recipe-builder.js') }}"></script>
+<script src="{{ url_for('static', filename='tvw-recipe-story.js') }}"></script>
 <script>
 (() => {
   const status = document.getElementById('recipeStatus');

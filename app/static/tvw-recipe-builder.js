@@ -514,6 +514,15 @@
   setRatioFromCalcInputs();
   queueCalc();
 
+  window.TVWRestoreRecipeRows = (rows) => {
+    rowsWrap.replaceChildren();
+    for (const row of rows.slice(0,100)) {
+      if (Number(row.ingredient_id)>0) registerFlavor({id:Number(row.ingredient_id),name:row.name,brand:row.brand});
+      buildRow(row);
+    }
+    if (!allRows().length) buildRow();
+    setRatioFromCalcInputs(); syncHiddenCalc(); queueCalc();
+  };
   if (cfg.hasErrors) {
     const summary = document.getElementById("formErrorSummary");
     if (summary) summary.focus();

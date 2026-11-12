@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import io
 import logging
 import os
 import re
 import sqlite3
 import uuid
 
-from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, session, url_for, send_file
 
 from db import SQLITE_BUSY_USER_MESSAGE, is_sqlite_busy_error, sqlite_retry
 from models import recipes_repo, users_repo
@@ -16,7 +17,7 @@ from services import recipe_library_discovery_service
 from services import recipe_library_presentation
 from services import stash_service
 from services import what_can_i_make_service
-from services import recipe_builder_service
+from services import recipe_builder_service, recipe_story_service
 from services.guided_mix_start_service import GuidedMixFormError
 from services.recipe_builder_service import RecipeBuilderFormError
 from utils.guided_mix_perf import (
@@ -59,9 +60,12 @@ def _render_recipe_builder(
     form_errors=None,
     flavour_rows=None,
 ):
+    if active_version and form_values is not None and 'has_image' not in form_values:
+        form_values['has_image'] = recipe_story_service.read(active_version['id'])['has_image']
     return render_template(
         "tvw_recipe_builder.html",
         mode=mode,
+        profile_options=recipe_story_service.PROFILES,
         recipe=recipe,
         active_version=active_version,
         items=items or [],
@@ -543,8 +547,15 @@ def _render_recipe_detail(
         mixer_notes_preview=mixer_notes_preview,
     )
 
+    saved_draft = session.get('recipe_builder_saved') or {}
+    clear_draft_key = None
+    if saved_draft.get('recipe_id') == recipe['id']:
+        clear_draft_key = session.pop('recipe_builder_saved')['draft_key']
     return render_template(
         "tvw_recipe_detail.html",
+        recipe_story=recipe_story_service.read(viewing_version_id),
+        my_recipe_notes=recipe_story_service.private_notes(recipe['id'], uid),
+        clear_draft_key=clear_draft_key,
         recipe=recipe,
         versions=versions,
         published_version=published_version,
@@ -657,6 +668,10 @@ def tvw_recipe_edit(slug: str):
     form_values["visibility"] = str(recipe.get("visibility") or "private").lower()
     form_values["status"] = str(recipe.get("status") or "wip").lower()
     form_values["tags"] = ", ".join(recipes_repo.fetch_recipe_tags(int(recipe["id"])))
+    story = recipe_story_service.read(active_version['id']) if active_version else {}
+    form_values.update(story)
+    form_values['steep_days'] = '' if story.get('steep_days') is None else str(story['steep_days'])
+    form_values['private_notes'] = recipe_story_service.private_notes(recipe['id'], int(user_id))
     form_values["recipe_id"] = str(recipe.get("id") or "")
     return _render_recipe_builder(
         mode="edit",
@@ -704,6 +719,10 @@ def tvw_recipe_save():
 
     try:
         payload = recipe_builder_service.parse_recipe_builder_form(request.form, is_edit=is_edit)
+        try:
+            prepared_image = recipe_story_service.prepare_image(request.files.get('recipe_image'))
+        except ValueError as image_error:
+            raise RecipeBuilderFormError({'recipe_image': str(image_error)}, values=recipe_builder_service.form_values_from_request(request.form), rows=recipe_builder_service.parse_flavour_rows(request.form)) from image_error
     except RecipeBuilderFormError as exc:
         recipe = existing
         active_version = None
@@ -785,6 +804,9 @@ def tvw_recipe_save():
                 default_nic_base_mg_ml=float(calc.get("nic_base_mg_ml")) if calc.get("nic_base_mg_ml") is not None else None,
                 default_nicotine_carrier=str(calc.get("nicotine_carrier") or "PG"),
             )
+            recipe_story_service.save(version_id=version_id, recipe_id=saved_id, user_id=user_id, values=payload.story,
+                image=prepared_image, previous_version_id=existing.get('current_version_id') if existing else None,
+                remove_image=request.form.get('remove_image') == '1')
             stage = "insert-items"
             recipes_repo.insert_recipe_items(version_id=version_id, items=items)
             stage = "update-current-version"
@@ -821,6 +843,7 @@ def tvw_recipe_save():
             flash("Recipe created successfully.", "success")
         else:
             flash(f"Saved as version {saved['version']}.", "success")
+        session['recipe_builder_saved'] = {'recipe_id': saved['recipe_id'], 'draft_key': f'tvw-recipe-draft:{user_id}:{recipe_id or "new"}'}
         return redirect(url_for("tvw_recipes.tvw_recipe_detail", slug=saved["slug"]))
     except sqlite3.OperationalError as exc:
         logger.exception(
@@ -978,3 +1001,20 @@ def tvw_stash():
         sort_dir=sort_dir,
     )
 
+
+
+@tvw_recipes_bp.route('/recipes/image/<int:version_id>')
+@login_required
+def tvw_recipe_image(version_id):
+    from db import get_db
+    version = recipes_repo.fetch_version(version_id)
+    recipe = recipes_repo.fetch_recipe(version['recipe_id']) if version else None
+    if not recipe or not recipes_repo.can_view_recipe_in_tvw_community(dict(recipe), viewer_user_id=int(session['user_id']), viewer_is_old_goat=is_old_goat_role(session.get('role'))):
+        abort(404)
+    row = get_db().execute('SELECT image_data FROM recipe_stories WHERE version_id=?', (version_id,)).fetchone()
+    if not row or not row['image_data']:
+        abort(404)
+    response = send_file(io.BytesIO(row['image_data']), mimetype='image/webp', max_age=0)
+    response.headers['Cache-Control'] = 'private, no-store'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response

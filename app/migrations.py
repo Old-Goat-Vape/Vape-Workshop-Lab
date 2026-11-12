@@ -27,6 +27,8 @@ def run_startup_migrations() -> dict:
     This keeps schema evolution out of request handlers.
     """
     db = get_db()
+    from services.recipe_story_service import SCHEMA as recipe_story_schema
+    db.executescript(recipe_story_schema)
 
     # Ensure base reference rows exist for logging (FK on mix_history_items.ingredient_id).
     try:
