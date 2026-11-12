@@ -13,6 +13,14 @@ CREATE TABLE IF NOT EXISTS recipe_stories (
  profiles_json TEXT NOT NULL DEFAULT '[]', steep_days INTEGER CHECK(steep_days IS NULL OR steep_days BETWEEN 0 AND 365),
  image_data BLOB
 );
+CREATE TABLE IF NOT EXISTS recipe_profile_audit (
+ id INTEGER PRIMARY KEY, batch_id TEXT NOT NULL, recipe_id INTEGER NOT NULL,
+ version_id INTEGER NOT NULL, actor_id INTEGER NOT NULL,
+ previous_json TEXT NOT NULL, assigned_json TEXT NOT NULL, evidence_json TEXT NOT NULL,
+ rule_version TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ undone INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_recipe_profile_audit_batch ON recipe_profile_audit(batch_id);
 CREATE TABLE IF NOT EXISTS recipe_private_notebooks (
  recipe_id INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

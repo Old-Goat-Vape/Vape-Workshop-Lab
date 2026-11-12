@@ -6,7 +6,7 @@ import csv
 from datetime import datetime, timedelta
 from typing import Any, Dict
 
-from flask import current_app, Blueprint, Response, jsonify, redirect, render_template, request, session, url_for
+from flask import current_app, Blueprint, Response, jsonify, redirect, render_template, request, session, url_for, flash
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
@@ -1138,3 +1138,54 @@ def audit_pdf(log_id: int):
     buf.close()
     return Response(pdf, mimetype="application/pdf", headers={"Content-Disposition": f"inline; filename=audit_{log_id}.pdf"})
 
+
+
+@master_admin_bp.route("/master-admin/recipe-profiles", methods=["GET", "POST"])
+@login_required
+@role_required("Old Goat", "Master")
+def recipe_profiles():
+    from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+    from services import recipe_profile_service as profiles
+    from services.recipe_story_service import PROFILES
+    from db import get_db
+    signer = URLSafeTimedSerializer(current_app.secret_key, salt="recipe-profile-preview-v1")
+    actor = int(session["user_id"])
+    if request.method == "POST":
+        try:
+            payload = signer.loads(request.form.get("preview_token", ""), max_age=7200)
+            if payload.get("actor") != actor:
+                raise ValueError("This preview belongs to another user. Refresh the page.")
+            action = request.form.get("action")
+            if action == "undo" and payload.get("kind") == "undo":
+                count = profiles.undo(payload["batch"])
+                flash(f"Restored {count} recipe profiles. Later edits were preserved.", "success")
+            elif action == "apply" and payload.get("kind") == "apply":
+                main = request.form.get("main_profile") or None
+                if main and (not payload.get("recipe_id") or main not in PROFILES):
+                    raise ValueError("Choose an available recipe profile.")
+                count, _ = profiles.apply(payload["digest"], actor, payload.get("recipe_id"), main)
+                flash(f"Assigned profiles to {count} recipes. Default artwork now follows the main profile.", "success")
+            else:
+                raise ValueError("Refresh the preview and try again.")
+        except (BadSignature, SignatureExpired):
+            flash("Preview expired or invalid. Refresh and review again; nothing changed.", "warning")
+        except ValueError as error:
+            flash(str(error), "warning")
+        return redirect(url_for("master_admin.recipe_profiles"))
+    rows = profiles.preview()
+    counts = {level: sum(r['confidence'] == level for r in rows) for level in ('high','review','unknown')}
+    reliable = [r for r in rows if r['confidence'] == 'high']
+    bulk_token = signer.dumps(dict(actor=actor,kind='apply',digest=profiles.selection_digest(reliable)))
+    view = request.args.get('view', 'all')
+    filtered = [r for r in rows if view == 'all' or r['confidence'] == view]
+    page = max(1, _safe_int(request.args.get('page'), 1))
+    pages = max(1, (len(filtered)+49)//50)
+    page = min(page, pages)
+    visible = filtered[(page-1)*50:page*50]
+    for row in visible:
+        row['token'] = signer.dumps(dict(actor=actor,kind='apply',recipe_id=row['id'],digest=profiles.selection_digest([row])))
+    batches = [dict(r) for r in get_db().execute("SELECT batch_id,MIN(created_at) AS created_at,COUNT(*) AS count FROM recipe_profile_audit WHERE undone=0 GROUP BY batch_id ORDER BY MIN(id) DESC LIMIT 5")]
+    for batch in batches:
+        batch['token'] = signer.dumps(dict(actor=actor,kind='undo',batch=batch['batch_id']))
+    return render_template('master_admin_recipe_profiles.html', rows=visible, counts=counts, bulk_token=bulk_token,
+        profiles=PROFILES, view=view, page=page, pages=pages, batches=batches)
