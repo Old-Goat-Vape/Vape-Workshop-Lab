@@ -124,6 +124,9 @@
           <fieldset class="tvw-rb-profiles"><legend class="tvw-rb-label">Flavour profile</legend>
             {% for profile in profile_options %}<label><input type="checkbox" name="profiles" value="{{ profile }}" {% if profile in fv.get('profiles',[]) %}checked{% endif %}><span>{{ profile }}</span></label>{% endfor %}
           </fieldset>
+          <label class="tvw-rb-label" for="mainProfile">Main profile for artwork</label>
+          <select id="mainProfile" name="main_profile" class="tvw-rb-select"><option value="">Automatic from selected profiles</option>{% for profile in profile_options %}<option value="{{ profile }}" {% if fv.get('main_profile') == profile %}selected{% endif %}>{{ profile }}</option>{% endfor %}</select>
+          <p class="text-secondary mt-2">Choose the profile you want to lead. Your own uploaded photo always comes first.</p>
           <div class="tvw-rb-story-grid">
             <div><label class="tvw-rb-label" for="steepDays">Recommended steep time (days)</label><input id="steepDays" name="steep_days" type="number" min="0" max="365" step="1" placeholder="Not set" class="tvw-rb-input" value="{{ fv.get('steep_days','') }}"><small class="text-secondary">Blank means Not set. Zero means Shake &amp; vape. This is your recommendation; reminders will come later.</small><div class="mt-2"><button type="button" id="shakeVape" class="btn btn-outline-light btn-sm">Shake &amp; vape</button> <button type="button" id="clearSteep" class="btn btn-outline-secondary btn-sm">Not set</button></div></div>
             <div><label class="tvw-rb-label" for="recipeImage">Recipe photo</label><input id="recipeImage" name="recipe_image" type="file" accept="image/jpeg,image/png,image/webp" class="tvw-rb-input"><small class="text-secondary">Your own JPG, PNG or WebP, up to 5 MB. Centre-cropped to landscape. Photos are optional and follow recipe visibility.</small>{% if fv.get('has_image') %}<label class="d-block mt-2"><input type="checkbox" name="remove_image" id="removeImage" value="1"> Remove existing photo</label>{% endif %}<p id="imageMessage" role="status" class="text-secondary"></p></div>
@@ -139,7 +142,7 @@
 
       <aside class="tvw-rb-summary tvw-rb-panel" aria-labelledby="rbSummaryHeading">
         <h2 class="tvw-rb-section-title" id="rbSummaryHeading">Recipe summary</h2>
-        <div class="tvw-rb-preview" aria-label="Live recipe preview"><img id="storyPreviewImage" {% if fv.get('has_image') and active_version %}src="{{ url_for('tvw_recipes.tvw_recipe_image',version_id=active_version.id) }}"{% else %}hidden{% endif %} alt="Your recipe photo preview"><p class="tvw-rb-preview-kicker">Your next creation</p><h3 id="storyPreviewName">Your recipe name</h3><p id="storyPreviewDescription">Give your recipe a little personality.</p><p id="storyPreviewProfiles"></p><span id="storyPreviewSteep">Steep time: Not set</span></div>
+        <div class="tvw-rb-preview" aria-label="Live recipe preview">{% set preview_art = recipe_artwork(fv.get('profiles'), tags_val, fv.get('has_image'), active_version.id if active_version else none) %}<img id="storyPreviewImage" src="{{ preview_art.url }}" data-uploaded="{{ 'true' if not preview_art.automatic else 'false' }}" width="960" height="540" alt="{{ preview_art.label }}"><p id="storyArtworkCaption" class="tvw-artwork-caption">{{ preview_art.label }}{% if preview_art.automatic %} · Upload your own photo{% endif %}</p><p class="tvw-rb-preview-kicker">Your next creation</p><h3 id="storyPreviewName">Your recipe name</h3><p id="storyPreviewDescription">Give your recipe a little personality.</p><p id="storyPreviewProfiles"></p><span id="storyPreviewSteep">Steep time: Not set</span></div>
         <div class="row g-2 mb-3">
           <div class="col-6">
             <label class="tvw-rb-label" for="calcTargetMl">Batch size (ml)</label>
@@ -268,6 +271,8 @@
 <script>
   window.TVW_RECIPE_BUILDER = {
     mode: {{ mode|tojson }},
+    artworkOptions: {{ artwork_options|tojson }},
+    defaultArtwork: {{ recipe_artwork()|tojson }},
     draftKey: {{ ('tvw-recipe-draft:' ~ session.get('user_id') ~ ':' ~ (recipe.id if recipe else 'new'))|tojson }},
     flavourCatalog: {{ flavour_options|tojson }},
     initialRows: [

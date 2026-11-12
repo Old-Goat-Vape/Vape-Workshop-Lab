@@ -17,7 +17,7 @@ from services import recipe_library_discovery_service
 from services import recipe_library_presentation
 from services import stash_service
 from services import what_can_i_make_service
-from services import recipe_builder_service, recipe_story_service
+from services import recipe_builder_service, recipe_story_service, recipe_artwork_service
 from services.guided_mix_start_service import GuidedMixFormError
 from services.recipe_builder_service import RecipeBuilderFormError
 from utils.guided_mix_perf import (
@@ -66,6 +66,7 @@ def _render_recipe_builder(
         "tvw_recipe_builder.html",
         mode=mode,
         profile_options=recipe_story_service.PROFILES,
+        artwork_options=recipe_artwork_service.preview_artworks(),
         recipe=recipe,
         active_version=active_version,
         items=items or [],
