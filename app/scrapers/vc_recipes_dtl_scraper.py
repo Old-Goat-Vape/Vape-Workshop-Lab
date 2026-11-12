@@ -243,7 +243,8 @@ def _fetch_links_via_public_controller(
         raise ValueError("VC public recipe list returned an unexpected response; no cursor was advanced.")
     links=_extract_recipe_links(str(data['html']))
     if progress is not None:
-        progress.update(next_page=page+1 if links else 1, pages=1)
+        progress.update(next_page=page+1 if links else 1, pages=1,
+                        total_pages=data.get("total_pages"), total_items=data.get("totalItems"))
     return links
 
 
@@ -270,7 +271,10 @@ def _fetch_links_for_user_profile(
             link=f"https://vceliquidrecipes.com/recipe/{rid}"
             if link not in links:links.append(link)
     if progress is not None:
-        progress.update(next_page=page+1 if links else 1,pages=1)
+        total = data.get("recordsFiltered", data.get("recordsTotal"))
+        progress.update(next_page=page+1 if links else 1,pages=1,
+                        total_pages=(int(total)+49)//50 if total is not None else None,
+                        total_items=total)
     return links
 
 
@@ -2145,15 +2149,19 @@ def _run_vc_dtl_scraper_impl(
     resume: bool = True,
     reset_checkpoint: bool = False,
     include_adapted: bool = False,
+    maintenance: bool = True,
     delay_s: float = 0.5,
     max_pages: int = 20,
     max_recipes: int = 300,
 ) -> dict[str, Any]:
     _ensure_reference_tables(db)
-    _repair_private_vc_library_metadata(db, actor_id)
-    repair_stats = _repair_existing_vc_import_signs(db)
-    resolver_ctx_bootstrap = _build_identity_resolver_context(db)
-    identity_repair_stats = _backfill_flavour_identity_matches(db, resolver_ctx=resolver_ctx_bootstrap, limit=5000)
+    repair_stats = {}
+    identity_repair_stats = {}
+    if maintenance:
+        _repair_private_vc_library_metadata(db, actor_id)
+        repair_stats = _repair_existing_vc_import_signs(db)
+        resolver_ctx_bootstrap = _build_identity_resolver_context(db)
+        identity_repair_stats = _backfill_flavour_identity_matches(db, resolver_ctx=resolver_ctx_bootstrap, limit=5000)
     db.commit()
     crawl_cfg = VC_DTL_CONFIG.get("crawl", {})
     mode = (mode or "vc_public_all").strip().lower()
@@ -3062,6 +3070,7 @@ def run_vc_dtl_scraper(
     resume: bool = True,
     reset_checkpoint: bool = False,
     include_adapted: bool = False,
+    maintenance: bool = True,
     delay_s: float = 0.5,
     max_pages: int = 20,
     max_recipes: int = 300,
@@ -3076,6 +3085,7 @@ def run_vc_dtl_scraper(
             resume=resume,
             reset_checkpoint=reset_checkpoint,
             include_adapted=include_adapted,
+            maintenance=maintenance,
             delay_s=delay_s,
             max_pages=max_pages,
             max_recipes=max_recipes,

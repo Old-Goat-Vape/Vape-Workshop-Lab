@@ -384,38 +384,38 @@ def scraper_health_report() -> Dict[str, Any]:
             """
             SELECT id, scraper_name, run_type, run_key, started_at, completed_at, status, summary_json
             FROM scraper_runs
-            WHERE scraper_name = ?
+            WHERE (scraper_name = ? OR (? = 'vc_dtl' AND (scraper_name LIKE 'vc_dtl_%' OR scraper_name IN ('vc_recipes','vc_recipes_dtl'))))
             ORDER BY id DESC LIMIT 1
             """,
-            (name,),
+            (name, name),
         ).fetchone()
         last_ok_row = db.execute(
             """
             SELECT id, scraper_name, run_type, run_key, started_at, completed_at, status, summary_json
             FROM scraper_runs
-            WHERE scraper_name = ? AND status IN ('success', 'partial')
+            WHERE (scraper_name = ? OR (? = 'vc_dtl' AND (scraper_name LIKE 'vc_dtl_%' OR scraper_name IN ('vc_recipes','vc_recipes_dtl')))) AND status IN ('success', 'partial')
             ORDER BY id DESC LIMIT 1
             """,
-            (name,),
+            (name, name),
         ).fetchone()
         last_fail_row = db.execute(
             """
             SELECT id, scraper_name, run_type, run_key, started_at, completed_at, status, summary_json
             FROM scraper_runs
-            WHERE scraper_name = ? AND status IN ('error', 'failed')
+            WHERE (scraper_name = ? OR (? = 'vc_dtl' AND (scraper_name LIKE 'vc_dtl_%' OR scraper_name IN ('vc_recipes','vc_recipes_dtl')))) AND status IN ('error', 'failed')
             ORDER BY id DESC LIMIT 1
             """,
-            (name,),
+            (name, name),
         ).fetchone()
         if not last_fail_row:
             last_fail_row = db.execute(
                 """
                 SELECT id, scraper_name, run_type, run_key, started_at, completed_at, status, summary_json
                 FROM scraper_runs
-                WHERE scraper_name = ? AND status IN ('stale', 'abandoned')
+                WHERE (scraper_name = ? OR (? = 'vc_dtl' AND (scraper_name LIKE 'vc_dtl_%' OR scraper_name IN ('vc_recipes','vc_recipes_dtl')))) AND status IN ('stale', 'abandoned')
                 ORDER BY id DESC LIMIT 1
                 """,
-                (name,),
+                (name, name),
             ).fetchone()
 
         latest = _row_to_run(latest_row)
@@ -792,7 +792,8 @@ def create_flavor_alias_from_admin_queue(*, actor_id: int, alias_raw: str, brand
 def _run_single_scraper(name: str, *, actor_id: int, run_type: str, run_key: str = "") -> Tuple[Dict[str, Any], int]:
     name = _normalize_scraper_token(name)
     db = get_db()
-    run_id = _start_scraper_run(scraper_name=name, run_type=run_type, run_key=run_key)
+    run_name = "vc_dtl" if name.startswith("vc_dtl") or name in {"vc_recipes", "vc_recipes_dtl"} else name
+    run_id = _start_scraper_run(scraper_name=run_name, run_type=run_type, run_key=run_key)
 
     def _ok(result: Dict[str, Any], http: int = 200) -> Tuple[Dict[str, Any], int]:
         result = dict(result)
@@ -859,45 +860,16 @@ def _run_single_scraper(name: str, *, actor_id: int, run_type: str, run_key: str
             "vc_dtl_user_reset_11",
             "vc_dtl_user_reset_385",
         }:
-            # Separate VC recipe reference scraper for DTL benchmark analytics.
-            mode = "vc_public_all"
+            from services import vc_import_job_service as jobs
+            from flask import current_app
             source_user_id = ""
-            resume = True
-            reset_checkpoint = False
-            if "public_reset" in name:
-                reset_checkpoint = True
             if "_user_" in name:
-                mode = "vc_user_profile"
-                m = re.search(r"(2078|11|385)", name)
-                source_user_id = (m.group(1) if m else "")
-                if "user_reset_" in name:
-                    reset_checkpoint = True
-            if name == "vc_dtl_public_all":
-                resume = False
-            res = run_vc_dtl_scraper(
-                db,
-                actor_id=actor_id,
-                mode=mode,
-                source_user_id=source_user_id,
-                resume=resume,
-                reset_checkpoint=reset_checkpoint,
-            )
-            result = {"scraper": "vc_dtl", **res}
-            status_value = str(result.get("status") or "").lower()
-            if status_value in {"success", "partial", "no_new_work"}:
-                run_status = "success"
-            else:
-                run_status = "error"
-            result["status"] = run_status
-            _log_admin_action(
-                actor_id=actor_id,
-                action="SCRAPER_RUN",
-                details=(
-                    f"vc_dtl run_id={run_id} stored={res.get('stored_recipes')} "
-                    f"eligible={res.get('benchmark_eligible')} broken={res.get('broken_or_incomplete')}"
-                ),
-            )
-            return _ok(result, http=200 if run_status == "success" else 500)
+                match = re.search(r"(2078|11|385)", name)
+                source_user_id = match.group(1) if match else ""
+            job = jobs.start_job(db, actor_id=actor_id, source_user_id=source_user_id)
+            jobs.start_worker(current_app._get_current_object())
+            return _ok({"status": "success", "scraper": "vc_dtl", "job": job,
+                        "message": "Background import queued. Follow progress in VC Recipe Import."})
 
         if name in {"vc_flavour_identity_backfill", "vc_flavour_identity_force", "vc_flavour_identity_unresolved"}:
             force = name == "vc_flavour_identity_force"
