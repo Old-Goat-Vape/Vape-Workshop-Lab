@@ -58,15 +58,16 @@ def parse(form):
 def prepare_image(upload):
     if not upload or not upload.filename:
         return None
-    data = upload.read(5 * 1024 * 1024 + 1)
-    if len(data) > 5 * 1024 * 1024:
-        raise ValueError('Choose an image smaller than 5 MB.')
+    data = upload.read(32 * 1024 * 1024 + 1)
+    if len(data) > 32 * 1024 * 1024:
+        raise ValueError('The original photo exceeds 32 MB. Try a browser that supports automatic photo resizing.')
     try:
         with warnings.catch_warnings():
             warnings.simplefilter('error', Image.DecompressionBombWarning)
             with Image.open(io.BytesIO(data)) as im:
-                if im.format not in {'JPEG','PNG','WEBP'} or im.width * im.height > 20000000:
-                    raise ValueError('Use a JPG, PNG or WebP image up to 20 megapixels.')
+                if im.format not in {'JPEG','PNG','WEBP'} or im.width * im.height > 80000000:
+                    raise ValueError('Use a JPG, PNG or WebP photo. This original exceeds the server image limit; use browser resizing for very large photos.')
+                im.draft('RGB', (2400,2400))
                 im = ImageOps.exif_transpose(im).convert('RGB')
                 im.thumbnail((1600,1600))
                 im = ImageOps.fit(im, (1200,675))

@@ -77,6 +77,18 @@ class RecipeStoryTests(unittest.TestCase):
         self.assertEqual(self.client.get(f'/recipes/image/{version}').status_code,404)
         self.assertEqual(self.client.get(url).status_code,200)
 
+    def test_large_camera_photo_is_optimized_without_manual_editing(self):
+        output=io.BytesIO()
+        image=Image.new('RGB',(8000,6000),'orange')
+        image.save(output,'JPEG',quality=90);image.close()
+        # Valid JPEG data with padding models a large original file/container.
+        output.write(b'\x00'*(6*1024*1024));output.seek(0)
+        _,row=self.create(recipe_image=(output,'large-camera.jpg'))
+        response=self.client.get(f'/recipes/image/{row["current_version_id"]}')
+        self.assertEqual(response.status_code,200)
+        self.assertLess(len(response.data),1024*1024)
+        self.assertEqual(Image.open(io.BytesIO(response.data)).size,(1200,675))
+
     def test_bad_image_is_rejected_without_losing_words(self):
         self._login(1,'member1','member')
         response=self.client.post('/recipes/save',data=base._valid_create_form(short_description='Keep this',recipe_image=(io.BytesIO(b'<svg onload="alert(1)"></svg>'),'fake.png')))

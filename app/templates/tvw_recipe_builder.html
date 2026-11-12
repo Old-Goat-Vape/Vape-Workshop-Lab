@@ -129,7 +129,7 @@
           <p class="text-secondary mt-2">Choose the profile you want to lead. Your own uploaded photo always comes first.</p>
           <div class="tvw-rb-story-grid">
             <div><label class="tvw-rb-label" for="steepDays">Recommended steep time (days)</label><input id="steepDays" name="steep_days" type="number" min="0" max="365" step="1" placeholder="Not set" class="tvw-rb-input" value="{{ fv.get('steep_days','') }}"><small class="text-secondary">Blank means Not set. Zero means Shake &amp; vape. This is your recommendation; reminders will come later.</small><div class="mt-2"><button type="button" id="shakeVape" class="btn btn-outline-light btn-sm">Shake &amp; vape</button> <button type="button" id="clearSteep" class="btn btn-outline-secondary btn-sm">Not set</button></div></div>
-            <div><label class="tvw-rb-label" for="recipeImage">Recipe photo</label><input id="recipeImage" name="recipe_image" type="file" accept="image/jpeg,image/png,image/webp" class="tvw-rb-input"><small class="text-secondary">Your own JPG, PNG or WebP, up to 5 MB. Centre-cropped to landscape. Photos are optional and follow recipe visibility.</small>{% if fv.get('has_image') %}<label class="d-block mt-2"><input type="checkbox" name="remove_image" id="removeImage" value="1"> Remove existing photo</label>{% endif %}<p id="imageMessage" role="status" class="text-secondary"></p></div>
+            <div><label class="tvw-rb-label" for="recipeImage">Recipe photo</label><input id="recipeImage" name="recipe_image" type="file" accept="image/jpeg,image/png,image/webp" class="tvw-rb-input"><small class="text-secondary">Choose your JPG, PNG or WebP. Large photos are resized and compressed automatically; your original stays unchanged. The saved copy is centre-cropped to landscape.</small>{% if fv.get('has_image') %}<label class="d-block mt-2"><input type="checkbox" name="remove_image" id="removeImage" value="1"> Remove existing photo</label>{% endif %}<p id="imageMessage" role="status" class="text-secondary"></p></div>
           </div>
           <details class="tvw-rb-extra" {% if fv.get('description') or notes_val %}open{% endif %}><summary>The story &amp; mixing notes</summary>
             <label class="tvw-rb-label" for="recipeDescription">Full description</label><textarea id="recipeDescription" name="description" maxlength="10000" class="tvw-rb-textarea" rows="4" placeholder="What inspired this recipe? What should it taste like?">{{ fv.get('description','') }}</textarea>
@@ -293,6 +293,7 @@
 </script>
 <script src="{{ url_for('static', filename='tvw-flavour-usage.js') }}"></script>
 <script src="{{ url_for('static', filename='tvw-recipe-builder.js') }}"></script>
+<script src="{{ url_for('static', filename='tvw-photo-upload.js') }}"></script>
 <script src="{{ url_for('static', filename='tvw-recipe-story.js') }}"></script>
 <script>
 (() => {
