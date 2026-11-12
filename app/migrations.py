@@ -824,6 +824,9 @@ def run_startup_migrations() -> dict:
             CREATE INDEX IF NOT EXISTS idx_flavour_reviews_flavour ON flavour_reviews(flavour_id, created_at);
             CREATE INDEX IF NOT EXISTS idx_flavour_reviews_moderation ON flavour_reviews(moderation_status, is_hidden);
             CREATE INDEX IF NOT EXISTS idx_flavour_notes_moderation ON flavour_notes(moderation_status, is_hidden);
+            CREATE INDEX IF NOT EXISTS idx_recipe_items_ingredient_version ON recipe_items(ingredient_id, version_id);
+            CREATE INDEX IF NOT EXISTS idx_recipe_items_version_ingredient ON recipe_items(version_id, ingredient_id);
+            CREATE INDEX IF NOT EXISTS idx_flavours_source_reference ON flavours(source_flavor_ref_id);
             CREATE INDEX IF NOT EXISTS idx_flavours_brand_name ON flavours(brand, canonical_name);
             CREATE INDEX IF NOT EXISTS idx_flavours_norm_name ON flavours(normalized_name);
             CREATE INDEX IF NOT EXISTS idx_flavours_moderation ON flavours(is_hidden, is_invalid, moderation_status);

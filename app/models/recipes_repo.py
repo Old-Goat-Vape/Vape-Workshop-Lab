@@ -605,87 +605,25 @@ def search_flavour_reference_for_builder(*, query: str, limit: int = 100) -> Lis
     q = (query or "").strip()
     if not q:
         return []
-    q_lower = q.lower()
-    like_prefix = f"{q_lower}%"
-    like_contains = f"%{q_lower}%"
-    lim = max(1, min(int(limit or 100), 250))
-    from config.catalogue_identity import recipe_flavour_sql
+    from config.catalogue_identity import recipe_flavour_sql, visible_flavour_sql
     db = get_db()
-    rows = db.execute(
-        f"""
-        SELECT
-            hits.id,
-            hits.brand,
-            hits.name,
-            hits.density,
-            hits.display_name,
-            hits.catalogue_name
-        FROM (
-            SELECT
-                fr.id AS id,
-                COALESCE(fr.brand, '') AS brand,
-                COALESCE(fr.name, '') AS name,
-                COALESCE(fr.density, 1.036) AS density,
-                (COALESCE(fr.brand, '') || ' - ' || COALESCE(fr.name, '')) AS display_name,
-                MIN(NULLIF(TRIM(COALESCE(fv.canonical_name, '')), '')) AS catalogue_name
+    lim = max(1, min(int(limit or 100), 250))
+    rows = []
+    for fuzzy in (0, 1):
+        rows = db.execute(f"""
+            SELECT fr.id, fr.brand, fr.name, COALESCE(fr.density,1.036) AS density,
+                   MIN(fv.canonical_name) AS catalogue_name,
+                   MAX(MAX(tvw_flavour_search_score(fr.brand,fr.name,?,?),
+                           tvw_flavour_search_score(fv.brand,fv.canonical_name,?,?))) AS search_score
             FROM flavor_reference fr
-            LEFT JOIN flavours fv
-              ON fv.source_flavor_ref_id = fr.id
-             AND COALESCE(fv.merged_into_flavour_id, 0) = 0
-            WHERE COALESCE(fr.active, 1) = 1
-              AND {recipe_flavour_sql('fr')} AND COALESCE(fr.is_nicotine,0)=0
-              AND (
-                lower(COALESCE(fr.name, '')) LIKE ?
-                OR lower(COALESCE(fr.brand, '')) LIKE ?
-                OR lower(COALESCE(fr.brand, '') || ' - ' || COALESCE(fr.name, '')) LIKE ?
-                OR lower(COALESCE(fr.name, '') || ' (' || COALESCE(fr.brand, '') || ')') LIKE ?
-                OR lower(COALESCE(fr.brand, '') || ' ' || COALESCE(fr.name, '')) LIKE ?
-                OR lower(COALESCE(fv.canonical_name, '')) LIKE ?
-                OR lower(COALESCE(fv.brand, '')) LIKE ?
-                OR lower(COALESCE(fv.canonical_name, '') || ' (' || COALESCE(fv.brand, '') || ')') LIKE ?
-                OR lower(COALESCE(fv.brand, '') || ' ' || COALESCE(fv.canonical_name, '')) LIKE ?
-              )
-            GROUP BY fr.id
-        ) AS hits
-        ORDER BY
-          CASE
-            WHEN lower(trim(hits.name)) = ? THEN 0
-            WHEN lower(trim(COALESCE(hits.catalogue_name, ''))) = ? THEN 0
-            WHEN lower(hits.name) LIKE ? THEN 1
-            WHEN lower(COALESCE(hits.catalogue_name, '')) LIKE ? THEN 1
-            WHEN lower(hits.display_name) LIKE ? THEN 2
-            WHEN lower(COALESCE(hits.catalogue_name, '') || ' (' || hits.brand || ')') LIKE ? THEN 2
-            WHEN lower(hits.name) LIKE ? THEN 3
-            WHEN lower(hits.display_name) LIKE ? THEN 4
-            WHEN lower(hits.brand) LIKE ? THEN 4
-            ELSE 5
-          END,
-          hits.brand COLLATE NOCASE ASC,
-          hits.name COLLATE NOCASE ASC
-        LIMIT ?
-        """,
-        (
-            like_contains,
-            like_contains,
-            like_contains,
-            like_contains,
-            like_contains,
-            like_contains,
-            like_contains,
-            like_contains,
-            like_contains,
-            q_lower,
-            q_lower,
-            like_prefix,
-            like_prefix,
-            like_prefix,
-            like_prefix,
-            like_contains,
-            like_contains,
-            like_contains,
-            lim,
-        ),
-    ).fetchall()
+            LEFT JOIN flavours fv ON fv.source_flavor_ref_id=fr.id AND {visible_flavour_sql('fv')}
+            LEFT JOIN flavours all_f ON all_f.source_flavor_ref_id=fr.id AND COALESCE(all_f.merged_into_flavour_id,0)=0
+            WHERE COALESCE(fr.active,1)=1 AND {recipe_flavour_sql('fr')} AND COALESCE(fr.is_nicotine,0)=0
+            GROUP BY fr.id HAVING search_score > 0 AND (MAX(all_f.id) IS NULL OR COUNT(fv.id)>0)
+            ORDER BY search_score DESC, fr.brand COLLATE NOCASE, fr.name COLLATE NOCASE, fr.id
+            LIMIT ?
+        """, (q,fuzzy,q,fuzzy,lim)).fetchall()
+        if rows: break
     out: list[dict[str, Any]] = []
     for row in rows:
         d = dict(row)
@@ -695,6 +633,7 @@ def search_flavour_reference_for_builder(*, query: str, limit: int = 100) -> Lis
         d["name"] = name
         ref_id = int(d["id"])
         d["display_label"] = f"{brand} - {name} (#{ref_id})"
+        d["suggestion"] = d["search_score"] < 60
         out.append(d)
     return out
 
@@ -731,7 +670,7 @@ def fetch_tvw_flavours(
 
     Metrics (no N+1):
       - ``used_in_count``: distinct community-visible recipes (same rules as recipe library)
-        using this flavour's ``source_flavor_ref_id`` in any version.
+        using this flavour's ``source_flavor_ref_id`` in the current version.
       - ``avg_rating``: mean of visible flavour_reviews only; NULL if none.
       - ``avg_usage_percent``: ``avg_usage`` else ``default_percent`` from import/catalog;
         NULL if neither set (UI shows —).
@@ -743,13 +682,15 @@ def fetch_tvw_flavours(
     offset = (page - 1) * page_size
     where = [visible_flavour_sql("f")]
     params: list[Any] = []
-    if search:
-        where.append("(f.canonical_name LIKE ? OR COALESCE(f.brand, '') LIKE ?)")
-        like = f"%{search}%"
-        params.extend([like, like])
     if manufacturer:
         where.append("LOWER(COALESCE(f.brand, '')) = ?")
         params.append(manufacturer.strip().lower())
+    fuzzy = 0
+    if search:
+        direct = db.execute(f"SELECT 1 FROM flavours f WHERE {' AND '.join(where)} AND tvw_flavour_search_score(f.brand,f.canonical_name,?,0)>0 LIMIT 1",(*params,search)).fetchone()
+        fuzzy = 0 if direct else 1
+        where.append("tvw_flavour_search_score(f.brand,f.canonical_name,?,?)>0")
+        params.extend([search,fuzzy])
     where.append("COALESCE(f.merged_into_flavour_id, 0) = 0")
 
     sort_map = {
@@ -772,6 +713,7 @@ def fetch_tvw_flavours(
             f.canonical_name,
             f.brand,
             f.category,
+            f.source_flavor_ref_id,
             CASE
                 WHEN f.avg_usage IS NOT NULL THEN f.avg_usage
                 WHEN f.default_percent IS NOT NULL THEN f.default_percent
@@ -792,7 +734,7 @@ def fetch_tvw_flavours(
             FROM flavours f2
             JOIN recipe_items ri ON ri.ingredient_id = f2.source_flavor_ref_id
             JOIN recipe_versions v ON v.id = ri.version_id
-            JOIN recipes r ON r.id = v.recipe_id
+            JOIN recipes r ON r.id = v.recipe_id AND r.current_version_id=v.id
             WHERE COALESCE(f2.merged_into_flavour_id, 0) = 0
               AND COALESCE(f2.source_flavor_ref_id, 0) != 0
               AND {pub}
@@ -809,7 +751,7 @@ def fetch_tvw_flavours(
         tuple(params),
     ).fetchone()
     total = int(count["c"] or 0) if count else 0
-    return [dict(r) for r in rows], total
+    return [dict(r, suggestion=bool(search and fuzzy)) for r in rows], total
 
 
 def fetch_tvw_flavour_manufacturers(*, limit: int = 1000) -> list[str]:

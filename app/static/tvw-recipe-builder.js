@@ -108,7 +108,7 @@
       btn.className = "tvw-flavor-ac-item";
       btn.setAttribute("role", "option");
       btn.dataset.id = String(f.id);
-      btn.textContent = mkLabel(f);
+      btn.textContent = (f.suggestion ? "Similar spelling: " : "") + mkLabel(f);
       btn.addEventListener("mousedown", (ev) => {
         ev.preventDefault();
         selectFlavor(wrap, f);

@@ -10,18 +10,11 @@
         <div class="flex-grow-1">
           <h1 class="h4 mb-1">{{ flavour.canonical_name }}</h1>
           <div class="text-secondary small mb-2">{{ flavour.brand or "Unknown manufacturer" }}</div>
-          <div class="d-flex flex-wrap gap-2 mb-2">
-            {% if flavour.usage_display_kind == 'avg_usage' %}
-              <span class="badge text-bg-info">Catalogue data</span>
-              <span class="small"><strong>{{ '%.2f'|format(flavour.usage_display_value) }}%</strong> typical usage (imported <code>avg_usage</code>)</span>
-            {% elif flavour.usage_display_kind == 'default_percent' %}
-              <span class="badge text-bg-secondary">Catalogue default</span>
-              <span class="small"><strong>{{ '%.2f'|format(flavour.usage_display_value) }}%</strong> suggested starting % (<code>default_percent</code>; no separate average on file)</span>
-            {% else %}
-              <span class="badge text-bg-dark">No usage hint</span>
-              <span class="small text-secondary">No <code>avg_usage</code> or <code>default_percent</code> on this catalogue row yet.</span>
-            {% endif %}
-          </div>
+          <p class="text-secondary">{% if flavour.usage_display_value is not none %}
+            Imported catalogue hint: <strong>{{ '%.2f'|format(flavour.usage_display_value) }}%</strong>.
+            {% if flavour.usage_display_kind == 'default_percent' %}Stored as a default percentage.{% else %}Stored as an average; its sample count is unknown.{% endif %}
+            This is separate from the TVW recipe statistics below.
+          {% else %}No imported usage hint is available.{% endif %}</p>
           <div class="small text-secondary border-top border-secondary pt-2 mt-2">
             <strong class="text-light">Your stash</strong>
             {% if stash_binding.is_lab_linked %}
@@ -50,6 +43,41 @@
       </div>
     </div>
   </header>
+
+  <section class="card shadow-sm mb-3" id="usage-insights" aria-labelledby="usageHeading">
+    <div class="card-body">
+      <h2 class="h4" id="usageHeading">How mixers use this flavour</h2>
+      <p>Based on <strong>{{ insights.count }} public TVW recipe{{ 's' if insights.count != 1 else '' }}</strong>, using each recipe’s current version once.</p>
+      <p class="text-secondary">These are percentages used in recipes, not single-flavour testing recommendations. The median is the middle value; the average can be pulled up by unusually high percentages. Private and hidden recipes are excluded.</p>
+      {% if insights.count %}
+        {% if insights.count < 5 %}<p class="text-warning">Small sample — treat these figures as examples, rather than an established usage range.</p>{% endif %}
+        <dl class="row g-3 mb-3">
+          {% for label,value in [('Median',insights.median),('Average',insights.average),('Lowest',insights.minimum),('Highest',insights.maximum)] %}
+            <div class="col-6 col-md-3"><dt>{{ label }}</dt><dd class="fs-4">{{ '%.2f'|format(value) }}%</dd></div>
+          {% endfor %}
+        </dl>
+        <details><summary>See the usage breakdown</summary>
+          <table class="table table-dark mt-2"><caption>Recipe percentages grouped into ranges. Each recipe is counted once; the upper boundary belongs to the next range, except in the final range.</caption>
+            <thead><tr><th scope="col">Flavour percentage</th><th scope="col">Recipes</th></tr></thead>
+            <tbody>{% for bin in insights.distribution %}<tr><th scope="row">{{ bin.low }}% {{ 'to' if bin.last else 'to below' }} {{ bin.high }}%</th><td>{{ bin.count }}</td></tr>{% endfor %}</tbody>
+          </table>
+        </details>
+      {% else %}<p>No usable percentages from public current recipes yet. Add a public recipe to help build this information.</p>{% endif %}
+    </div>
+  </section>
+
+  <section class="card shadow-sm mb-3" aria-labelledby="pairingHeading">
+    <div class="card-body">
+      <h2 class="h4" id="pairingHeading">Often used in the same recipe</h2>
+      <p class="text-secondary">Observed combinations in the same {{ insights.count }} public recipes. This shows what people combined, rather than a guarantee that flavours work well together.</p>
+      <ul class="list-unstyled mb-0">
+        {% for partner in insights.pairings %}<li class="py-2 border-bottom border-secondary">
+          <a class="link-info" href="{{ url_for('tvw_recipes.tvw_flavour_detail',flavour_id=partner.flavour_id) }}">{{ partner.name }} — {{ partner.brand }}</a>
+          <span> · {{ partner.recipe_count }} recipe{{ 's' if partner.recipe_count != 1 else '' }}</span>
+        </li>{% else %}<li>No pairings from public recipes yet.</li>{% endfor %}
+      </ul>
+    </div>
+  </section>
 
   <section class="card shadow-sm mb-3" id="stash-actions">
     <div class="card-body">
