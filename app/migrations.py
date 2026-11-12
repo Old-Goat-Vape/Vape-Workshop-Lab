@@ -1203,5 +1203,13 @@ def run_startup_migrations() -> dict:
             pass
 
     db.commit()
+    # One-time owner-requested profile pass, after all schema changes. It fills only
+    # empty metadata, audits every assignment, and never repeats after an undo.
+    from flask import current_app
+    if current_app.config.get('TVW_ENABLE_LAB_MODULES'):
+        from services.recipe_profile_service import backfill_once
+        outcome = backfill_once()
+        if not outcome['already_applied']:
+            print(f"[recipe-profiles] second pass assigned={outcome['count']} batch={outcome['batch_id']} (undo available in Lab recipe data)")
     return {"added_columns": added, "count": len(added)}
 

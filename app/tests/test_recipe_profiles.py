@@ -52,6 +52,37 @@ class SuggestionTests(unittest.TestCase):
         self.assertEqual(result['confidence'],'review')
         self.assertNotIn('Custard',result['profiles'])
 
+    def test_second_pass_food_names_and_compound_ingredients(self):
+        for name,expected in [('Cronut','Bakery'),('Crumble topping','Bakery'),('Macchiato','Beverage'),('Limeade','Beverage'),('Gelato','Dessert'),('Buttermilk','Cream'),('Beer Nuts','Nut')]:
+            self.assertEqual(profiles.matches(name)[0],expected,name)
+        self.assertNotIn('Menthol',profiles.matches('Vanilla Ice Cream'))
+        self.assertEqual(profiles.matches('Peanut Butter')[0],'Nut')
+        self.assertEqual(profiles.matches('Butter Pecan')[0],'Nut')
+
+    def test_family_pass_supports_unnamed_bakery_and_broad_dessert(self):
+        result=profiles.suggest('Experiment',ingredients=[ingredient('Cookie',3),ingredient('Whipped Cream',2),ingredient('Vanilla Custard',2)])
+        self.assertEqual(result['confidence'],'high')
+        self.assertEqual(result['profiles'][0],'Dessert')
+        result=profiles.suggest('Golden Grahams',ingredients=[ingredient('Cereal 27',3),ingredient('Meringue',2),ingredient('Cream',1)])
+        self.assertEqual(result['confidence'],'high')
+        self.assertEqual(result['profiles'][0],'Bakery')
+
+    def test_compound_tobacco_is_not_classified_as_chocolate_candy(self):
+        result=profiles.suggest('Experiment',ingredients=[ingredient('Cocoa Tobacco',4),ingredient('Vanilla',1)])
+        self.assertEqual(result['profiles'][0],'Tobacco')
+        self.assertEqual(result['confidence'],'high')
+
+    def test_author_credit_is_not_a_flavour(self):
+        result=profiles.suggest('Vanilla Cream by Pauly Walnuts',ingredients=[ingredient('Vanilla',4),ingredient('Cream',3)])
+        self.assertEqual(result['profiles'][0],'Cream')
+        self.assertEqual(result['confidence'],'high')
+
+    def test_tobacco_custard_and_unknown_bases_still_need_review(self):
+        result=profiles.suggest('RY4 Custard',ingredients=[ingredient('RY4',4),ingredient('Custard',3)])
+        self.assertEqual(result['confidence'],'review')
+        result=profiles.suggest('Cronut',ingredients=[ingredient('Donut',2),ingredient('Unknown Base',6)])
+        self.assertEqual(result['confidence'],'review')
+
 
 class ProfileIntegrationTests(unittest.TestCase):
     setUp=base.RecipeBuilderCreateTests.setUp
@@ -135,3 +166,42 @@ class ProfileIntegrationTests(unittest.TestCase):
             self.assertEqual(preview[0]['confidence'],'unknown')
             count,_=profiles.apply(profiles.selection_digest(preview),3,row['id'],'Dessert')
             self.assertEqual(count,1)
+
+    def test_one_time_backfill_is_audited_and_restart_does_not_reverse_undo(self):
+        row=self.create(name='Vanilla Cream')
+        existing=self.create(name='Chosen',profiles=['Fruit'])
+        with base.flask_app.app_context():
+            db=get_db()
+            db.execute('DELETE FROM recipe_profile_backfills');db.commit()
+            outcome=profiles.backfill_once()
+            self.assertEqual(outcome['count'],1)
+            self.assertFalse(outcome['already_applied'])
+            audit=db.execute('SELECT * FROM recipe_profile_audit WHERE batch_id=?',(outcome['batch_id'],)).fetchone()
+            self.assertEqual(audit['actor_id'],0)
+            self.assertEqual(audit['rule_version'],'2')
+            self.assertEqual(profiles.undo(outcome['batch_id']),1)
+            second=profiles.backfill_once()
+            self.assertTrue(second['already_applied'])
+            self.assertEqual(db.execute('SELECT profiles_json FROM recipe_stories WHERE version_id=?',(row['current_version_id'],)).fetchone()[0],'[]')
+            self.assertEqual(db.execute('SELECT profiles_json FROM recipe_stories WHERE version_id=?',(existing['current_version_id'],)).fetchone()[0],'["Fruit"]')
+
+    def test_failed_backfill_rolls_back_profiles_and_marker(self):
+        row=self.create(name='Vanilla Cream')
+        with base.flask_app.app_context():
+            db=get_db()
+            db.execute('DELETE FROM recipe_profile_backfills')
+            db.execute("CREATE TRIGGER fail_profile_audit BEFORE INSERT ON recipe_profile_audit BEGIN SELECT RAISE(ABORT,'test failure'); END")
+            db.commit()
+            with self.assertRaises(Exception):profiles.backfill_once()
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM recipe_profile_backfills').fetchone()[0],0)
+            self.assertEqual(db.execute('SELECT profiles_json FROM recipe_stories WHERE version_id=?',(row['current_version_id'],)).fetchone()[0],'[]')
+
+    def test_startup_runs_backfill_once_for_existing_recipes(self):
+        row=self.create(name='Vanilla Cream')
+        with base.flask_app.app_context():
+            db=get_db();db.execute('DELETE FROM recipe_profile_backfills');db.commit()
+            base.run_startup_migrations()
+            self.assertEqual(db.execute('SELECT profiles_json FROM recipe_stories WHERE version_id=?',(row['current_version_id'],)).fetchone()[0],'["Cream"]')
+            count=db.execute('SELECT COUNT(*) FROM recipe_profile_audit').fetchone()[0]
+            base.run_startup_migrations()
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM recipe_profile_audit').fetchone()[0],count)
