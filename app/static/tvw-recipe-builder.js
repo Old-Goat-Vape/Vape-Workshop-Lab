@@ -79,6 +79,20 @@
     if (brandEl) brandEl.value = flavour?.brand || "";
   };
 
+  const usageControllers = new WeakMap();
+  const fetchUsage = async (id) => {
+    const response = await fetch(`/api/recipes/flavour-usage/${id}`, {
+      credentials: 'same-origin', cache: 'no-store', headers: {Accept: 'application/json'},
+    });
+    const body = await response.json();
+    if (!response.ok || body.status !== 'success') throw new Error('Usage unavailable');
+    return body.usage;
+  };
+  const usageFor = (row) => {
+    if (!usageControllers.has(row)) usageControllers.set(row, new window.TVWFlavourUsage(row, fetchUsage, queueCalc));
+    return usageControllers.get(row);
+  };
+
   const selectFlavor = (wrap, flavour) => {
     const row = wrap.closest(".ingredient-row");
     const input = wrap.querySelector(".flavor-input");
@@ -87,6 +101,7 @@
     input.value = mkLabel(flavour);
     idEl.value = String(flavour.id);
     updateRowBrand(row, flavour);
+    usageFor(row).select(flavour.id);
     closeFlavorMenu(wrap);
     queueCalc();
   };
@@ -152,6 +167,7 @@
     const id = parseFlavorId(input.value);
     idEl.value = id > 0 ? String(id) : "";
     if (id <= 0) updateRowBrand(row, null);
+    usageFor(row).select(id);
     if (searchTimer) clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
       activeAcWrap = wrap;
@@ -270,6 +286,7 @@
     }
     if (percent !== "" && percent != null) pctEl.value = String(percent);
     wireFlavorAutocomplete(row);
+    usageFor(row).select(idNum, {autofill: false});
     return row;
   };
 
@@ -451,6 +468,9 @@
       const f = byId.get(id);
       e.target.value = mkLabel(f);
       updateRowBrand(row, f);
+      usageFor(row).select(id);
+    } else {
+      usageFor(row).select(0);
     }
     queueCalc();
   }, true);
