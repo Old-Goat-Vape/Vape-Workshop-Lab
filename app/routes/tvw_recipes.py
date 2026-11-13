@@ -82,6 +82,8 @@ def _render_recipe_builder(
 @tvw_recipes_bp.route("/recipes/new")
 @login_required
 def tvw_recipe_new():
+    if request.args.get('practice') == '1':
+        return _render_recipe_builder(mode='create',form_values=dict(name='My first practice mix',visibility='private',status='wip',calc_target_ml='10',calc_target_nic='0',calc_pg_ratio='30',calc_vg_ratio='70'))
     return _render_recipe_builder(mode="create")
 
 
@@ -845,7 +847,8 @@ def tvw_recipe_save():
             flash("Recipe created successfully.", "success")
         else:
             flash(f"Saved as version {saved['version']}.", "success")
-        session['recipe_builder_saved'] = {'recipe_id': saved['recipe_id'], 'draft_key': f'tvw-recipe-draft:{user_id}:{recipe_id or "new"}'}
+        draft_slot = recipe_id or ('new-practice' if request.form.get('practice_mode') == '1' else 'new')
+        session['recipe_builder_saved'] = {'recipe_id': saved['recipe_id'], 'draft_key': f'tvw-recipe-draft:{user_id}:{draft_slot}'}
         return redirect(url_for("tvw_recipes.tvw_recipe_detail", slug=saved["slug"]))
     except sqlite3.OperationalError as exc:
         logger.exception(

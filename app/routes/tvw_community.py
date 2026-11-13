@@ -78,3 +78,9 @@ def bridge_to_lab():
         flash("Lab access is restricted to admin-level users.", "warning")
         return redirect(url_for("tvw_community.community_feed"))
     return redirect(url_for("dashboard_index"))
+
+
+@tvw_community_bp.route('/first-mix')
+@login_required
+def first_mix():
+    return render_template('tvw_first_mix.html')

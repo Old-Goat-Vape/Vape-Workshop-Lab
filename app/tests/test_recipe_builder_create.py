@@ -76,6 +76,8 @@ class RecipeBuilderCreateTests(unittest.TestCase):
 
     def _login(self, user_id: int, username: str, role: str):
         with self.client.session_transaction() as sess:
+            # A simulated new login must not retain another account's password signature.
+            sess.clear()
             sess["user_id"] = user_id
             sess["username"] = username
             sess["role"] = role
