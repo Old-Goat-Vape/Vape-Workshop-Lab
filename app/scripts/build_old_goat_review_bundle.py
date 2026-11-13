@@ -54,7 +54,8 @@ def build(documents):
     return dict(source='https://drive.google.com/drive/folders/1NcEtMMfDLE0IRyA_UL83Vz4THkPpL4ac',
         reviewer='Old Goat',collected_on='2026-11-13',permission='Author explicitly requested importing his Drive flavour reviews into TVW.',
         documents_read=len(documents),records=len(records),with_text=len(records),excluded_documents=excluded,
-        coverage_note='Includes all 59 documents returned by the accessible main/manufacturer folder listings. The main listing returned exactly 50 documents without pagination; complete folder coverage is not confirmed.',
+        coverage_note='Signed-in Drive UI verified the supplied folder and all eight subfolders: 50 root documents and nine subfolder documents, 59 total. All documents were read; 58 reviews were packaged and one non-review was excluded.',
+        folder_coverage_verified=True,folder_item_counts={'root_documents':50,'CAP':0,'FE':0,'FLV':0,'FW':1,'IWN':1,'LB':1,'SSA':2,'TFA':4},
         encoding='gzip+base64 JSON UTF-8',gzip_base64=base64.b64encode(gzip.compress(json.dumps(records,ensure_ascii=False).encode(),mtime=0)).decode())
 
 

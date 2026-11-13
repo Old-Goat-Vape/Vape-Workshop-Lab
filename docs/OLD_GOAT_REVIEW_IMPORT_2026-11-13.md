@@ -1,14 +1,15 @@
-# Old Goat Drive reference reviews — first accessible batch
+# Old Goat Drive reference reviews — verified supplied-folder coverage
 
 The author supplied the direct review-folder link on 13 November 2026:
 https://drive.google.com/drive/folders/1NcEtMMfDLE0IRyA_UL83Vz4THkPpL4ac?usp=sharing
 
-The connected Drive reader could access this shared folder without changing any
-permissions or modifying source documents. Its main-folder listing returned 50
-Word documents plus eight manufacturer folders. Those folders returned another
-nine documents: 59 accessible documents in total. No listing exposed a next-page
-cursor. Complete source-folder coverage is **not confirmed**; the browser remains
-signed out of the author's Drive account. Do not claim all Drive reviews are done.
+The connected Drive reader collected 50 Word documents in the root and nine in
+manufacturer subfolders. A subsequent signed-in browser check verified the root
+through its last item and all eight subfolders: CAP 0, FE 0, FLV 0, FW 1, IWN 1,
+LB 1, SSA 2 and TFA 4. The supplied folder contains 59 documents; all were read.
+Fifty-eight are flavour reviews and one is unrelated forum planning. This verifies
+coverage of the supplied folder and descendants, not other locations in the Drive.
+Source documents and sharing permissions were not changed.
 
 ## Packaged records
 
