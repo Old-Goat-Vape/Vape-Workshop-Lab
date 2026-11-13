@@ -7,7 +7,7 @@ import unittest
 from tests import test_tvw_api as base
 from db import get_db
 from services import expert_flavour_review_service as expert
-from scripts.build_old_goat_review_bundle import heading_identity,build
+from scripts.build_old_goat_review_bundle import heading_identity,build,build_additional,duplicate_key
 
 
 def bundle_rows():
@@ -64,9 +64,56 @@ class OldGoatImportTests(unittest.TestCase):
     def test_bundles_are_independent_and_repeat_startup_does_not_duplicate(self):
         with base.flask_app.app_context():
             db=get_db()
-            self.assertEqual(db.execute('SELECT COUNT(*) FROM expert_flavour_reviews').fetchone()[0],1235)
+            expected={}
+            for path in (Path(expert.__file__).resolve().parents[1]/'data/flavour_reviews').glob('*.json'):
+                b=json.loads(path.read_text())
+                for row in json.loads(gzip.decompress(base64.b64decode(b['gzip_base64']))):
+                    expected[row['reviewer']]=expected.get(row['reviewer'],0)+1
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM expert_flavour_reviews').fetchone()[0],sum(expected.values()))
             self.assertIsNone(expert.import_bundled_once())
-            self.assertEqual({r['reviewer']:r['total'] for r in expert.reviewer_totals()},{'Old Goat':58,'SessionDrummer':1177})
+            self.assertEqual({r['reviewer']:r['total'] for r in expert.reviewer_totals()},expected)
             counts,rows,total=expert.report(reviewer='Old Goat')
-            self.assertEqual(total,58)
+            self.assertEqual(total,expected['Old Goat'])
             self.assertTrue(all(r['reviewer']=='Old Goat' for r in rows))
+
+    def test_additional_bundle_coverage_identity_and_original_prose(self):
+        path=Path(expert.__file__).resolve().parents[1]/'data/flavour_reviews/old-goat-additional-2026-11-13.json'
+        b=json.loads(path.read_text())
+        rows=json.loads(gzip.decompress(base64.b64decode(b['gzip_base64'])))
+        self.assertEqual(b['documents_read'],358)
+        self.assertEqual(sum(b['folder_item_counts'].values()),358)
+        self.assertEqual(len(rows),355)
+        self.assertEqual(len(b['excluded_documents']),2)
+        self.assertEqual(len(b['duplicate_documents']),1)
+        _,old=bundle_rows()
+        self.assertEqual(len({r['source_key'] for r in rows+old}),413)
+        self.assertEqual(len({duplicate_key(r) for r in rows+old}),413)
+        for row in rows:
+            self.assertEqual(row['content_sha256'],hashlib.sha256(row['review_text'].encode()).hexdigest())
+            self.assertEqual(heading_identity(row['review_text'].split('\n')[0].strip()),(row['code'],row['flavour']))
+        for h,result in [
+            ('Candied Watermelon (Capella Silver Line)',('CAP (SL)','Candied Watermelon')),
+            ('Cinnamon Sugar (CAP SL)',('CAP (SL)','Cinnamon Sugar')),
+            ('French Vanilla (CAP) v2',('CAP','French Vanilla v2')),
+            ('Flavour Art (FA) King (Pazzo) – Flavour Review',('FA PAZZO','King')),
+            ('Ace (Pazzo) – Flavour Review',('FA PAZZO','Ace')),
+            ('Flavour Art Custard Extra 2 – Flavour Review',('FA','Custard Extra 2')),
+            ('by Flavorah (FLV)Native Tobacco',('FLV','Native Tobacco')),
+            ('French Vanilla V2 (DIYFS) – DIY Flavour Shack',('DIYFS','French Vanilla V2')),
+        ]:self.assertEqual(heading_identity(h),result)
+
+    def test_deduplication_keeps_revisions_versions_and_manufacturers(self):
+        def doc(i,heading,body):
+            return dict(id=str(i),title='source.docx',content=heading+'\n'+body)
+        docs=[doc(1,'Custard (CAP)','Original review.'),
+              doc(2,'Custard (CAP)','Original   review.'),
+              doc(3,'Custard (CAP)','Revised review.'),
+              doc(4,'Custard V2 (CAP)','Original review.'),
+              doc(5,'Custard (FLV)','Original review.')]
+        b=build_additional(docs,[])
+        self.assertEqual(b['records'],4)
+        self.assertEqual(len(b['duplicate_documents']),1)
+        rows=json.loads(gzip.decompress(base64.b64decode(b['gzip_base64'])))
+        again=build_additional(docs,rows)
+        self.assertEqual(again['records'],0)
+        self.assertEqual(len(again['duplicate_documents']),5)
