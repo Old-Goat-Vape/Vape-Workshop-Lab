@@ -5,7 +5,7 @@
 
 <link rel="stylesheet" href="{{ url_for('static',filename='tvw-flavours.css') }}">
 <div class="tvw-page flavour-detail-page">
-  <a class="link-light d-inline-block mb-3" href="{{ url_for('tvw_recipes.tvw_flavours') }}">← Back to flavour library</a>
+  <a class="link-light d-inline-block mb-3" href="{{ library_return }}">← Back to flavour library</a>
   <header class="flavour-detail-hero" id="summary">
     <img src="{{ url_for('static',filename=flavour_artwork.filename) }}" alt="{{ flavour_artwork.label }}" width="960" height="540" fetchpriority="high">
     <div><p class="flavour-eyebrow">{{ flavour.brand or 'Unknown manufacturer' }}</p><h1>{{ flavour.canonical_name }}</h1>
@@ -19,14 +19,15 @@
     <div class="d-flex flex-wrap gap-2"><a class="btn btn-warning" href="#stash-actions">{{ 'Update stash' if stash_binding.quantity_ml > 0 else 'Add to stash' }}</a><a class="btn btn-outline-light" href="#my-notebook">My notebook</a><a class="btn btn-outline-light" href="{{ url_for('tvw_recipes.tvw_stash') }}">Open My Stash</a></div>
     </div>
   </header>
-  <nav class="flavour-section-nav" aria-label="Flavour sections"><a href="#usage-insights">Usage data</a><a href="#pairings">Pairings</a><a href="#my-notebook">Private notebook</a><a href="#recipes">Recipes · {{ recipes_total }}</a><a href="#notes">Community notes · {{ community_counts.notes_visible }}</a><a href="#reviews">Reviews · {{ community_counts.reviews_visible }}</a></nav>
+  <nav class="flavour-section-nav" aria-label="Flavour sections"><a href="#tasting-tests">My tasting tests</a><a href="#usage-insights">Usage data</a><a href="#pairings">Pairings</a><a href="#my-notebook">Private notebook</a><a href="#recipes">Recipes · {{ recipes_total }}</a><a href="#notes">Community notes · {{ community_counts.notes_visible }}</a><a href="#reviews">Reviews · {{ community_counts.reviews_visible }}</a></nav>
   {% if cost_info is not none %}<section class="card card-body mb-3" id="owner-costs"><h2 class="h5">Your costing reference</h2><p class="mb-1">{% if cost_info.price_per_ml is not none and cost_info.price_per_ml > 0 %}<strong>R {{ '%.2f'|format(cost_info.price_per_ml) }} / ml</strong>{% else %}No catalogue price is set for this exact linked flavour.{% endif %}</p><p class="text-secondary mb-0">Private costing · Old Goat access. This is the linked catalogue price; recipe costing may resolve a priced equivalent or a saved override.</p></section>{% endif %}
   <section class="card card-body mb-3" id="my-notebook" aria-labelledby="notebookHeading">
     <p class="flavour-private-label mb-1">Only you can see this</p><h2 class="h4" id="notebookHeading">My flavour notebook</h2>
     <p class="text-secondary">Keep your impressions, percentages tried and reminders here. Nothing in this notebook is posted to the community or used as a verified recommendation.</p>
-    <form method="post" action="{{ url_for('tvw_recipes.tvw_flavour_notebook',flavour_id=flavour.id) }}"><label for="privateFlavourNotes" class="form-label">Your private notes</label><textarea id="privateFlavourNotes" class="form-control" rows="5" name="private_notes" maxlength="10000" placeholder="What did you taste? At what percentage and after how many days?">{{ private_notebook }}</textarea><button class="btn btn-outline-warning mt-3">Save private notes</button></form>
+    <form method="post" action="{{ url_for('tvw_recipes.tvw_flavour_notebook',flavour_id=flavour.id) }}"><input type="hidden" name="return_to" value="{{ library_return }}"><label for="privateFlavourNotes" class="form-label">Your private notes</label><textarea id="privateFlavourNotes" class="form-control" rows="5" name="private_notes" maxlength="10000" placeholder="What did you taste? At what percentage and after how many days?">{{ private_notebook }}</textarea><button class="btn btn-outline-warning mt-3">Save private notes</button></form>
   </section>
 
+  {% include "partials/tvw_flavour_tasting.html" %}
   <section class="card shadow-sm mb-3" id="usage-insights" aria-labelledby="usageHeading">
     <div class="card-body">
       <h2 class="h4" id="usageHeading">How mixers use this flavour</h2>
@@ -56,7 +57,7 @@
       <p class="text-secondary">Observed combinations in the same {{ insights.count }} eligible recipes, including private and unlisted recipes. This shows what people combined, rather than a guarantee that flavours work well together.</p>
       <ul class="list-unstyled mb-0">
         {% for partner in insights.pairings %}<li class="py-2 border-bottom border-secondary">
-          <a class="link-info" href="{{ url_for('tvw_recipes.tvw_flavour_detail',flavour_id=partner.flavour_id) }}">{{ partner.name }} — {{ partner.brand }}</a>
+          <a class="link-info" href="{{ url_for('tvw_recipes.tvw_flavour_detail',flavour_id=partner.flavour_id,return_to=library_return) }}">{{ partner.name }} — {{ partner.brand }}</a>
           <span> · {{ partner.recipe_count }} recipe{{ 's' if partner.recipe_count != 1 else '' }}</span>
         </li>{% else %}<li>No pairings from eligible recipes yet.</li>{% endfor %}
       </ul>
@@ -108,11 +109,11 @@
       {% if recipes_total_pages > 1 %}
         <div class="d-flex flex-wrap gap-2 mt-3 align-items-center">
           {% if recipes_page > 1 %}
-            <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_flavour_detail', flavour_id=flavour.id, recipes_page=recipes_page - 1) }}">Previous</a>
+            <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_flavour_detail', flavour_id=flavour.id, recipes_page=recipes_page - 1,return_to=library_return) }}">Previous</a>
           {% endif %}
           <span class="small text-secondary">Page {{ recipes_page }} of {{ recipes_total_pages }}</span>
           {% if recipes_page < recipes_total_pages %}
-            <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_flavour_detail', flavour_id=flavour.id, recipes_page=recipes_page + 1) }}">Next</a>
+            <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_flavour_detail', flavour_id=flavour.id, recipes_page=recipes_page + 1,return_to=library_return) }}">Next</a>
           {% endif %}
         </div>
       {% endif %}

@@ -25,11 +25,11 @@
 <div class="flavour-card-grid">
 {% for flavour in flavours %}
 <article class="flavour-card">
-<a class="flavour-card-picture" href="{{ url_for('tvw_recipes.tvw_flavour_detail',flavour_id=flavour.id) }}" tabindex="-1" aria-hidden="true"><img src="{{ url_for('static',filename=flavour.artwork.filename) }}" width="960" height="540" alt="" loading="lazy"><span>{{ flavour.suggested_family or 'Explore this flavour' }}</span></a>
-<div class="flavour-card-body"><p class="flavour-brand">{{ flavour.brand or 'Unknown manufacturer' }}</p><h2><a href="{{ url_for('tvw_recipes.tvw_flavour_detail',flavour_id=flavour.id) }}">{{ flavour.canonical_name }}</a></h2>
+<a class="flavour-card-picture" href="{{ url_for('tvw_recipes.tvw_flavour_detail',flavour_id=flavour.id,return_to=library_return) }}" tabindex="-1" aria-hidden="true"><img src="{{ url_for('static',filename=flavour.artwork.filename) }}" width="960" height="540" alt="" loading="lazy"><span>{{ flavour.suggested_family or 'Explore this flavour' }}</span></a>
+<div class="flavour-card-body"><p class="flavour-brand">{{ flavour.brand or 'Unknown manufacturer' }}</p><h2><a href="{{ url_for('tvw_recipes.tvw_flavour_detail',flavour_id=flavour.id,return_to=library_return) }}">{{ flavour.canonical_name }}</a></h2>
 {% if flavour.quantity_ml > 0 %}<p class="flavour-owned">✓ In your stash · {{ '%.1f'|format(flavour.quantity_ml) }} ml</p>{% else %}<p class="flavour-not-owned">Not in your stash</p>{% endif %}
 <div class="flavour-card-stats"><span><strong>{{ flavour.used_in_count }}</strong> recipes</span><span>{% if flavour.avg_rating is not none %}★ {{ '%.1f'|format(flavour.avg_rating) }} / 5{% else %}No ratings yet{% endif %}</span></div>
-<div class="flavour-card-actions"><a class="btn btn-outline-light" href="{{ url_for('tvw_recipes.tvw_flavour_detail',flavour_id=flavour.id) }}">Explore flavour</a><a class="link-warning" href="{{ url_for('tvw_recipes.tvw_flavour_detail',flavour_id=flavour.id) }}#stash-actions">{{ 'Update stash' if flavour.quantity_ml > 0 else 'Add to stash' }}</a></div>
+<div class="flavour-card-actions"><a class="btn btn-outline-light" href="{{ url_for('tvw_recipes.tvw_flavour_detail',flavour_id=flavour.id,return_to=library_return) }}">Explore flavour</a><a class="link-warning" href="{{ url_for('tvw_recipes.tvw_flavour_detail',flavour_id=flavour.id,return_to=library_return) }}#stash-actions">{{ 'Update stash' if flavour.quantity_ml > 0 else 'Add to stash' }}</a></div>
 </div></article>
 {% else %}<div class="flavour-empty"><h2>Let’s try a wider search.</h2><p>Check the spelling or clear a filter. Your stash and notes are safe.</p><a class="btn btn-outline-warning" href="{{ url_for('tvw_recipes.tvw_flavours') }}">Browse all flavours</a></div>{% endfor %}
 </div>

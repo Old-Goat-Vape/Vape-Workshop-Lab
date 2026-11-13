@@ -54,7 +54,7 @@
                    href="{{ url_for('tvw_recipes.tvw_my_mixes') }}"
                    {% if nav_mix_active %}aria-current="page"{% endif %}>My mixes</a>
                 <a class="tvw-nav-link{% if nav_flavours_active %} is-active{% endif %}"
-                   href="{{ url_for('tvw_recipes.tvw_flavours') }}"
+                   href="{{ library_return|default(url_for('tvw_recipes.tvw_flavours'),true) }}"
                    {% if nav_flavours_active %}aria-current="page"{% endif %}>Flavours</a>
             </nav>
             <div class="tvw-header-actions" id="tvwHeaderActions">

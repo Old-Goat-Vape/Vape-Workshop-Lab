@@ -913,6 +913,7 @@ def tvw_flavours():
     row_end = (page - 1) * page_size + shown_count
     return render_template(
         "tvw_flavour_index.html",
+        library_return=browse.library_return(request.full_path),
         profiles=PROFILES,profile=profile,in_stash=in_stash,lab_linked=lab_linked,
         flavours=flavours,
         total=total,
@@ -935,7 +936,7 @@ def tvw_flavours():
 def tvw_flavour_detail(flavour_id: int):
     canonical_id = recipes_repo.resolve_tvw_flavour_id(flavour_id)
     if canonical_id != flavour_id:
-        return redirect(url_for("tvw_recipes.tvw_flavour_detail", flavour_id=canonical_id), code=302)
+        return redirect(url_for("tvw_recipes.tvw_flavour_detail", flavour_id=canonical_id,return_to=request.args.get('return_to','')), code=302)
     flavour = recipes_repo.fetch_tvw_flavour(flavour_id)
     if not flavour:
         abort(404)
@@ -957,7 +958,7 @@ def tvw_flavour_detail(flavour_id: int):
             url_for(
                 "tvw_recipes.tvw_flavour_detail",
                 flavour_id=flavour_id,
-                recipes_page=recipes_total_pages,
+                recipes_page=recipes_total_pages,return_to=request.args.get('return_to',''),
             ),
             code=302,
         )
@@ -974,16 +975,20 @@ def tvw_flavour_detail(flavour_id: int):
         username=str(session.get("username") or ""),
         flavour_id=flavour_id,
     )
-    from services import flavour_browse_service as browse
+    from services import flavour_browse_service as browse, flavour_testing_service as tasting
     cost_info = None
     if can_access_private_costs(session.get('username'),session.get('role')):
         from db import get_db
         row = get_db().execute('SELECT price_per_ml FROM flavor_reference WHERE id=?',(flavour.get('source_flavor_ref_id'),)).fetchone()
         cost_info = dict(price_per_ml=row['price_per_ml'] if row else None)
+    from flask import g
     return render_template(
         "tvw_flavour_detail.html",
         flavour=flavour,flavour_artwork=browse.artwork(flavour['canonical_name']),cost_info=cost_info,
         private_notebook=browse.private_notes(uid,flavour_id),
+        library_return=browse.library_return(request.values.get('return_to','')),
+        tasting_tests=tasting.tests_for(uid,flavour_id),test_kinds=tasting.KINDS,test_strengths=tasting.STRENGTHS,
+        tasting_error=getattr(g,'tasting_error',None),tasting_form=getattr(g,'tasting_form',{}),tasting_test_id=getattr(g,'tasting_test_id',None),
         notes=notes,
         reviews=reviews,
         insights=insights,
@@ -1008,7 +1013,36 @@ def tvw_flavour_notebook(flavour_id):
     except ValueError as error:
         abort(400,description=str(error))
     flash('Your private flavour notebook was saved.','success')
-    return redirect(url_for('tvw_recipes.tvw_flavour_detail',flavour_id=canonical_id)+'#my-notebook')
+    return redirect(url_for('tvw_recipes.tvw_flavour_detail',flavour_id=canonical_id,return_to=browse.library_return(request.form.get('return_to','')))+'#my-notebook')
+
+
+@tvw_recipes_bp.route('/flavours/<int:flavour_id>/tests', methods=['POST'])
+@tvw_recipes_bp.route('/flavours/<int:flavour_id>/tests/<int:test_id>/<action>', methods=['POST'])
+@login_required
+def tvw_flavour_testing(flavour_id,test_id=None,action=None):
+    from services import flavour_testing_service as tasting, flavour_browse_service as browse
+    flavour_id=recipes_repo.resolve_tvw_flavour_id(flavour_id)
+    if not recipes_repo.fetch_tvw_flavour(flavour_id): abort(404)
+    uid=int(session['user_id'])
+    try:
+        if test_id is None:
+            tasting.create(uid,flavour_id,request.form)
+        elif action == 'observe':
+            tasting.observe(uid,flavour_id,test_id,request.form)
+        elif action == 'share':
+            tasting.share(uid,flavour_id,test_id,request.form.get('share_digest',''))
+        else: abort(404)
+    except LookupError:
+        abort(404)
+    except ValueError as error:
+        # Preserve submitted values in the owner-only page rather than losing a tasting.
+        from flask import g
+        g.tasting_error=str(error)
+        g.tasting_form=request.form.to_dict()
+        g.tasting_test_id=test_id
+        return tvw_flavour_detail(flavour_id),400
+    flash('Snapshot posted as a community note.' if action=='share' else 'Your private tasting record was saved.','success')
+    return redirect(url_for('tvw_recipes.tvw_flavour_detail',flavour_id=flavour_id,return_to=browse.library_return(request.form.get('return_to','')))+'#tasting-tests')
 
 
 @tvw_recipes_bp.route("/stash")

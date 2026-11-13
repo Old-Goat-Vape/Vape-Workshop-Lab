@@ -33,3 +33,17 @@ def save_private_notes(user_id, flavour_id, notes):
     db.execute('''INSERT INTO flavour_private_notebooks(user_id,flavour_id,notes) VALUES(?,?,?)
         ON CONFLICT(user_id,flavour_id) DO UPDATE SET notes=excluded.notes,updated_at=CURRENT_TIMESTAMP''',(user_id,flavour_id,notes))
     db.commit()
+
+
+def library_return(raw):
+    """Per-tab navigation, confined to the catalogue and its known query fields."""
+    from urllib.parse import urlsplit, parse_qsl, urlencode
+    if not isinstance(raw,str) or len(raw)>3000: return '/flavours'
+    try:
+        parsed=urlsplit(raw)
+    except ValueError:
+        return '/flavours'
+    if parsed.scheme or parsed.netloc or parsed.path != '/flavours': return '/flavours'
+    allowed={'search','manufacturer','profile','in_stash','sort_by','sort_dir','page','page_size'}
+    query=urlencode([(k,v[:250]) for k,v in parse_qsl(parsed.query) if k in allowed])
+    return '/flavours'+('?' + query if query else '')
