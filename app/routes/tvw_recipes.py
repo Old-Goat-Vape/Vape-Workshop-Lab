@@ -1170,5 +1170,6 @@ def tvw_flavour_review_imports():
         return redirect(url_for('.tvw_flavour_review_imports'))
     page=max(1,request.args.get('page',1,type=int) or 1)
     search=request.args.get('search','').strip()[:200]
-    counts,rows,total=expert.report(search,page)
-    return render_template('tvw_expert_review_imports.html',counts=counts,rows=rows,total=total,page=page,search=search)
+    reviewer=request.args.get('reviewer','').strip()[:100]
+    counts,rows,total=expert.report(search,page,reviewer)
+    return render_template('tvw_expert_review_imports.html',counts=counts,rows=rows,total=total,page=page,search=search,reviewer=reviewer,reviewer_totals=expert.reviewer_totals())
