@@ -1091,3 +1091,67 @@ def tvw_recipe_image(version_id):
     response.headers['Cache-Control'] = 'private, no-store'
     response.headers['X-Content-Type-Options'] = 'nosniff'
     return response
+
+
+@tvw_recipes_bp.route('/shopping-list')
+@login_required
+def tvw_shopping_list():
+    from services import purchase_purpose_service as purpose
+    status = request.args.get('status','shopping')
+    if status not in ('shopping','bought','archived'): status = 'shopping'
+    rows = purpose.entries(int(session['user_id']),status=status,old_goat=is_old_goat_role(session.get('role')))
+    bindings = {}
+    for row in rows:
+        fid = row['flavour_id']
+        if fid not in bindings:
+            bindings[fid] = stash_service.fetch_stash_binding_for_flavour(user_id=int(session['user_id']),
+                role=str(session.get('role') or ''),username=str(session.get('username') or ''),flavour_id=fid)
+        row['stash_ml'] = bindings[fid]['quantity_ml']
+    return render_template('tvw_purchase_purposes.html', rows=rows, status=status, flavour=None, recipes=[], editing=None, form={})
+
+
+@tvw_recipes_bp.route('/flavours/<int:flavour_id>/purchase-purpose', methods=['GET','POST'])
+@login_required
+def tvw_purchase_purpose(flavour_id):
+    from services import purchase_purpose_service as purpose
+    flavour_id = recipes_repo.resolve_tvw_flavour_id(flavour_id)
+    flavour = recipes_repo.fetch_tvw_flavour(flavour_id)
+    if not flavour: abort(404)
+    uid = int(session['user_id'])
+    og = is_old_goat_role(session.get('role'))
+    rows = purpose.entries(uid,flavour_id=flavour_id,old_goat=og)
+    entry_id = request.values.get('edit',type=int)
+    editing = next((r for r in rows if r['id']==entry_id),None)
+    if entry_id and not editing: abort(404)
+    binding = stash_service.fetch_stash_binding_for_flavour(user_id=uid,role=str(session.get('role') or ''),
+        username=str(session.get('username') or ''),flavour_id=flavour_id)
+    form = request.form if request.method=='POST' else (editing or {'status':'bought' if binding['quantity_ml']>0 else 'shopping'})
+    if request.method=='POST':
+        try:
+            purpose.save(uid,flavour_id,form,og,entry_id)
+        except ValueError as exc:
+            flash(str(exc),'warning')
+        else:
+            flash('Purchase reason saved privately.','success')
+            return redirect(url_for('.tvw_purchase_purpose',flavour_id=flavour_id))
+    recipes, _ = recipes_repo.fetch_tvw_library(search=request.args.get('search',''),page_size=30,
+        viewer_user_id=uid,viewer_is_old_goat=og)
+    selected = purpose.visible_recipe(form.get('recipe_id'),uid,og)
+    if selected and not any(r['id']==selected['id'] for r in recipes): recipes.insert(0,selected)
+    return render_template('tvw_purchase_purposes.html',flavour=flavour,rows=rows,recipes=recipes,
+        editing=editing,form=form,status=None)
+
+
+@tvw_recipes_bp.route('/shopping-list/<int:entry_id>/status', methods=['POST'])
+@login_required
+def tvw_purchase_status(entry_id):
+    from services import purchase_purpose_service as purpose
+    status = request.form.get('status')
+    try:
+        fid = purpose.change_status(int(session['user_id']),entry_id,status)
+    except LookupError: abort(404)
+    except ValueError: abort(400)
+    if status=='bought':
+        flash('Marked bought. Set your actual stash quantity below; your purchase reason is kept.','success')
+        return redirect(url_for('.tvw_flavour_detail',flavour_id=fid,_anchor='stash-actions'))
+    return redirect(url_for('.tvw_shopping_list',status='archived' if status=='archived' else 'shopping'))
