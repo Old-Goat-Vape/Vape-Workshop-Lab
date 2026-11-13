@@ -45,8 +45,9 @@ searches for reviews/flavour/flavor found no review collection. The browser is s
 out of the Old Goat Drive account. No Old Goat review files have been imported.
 The author subsequently supplied an accessible review-folder link. The first
 58 Old Goat reviews are documented in OLD_GOAT_REVIEW_IMPORT_2026-11-13.md.
-Complete folder coverage still needs verification; do not report the SD collection
-as a completed import of all Old Goat reviews.
+Signed-in browser verification then confirmed all 59 documents in the supplied
+folder and its subfolders were read (58 reviews plus one excluded planning note).
+SD and Old Goat remain separately attributed collections.
 
 ## Validation and deployment
 
