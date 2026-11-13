@@ -29,6 +29,8 @@ def run_startup_migrations() -> dict:
     db = get_db()
     from services.recipe_story_service import SCHEMA as recipe_story_schema
     db.executescript(recipe_story_schema)
+    from services.flavour_browse_service import SCHEMA as flavour_notebook_schema
+    db.executescript(flavour_notebook_schema)
 
     # Ensure base reference rows exist for logging (FK on mix_history_items.ingredient_id).
     try:

@@ -676,6 +676,10 @@ def fetch_tvw_flavours(
     *,
     search: str = "",
     manufacturer: str = "",
+    profile: str = "",
+    in_stash: bool = False,
+    user_id: int | None = None,
+    lab_linked: bool = False,
     sort_by: str = "name",
     sort_dir: str = "asc",
     page: int = 1,
@@ -692,6 +696,15 @@ def fetch_tvw_flavours(
     """
     from config.catalogue_identity import visible_flavour_sql
     db = get_db()
+    from services.flavour_browse_service import family
+    from services.recipe_story_service import PROFILES
+    db.create_function('tvw_flavour_family',1,family,deterministic=True)
+    if lab_linked:
+        stash_sql = '(SELECT COALESCE(SUM(li.current_stock),0) FROM library_items li WHERE li.reference_id=f.source_flavor_ref_id AND li.active=1)'
+        stash_params = []
+    else:
+        stash_sql = '(SELECT COALESCE(SUM(si.quantity_ml),0) FROM user_stash_items si WHERE si.flavour_id=f.id AND si.user_id=?)'
+        stash_params = [int(user_id or 0)]
     page = max(1, int(page or 1))
     page_size = max(1, min(100, int(page_size or 24)))
     offset = (page - 1) * page_size
@@ -700,6 +713,15 @@ def fetch_tvw_flavours(
     if manufacturer:
         where.append("LOWER(COALESCE(f.brand, '')) = ?")
         params.append(manufacturer.strip().lower())
+    if profile in PROFILES:
+        if profile == 'Fruit':
+            where.append("tvw_flavour_family(f.canonical_name) IN ('Fruit','Berry','Citrus','Tropical')")
+        else:
+            where.append('tvw_flavour_family(f.canonical_name)=?')
+            params.append(profile)
+    if in_stash:
+        where.append(f'{stash_sql}>0')
+        params.extend(stash_params)
     fuzzy = 0
     if search:
         direct = db.execute(f"SELECT 1 FROM flavours f WHERE {' AND '.join(where)} AND tvw_flavour_search_score(f.brand,f.canonical_name,?,0)>0 LIMIT 1",(*params,search)).fetchone()
@@ -728,6 +750,8 @@ def fetch_tvw_flavours(
             f.canonical_name,
             f.brand,
             f.category,
+            tvw_flavour_family(f.canonical_name) AS suggested_family,
+            {stash_sql} AS quantity_ml,
             f.source_flavor_ref_id,
             CASE
                 WHEN f.avg_usage IS NOT NULL THEN f.avg_usage
@@ -759,7 +783,7 @@ def fetch_tvw_flavours(
         ORDER BY {sort_expr} {sort_order}, f.id ASC
         LIMIT ? OFFSET ?
         """,
-        (*params, page_size, offset),
+        (*stash_params, *params, page_size, offset),
     ).fetchall()
     count = db.execute(
         f"SELECT COUNT(1) AS c FROM flavours f WHERE {' AND '.join(where)}",

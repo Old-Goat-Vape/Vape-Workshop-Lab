@@ -877,30 +877,43 @@ def tvw_recipe_save():
 @tvw_recipes_bp.route("/flavours")
 @login_required
 def tvw_flavours():
+    from services import flavour_browse_service as browse, holdings_bridge_service
+    from services.recipe_story_service import PROFILES
+    profile = request.args.get('profile','')
+    if profile not in PROFILES: profile = ''
+    in_stash = request.args.get('in_stash') == '1'
+    lab_linked = holdings_bridge_service.is_old_goat_user(user_id=session.get('user_id'),role=session.get('role'),username=session.get('username'))
     search = (request.args.get("search") or "").strip()
     manufacturer = (request.args.get("manufacturer") or "").strip()
     sort_by = (request.args.get("sort_by") or "name").strip().lower()
     sort_dir = (request.args.get("sort_dir") or "asc").strip().lower()
     page_raw = (request.args.get("page") or "1").strip()
-    page = int(page_raw) if page_raw.isdigit() else 1
+    page = max(1,int(page_raw)) if page_raw.isdigit() else 1
     ps_raw = (request.args.get("page_size") or "25").strip()
     page_size = int(ps_raw) if ps_raw.isdigit() else 25
     page_size = max(10, min(100, page_size))
     flavours, total = recipes_repo.fetch_tvw_flavours(
         search=search,
         manufacturer=manufacturer,
+        profile=profile,in_stash=in_stash,user_id=session.get('user_id'),lab_linked=lab_linked,
         sort_by=sort_by,
         sort_dir=sort_dir,
         page=page,
         page_size=page_size,
     )
+    for item in flavours: item['artwork'] = browse.artwork(item['canonical_name'])
     manufacturers = recipes_repo.fetch_tvw_flavour_manufacturers(limit=1000)
     total_pages = (total + page_size - 1) // page_size if total else 1
+    if page > total_pages:
+        args = request.args.to_dict()
+        args['page'] = total_pages
+        return redirect(url_for('tvw_recipes.tvw_flavours',**args))
     shown_count = len(flavours)
     row_start = (page - 1) * page_size + 1 if total and shown_count else 0
     row_end = (page - 1) * page_size + shown_count
     return render_template(
         "tvw_flavour_index.html",
+        profiles=PROFILES,profile=profile,in_stash=in_stash,lab_linked=lab_linked,
         flavours=flavours,
         total=total,
         shown_count=shown_count,
@@ -961,9 +974,16 @@ def tvw_flavour_detail(flavour_id: int):
         username=str(session.get("username") or ""),
         flavour_id=flavour_id,
     )
+    from services import flavour_browse_service as browse
+    cost_info = None
+    if can_access_private_costs(session.get('username'),session.get('role')):
+        from db import get_db
+        row = get_db().execute('SELECT price_per_ml FROM flavor_reference WHERE id=?',(flavour.get('source_flavor_ref_id'),)).fetchone()
+        cost_info = dict(price_per_ml=row['price_per_ml'] if row else None)
     return render_template(
         "tvw_flavour_detail.html",
-        flavour=flavour,
+        flavour=flavour,flavour_artwork=browse.artwork(flavour['canonical_name']),cost_info=cost_info,
+        private_notebook=browse.private_notes(uid,flavour_id),
         notes=notes,
         reviews=reviews,
         insights=insights,
@@ -975,6 +995,20 @@ def tvw_flavour_detail(flavour_id: int):
         community_counts=community_counts,
         stash_binding=stash_binding,
     )
+
+
+@tvw_recipes_bp.route('/flavours/<int:flavour_id>/notebook', methods=['POST'])
+@login_required
+def tvw_flavour_notebook(flavour_id):
+    from services import flavour_browse_service as browse
+    canonical_id = recipes_repo.resolve_tvw_flavour_id(flavour_id)
+    if not recipes_repo.fetch_tvw_flavour(canonical_id): abort(404)
+    try:
+        browse.save_private_notes(int(session['user_id']),canonical_id,request.form.get('private_notes','').strip())
+    except ValueError as error:
+        abort(400,description=str(error))
+    flash('Your private flavour notebook was saved.','success')
+    return redirect(url_for('tvw_recipes.tvw_flavour_detail',flavour_id=canonical_id)+'#my-notebook')
 
 
 @tvw_recipes_bp.route("/stash")
