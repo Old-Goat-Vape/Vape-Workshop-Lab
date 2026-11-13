@@ -6,6 +6,8 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='tvw-recipe-builder.css') }}">
 
 {% set fv = form_values or {} %}
+{% set practice_mode = not recipe and (request.args.get('practice') == '1' or request.form.get('practice_mode') == '1') %}
+{% if practice_mode %}<div class="alert alert-info">Practice draft: starts at 10 ml and 0 mg/ml. Check the targets before mixing; you can change them. <a href="{{ url_for('tvw_community.first_mix') }}">Return to your first mix guide</a>.</div>{% endif %}
 {% set vis = fv.get('visibility', (recipe.visibility if recipe else 'private')) %}
 {% set st = fv.get('status', (recipe.status if recipe else 'wip'))|lower %}
 {% set name_val = fv.get('name', (recipe.name if recipe else '')) %}
@@ -36,6 +38,7 @@
 
   <form enctype="multipart/form-data" method="post" action="{{ url_for('tvw_recipes.tvw_recipe_save') }}" id="recipeBuilderForm" novalidate>
     {% if recipe %}<input type="hidden" name="recipe_id" value="{{ recipe.id }}">{% endif %}
+    {% if practice_mode %}<input type="hidden" name="practice_mode" value="1">{% endif %}
     <div class="tvw-rb-draft-bar"><span id="draftStatus" role="status">Drafts save in this browser on this device.</span><span id="draftRecovery" hidden><button type="button" id="restoreDraft" class="btn btn-outline-info">Restore draft</button> <button type="button" id="discardDraft" class="btn btn-outline-secondary">Discard draft</button></span></div>
     <input type="hidden" name="target_ratio" id="targetRatioField" value="{{ ratio_val }}">
     <input type="hidden" name="calc_target_ml" id="calcTargetMlHidden" value="{{ fv.get('calc_target_ml', '60') }}">
@@ -273,7 +276,7 @@
     mode: {{ mode|tojson }},
     artworkOptions: {{ artwork_options|tojson }},
     defaultArtwork: {{ recipe_artwork()|tojson }},
-    draftKey: {{ ('tvw-recipe-draft:' ~ session.get('user_id') ~ ':' ~ (recipe.id if recipe else 'new'))|tojson }},
+    draftKey: {{ ('tvw-recipe-draft:' ~ session.get('user_id') ~ ':' ~ (recipe.id if recipe else ('new-practice' if practice_mode else 'new')))|tojson }},
     flavourCatalog: {{ flavour_options|tojson }},
     initialRows: [
       {% if flavour_rows %}
