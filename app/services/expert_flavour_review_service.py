@@ -28,6 +28,7 @@ BRANDS = {
  'wonder flavors':'WF','wonder flavours':'WF','wf':'WF',
  'sobucky super aromas':'SSA','ssa':'SSA','tfa':'TFA','tpa':'TFA','the flavor apprentice':'TFA',
  'jf':'JF','jungle flavors':'JF','jungle flavours':'JF','flavor jungle':'JF','flavorjungle':'JF',
+ 'fw':'FW','flavor west':'FW','flavour west':'FW',
  'vta':'VT','vt':'VT','vape train australia':'VT',
  'pur':'PUR','purilum':'PUR','lb':'LB','liquid barn':'LB',
  'mol':'MOL','mb':'MOL','molinberry':'MOL','mf':'MF','medicine flower':'MF',
@@ -102,28 +103,31 @@ def import_records(records):
 
 
 def import_bundled_once():
-    path=Path(__file__).resolve().parents[1]/'data'/'flavour_reviews'/'sd-2026-11-13.json'
-    if not path.exists():return None
-    raw=path.read_bytes(); digest=hashlib.sha256(raw).hexdigest();db=get_db()
-    if db.execute('SELECT 1 FROM expert_review_imports WHERE bundle_hash=?',(digest,)).fetchone():return None
-    bundle=json.loads(raw)
-    records=json.loads(gzip.decompress(base64.b64decode(bundle['gzip_base64'])))
-    result=import_records(records)
-    db.execute('INSERT INTO expert_review_imports(bundle_hash,record_count) VALUES(?,?)',(digest,len(records)))
-    db.commit()
-    return result
+    directory=Path(__file__).resolve().parents[1]/'data'/'flavour_reviews'
+    db=get_db();results={}
+    for path in sorted(directory.glob('*.json')):
+        raw=path.read_bytes();digest=hashlib.sha256(raw).hexdigest()
+        if db.execute('SELECT 1 FROM expert_review_imports WHERE bundle_hash=?',(digest,)).fetchone():continue
+        bundle=json.loads(raw)
+        records=json.loads(gzip.decompress(base64.b64decode(bundle['gzip_base64'])))
+        results[path.name]=import_records(records)
+        db.execute('INSERT INTO expert_review_imports(bundle_hash,record_count) VALUES(?,?)',(digest,len(records)))
+        db.commit()
+    return results or None
 
 
 def for_flavour(flavour_id):
     return [dict(r) for r in get_db().execute("SELECT * FROM expert_flavour_reviews WHERE flavour_id=? AND match_status='matched' ORDER BY reviewer,source_key",(flavour_id,))]
 
 
-def report(search='',page=1):
+def report(search='',page=1,reviewer=''):
     db=get_db()
     counts={r['match_status']:r['n'] for r in db.execute('SELECT match_status,COUNT(*) n FROM expert_flavour_reviews GROUP BY match_status')}
     where="WHERE match_status!='matched'";args=[]
+    if reviewer:
+        where+=' AND reviewer=?';args.append(reviewer)
     if search:
-        where+=' AND (manufacturer LIKE ? OR flavour_name LIKE ?)';args=['%'+search+'%']*2
+        where+=' AND (manufacturer LIKE ? OR flavour_name LIKE ?)';args+=['%'+search+'%']*2
     total=db.execute('SELECT COUNT(*) FROM expert_flavour_reviews '+where,args).fetchone()[0]
     rows=[dict(r) for r in db.execute('SELECT * FROM expert_flavour_reviews '+where+' ORDER BY manufacturer,flavour_name LIMIT 50 OFFSET ?',args+[(page-1)*50])]
     return counts,rows,total
@@ -140,3 +144,9 @@ def reconcile_unmatched():
         changed+=status=='matched'
     db.commit()
     return changed
+
+
+def reviewer_totals():
+    return [dict(row) for row in get_db().execute("""SELECT reviewer,COUNT(*) AS total,
+        SUM(CASE WHEN match_status='matched' THEN 1 ELSE 0 END) AS matched
+        FROM expert_flavour_reviews GROUP BY reviewer ORDER BY reviewer""")]

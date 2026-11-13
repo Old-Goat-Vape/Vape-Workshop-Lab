@@ -37,15 +37,16 @@ recipe percentages; no steep recommendation is inferred or applied by this impor
 Flavour consolidation preserves matched review references. Repeated imports do not
 create duplicates. Existing records are retained rather than silently overwritten.
 
-## Old Goat Drive source still blocked
+## Old Goat Drive access at the initial SD import
 
 The supplied `/drive/u/2/my-drive` link identifies a browser account slot, not a
 review folder. The Drive connector currently accesses a different Google account;
 searches for reviews/flavour/flavor found no review collection. The browser is signed
 out of the Old Goat Drive account. No Old Goat review files have been imported.
-A direct review-folder/file link with accessible permissions, or restored account
-access, is required to finish that source. Do not report the SD collection as a
-completed import of Old Goat's reviews.
+The author subsequently supplied an accessible review-folder link. The first
+58 Old Goat reviews are documented in OLD_GOAT_REVIEW_IMPORT_2026-11-13.md.
+Complete folder coverage still needs verification; do not report the SD collection
+as a completed import of all Old Goat reviews.
 
 ## Validation and deployment
 
