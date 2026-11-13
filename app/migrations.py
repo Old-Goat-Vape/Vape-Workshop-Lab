@@ -37,6 +37,9 @@ def run_startup_migrations() -> dict:
     from services.purchase_purpose_service import SCHEMA as purchase_schema
     db.executescript(purchase_schema)
 
+    from services.expert_flavour_review_service import SCHEMA as expert_review_schema
+    db.executescript(expert_review_schema)
+
     # Ensure base reference rows exist for logging (FK on mix_history_items.ingredient_id).
     try:
         db.execute(
@@ -1218,5 +1221,9 @@ def run_startup_migrations() -> dict:
         outcome = backfill_once()
         if not outcome['already_applied']:
             print(f"[recipe-profiles] second pass assigned={outcome['count']} batch={outcome['batch_id']} (undo available in Lab recipe data)")
+    from services.expert_flavour_review_service import import_bundled_once
+    review_result = import_bundled_once()
+    if review_result is not None:
+        print(f"[expert-reviews] {review_result}")
     return {"added_columns": added, "count": len(added)}
 

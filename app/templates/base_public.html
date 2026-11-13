@@ -71,6 +71,7 @@
                         <a class="tvw-user-menu-link" href="{{ url_for('tvw_recipes.tvw_recipe_library', mine=1) }}">My recipes</a>
                         <a class="tvw-user-menu-link" href="{{ url_for('tvw_recipes.tvw_stash') }}">My stash</a>
                         <a class="tvw-user-menu-link" href="{{ url_for('tvw_recipes.tvw_shopping_list') }}">My shopping list</a>
+                        {% if session.get('role')=='Old Goat' %}<a class="tvw-user-menu-link" href="{{ url_for('tvw_recipes.tvw_flavour_review_imports') }}">Review imports</a>{% endif %}
                         <a class="tvw-user-menu-link" href="{{ url_for('tvw_community.first_mix') }}">Your first mix guide</a>
                         <a class="tvw-user-menu-link" href="{{ url_for('tvw_recipes.tvw_what_can_i_make') }}">What can I make</a>
                         <a class="tvw-user-menu-link" href="{{ url_for('tvw_recipes.tvw_my_mixes') }}">My mixes</a>

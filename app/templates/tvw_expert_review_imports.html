@@ -1,0 +1,11 @@
+{% extends 'base_public.html' %}
+{% block title %}Reference review imports | TVW{% endblock %}
+{% block content %}<link rel="stylesheet" href="{{ url_for('static',filename='tvw.css') }}">
+<div class="tvw-page"><h1>Reference review imports</h1><p>Old Goat only · Uncertain matches stay out of flavour pages. Original text and source links are preserved.</p>
+<div class="d-flex flex-wrap gap-3 mb-4">{% for status,n in counts.items() %}<div class="card p-3"><strong>{{ n }}</strong><span>{{ status|replace('_',' ') }}</span></div>{% endfor %}</div>
+<p>Source review needed means the source text could not be verified against the indexed flavour name. Unmatched means no exact catalogue identity was found; ambiguous means more than one active entry matches. No fuzzy matches are published.</p>
+<form method="post" class="mb-3"><button class="btn btn-outline-warning">Recheck exact matches after catalogue changes</button></form>
+<form class="d-flex gap-2 mb-3"><input name="search" class="form-control" aria-label="Search import exceptions" value="{{ search }}" placeholder="Manufacturer or flavour"><button class="btn btn-warning">Search</button></form>
+<p>{{ total }} exceptions · Page {{ page }}</p>
+{% for row in rows %}<article class="card p-3 mb-3"><h2 class="h5">{{ row.manufacturer }} · {{ row.flavour_name }}</h2><p>{{ row.match_status|replace('_',' ') }} · {{ row.reviewer }}</p><div class="d-flex flex-wrap gap-3"><a href="{{ row.source_url }}" target="_blank" rel="noopener noreferrer">Original source ↗</a><a href="{{ url_for('tvw_recipes.tvw_flavours',search=row.flavour_name) }}">Find in flavour library</a></div>{% if row.review_text %}<details class="mt-2"><summary>Preserved review text</summary><div style="white-space:pre-wrap;overflow-wrap:anywhere">{{ row.review_text }}</div></details>{% endif %}</article>{% else %}<p>No exceptions here.</p>{% endfor %}
+<div class="d-flex gap-3">{% if page>1 %}<a href="{{ url_for('tvw_recipes.tvw_flavour_review_imports',page=page-1,search=search) }}">Previous</a>{% endif %}{% if page*50<total %}<a href="{{ url_for('tvw_recipes.tvw_flavour_review_imports',page=page+1,search=search) }}">Next</a>{% endif %}</div></div>{% endblock %}

@@ -77,6 +77,9 @@ class PurchasePurposeTests(unittest.TestCase):
         with base.flask_app.app_context():
             db=get_db()
             db.execute("INSERT INTO flavours(id,canonical_name,brand,category,source_flavor_ref_id) VALUES(2,'Vanilla','Test','Flavor',101)")
+            from services import expert_flavour_review_service as expert
+            expert.import_records([dict(source_key='merge-test',reviewer='Old Goat',manufacturer='Test',code='Test',flavour='Vanilla',source_url='https://example.com/merge-review',review_text='Original review')])
+            # Ambiguous duplicate identities must wait for consolidation.
             purpose.save(1,1,dict(notes='First purpose'))
             purpose.save(1,2,dict(notes='Second purpose'))
             plan=next(p for p in cleanup.duplicate_plan(db) if set([p['target_id']]+p['source_ids'])=={1,2})
@@ -86,6 +89,8 @@ class PurchasePurposeTests(unittest.TestCase):
             self.assertEqual(len(records),2)
             self.assertEqual({r['flavour_id'] for r in records},{plan['target_id']})
             self.assertEqual({r['notes'] for r in records},{'First purpose','Second purpose'})
+            self.assertEqual(expert.reconcile_unmatched(),1)
+            self.assertEqual(len(expert.for_flavour(plan['target_id'])),1)
 
     def test_anonymous_access_requires_login(self):
         with self.client.session_transaction() as s: s.clear()

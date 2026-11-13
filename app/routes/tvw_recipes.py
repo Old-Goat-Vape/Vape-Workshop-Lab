@@ -970,6 +970,7 @@ def tvw_flavour_detail(flavour_id: int):
         ref_ids, offset=recipes_offset, limit=recipes_page_size
     )
     uid = int(session.get("user_id")) if session.get("user_id") is not None else None
+    from services import expert_flavour_review_service as expert_reviews
     notes = recipes_repo.fetch_tvw_flavour_notes(flavour_id, viewer_user_id=uid)
     reviews = recipes_repo.fetch_tvw_flavour_reviews(flavour_id, viewer_user_id=uid)
     stash_binding = stash_service.fetch_stash_binding_for_flavour(
@@ -994,6 +995,7 @@ def tvw_flavour_detail(flavour_id: int):
         tasting_error=getattr(g,'tasting_error',None),tasting_form=getattr(g,'tasting_form',{}),tasting_test_id=getattr(g,'tasting_test_id',None),
         notes=notes,
         reviews=reviews,
+        expert_reviews=expert_reviews.for_flavour(flavour_id),
         insights=insights,
         recipes_using=recipes_using,
         recipes_total=recipes_total,
@@ -1155,3 +1157,18 @@ def tvw_purchase_status(entry_id):
         flash('Marked bought. Set your actual stash quantity below; your purchase reason is kept.','success')
         return redirect(url_for('.tvw_flavour_detail',flavour_id=fid,_anchor='stash-actions'))
     return redirect(url_for('.tvw_shopping_list',status='archived' if status=='archived' else 'shopping'))
+
+
+@tvw_recipes_bp.route('/flavour-review-imports', methods=['GET','POST'])
+@login_required
+def tvw_flavour_review_imports():
+    if not is_old_goat_role(session.get('role')): abort(403)
+    from services import expert_flavour_review_service as expert
+    if request.method=='POST':
+        changed=expert.reconcile_unmatched()
+        flash(f'{changed} reviews matched to exact catalogue identities.','success')
+        return redirect(url_for('.tvw_flavour_review_imports'))
+    page=max(1,request.args.get('page',1,type=int) or 1)
+    search=request.args.get('search','').strip()[:200]
+    counts,rows,total=expert.report(search,page)
+    return render_template('tvw_expert_review_imports.html',counts=counts,rows=rows,total=total,page=page,search=search)
