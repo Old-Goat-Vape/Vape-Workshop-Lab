@@ -309,6 +309,13 @@ def consolidate_group(db, plan, *, actor_user_id, actor_role):
         _merge_user_stash_flavours(
             db, source_flavour_id=sid, target_flavour_id=target_id
         )
+        # Preserve each person's private notebook when consolidating duplicates.
+        if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='flavour_private_notebooks'").fetchone():
+            for notebook in db.execute('SELECT user_id,notes FROM flavour_private_notebooks WHERE flavour_id=?',(sid,)).fetchall():
+                existing = db.execute('SELECT notes FROM flavour_private_notebooks WHERE user_id=? AND flavour_id=?',(notebook['user_id'],target_id)).fetchone()
+                combined = notebook['notes'] if not existing or not existing['notes'] else existing['notes'] + '\n\n[Notes from merged flavour]\n' + notebook['notes']
+                db.execute('INSERT INTO flavour_private_notebooks(user_id,flavour_id,notes) VALUES(?,?,?) ON CONFLICT(user_id,flavour_id) DO UPDATE SET notes=excluded.notes',(notebook['user_id'],target_id,combined))
+            db.execute('DELETE FROM flavour_private_notebooks WHERE flavour_id=?',(sid,))
         for table in ("flavour_notes", "flavour_reviews"):
             db.execute(
                 f"UPDATE {table} SET flavour_id=? WHERE flavour_id=?", (target_id, sid)
