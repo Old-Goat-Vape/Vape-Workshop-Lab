@@ -316,6 +316,8 @@ def consolidate_group(db, plan, *, actor_user_id, actor_role):
                 combined = notebook['notes'] if not existing or not existing['notes'] else existing['notes'] + '\n\n[Notes from merged flavour]\n' + notebook['notes']
                 db.execute('INSERT INTO flavour_private_notebooks(user_id,flavour_id,notes) VALUES(?,?,?) ON CONFLICT(user_id,flavour_id) DO UPDATE SET notes=excluded.notes',(notebook['user_id'],target_id,combined))
             db.execute('DELETE FROM flavour_private_notebooks WHERE flavour_id=?',(sid,))
+        if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='flavour_purchase_purposes'").fetchone():
+            db.execute("UPDATE flavour_purchase_purposes SET flavour_id=? WHERE flavour_id=?", (target_id,sid))
         if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='flavour_tasting_tests'").fetchone():
             db.execute('UPDATE flavour_tasting_tests SET flavour_id=? WHERE flavour_id=?',(target_id,sid))
         for table in ("flavour_notes", "flavour_reviews"):

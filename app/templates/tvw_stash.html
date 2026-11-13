@@ -18,6 +18,7 @@
       {% endif %}
     </div>
     <div class="d-flex flex-wrap gap-2 w-100 w-md-auto">
+      <a class="btn btn-sm btn-outline-warning flex-grow-1 flex-md-grow-0" href="{{ url_for('tvw_recipes.tvw_shopping_list') }}">My shopping list</a>
       <a class="btn btn-sm btn-outline-info flex-grow-1 flex-md-grow-0" href="{{ url_for('tvw_recipes.tvw_what_can_i_make') }}">What Can I Make</a>
       <a class="btn btn-sm btn-outline-light flex-grow-1 flex-md-grow-0" href="{{ url_for('tvw_recipes.tvw_flavours') }}">Browse flavours</a>
     </div>
@@ -127,7 +128,7 @@
             <td>
               <span class="d-md-none text-secondary small">{{ row.brand }} · </span>
               {% if row.flavour_id %}
-                <a class="fw-semibold text-light" href="{{ url_for('tvw_recipes.tvw_flavour_detail', flavour_id=row.flavour_id) }}">{{ row.display_name }}</a>
+                <a class="fw-semibold text-light" href="{{ url_for('tvw_recipes.tvw_flavour_detail', flavour_id=row.flavour_id) }}">{{ row.display_name }}</a><div class="small mt-1"><a href="{{ url_for('tvw_recipes.tvw_purchase_purpose',flavour_id=row.flavour_id) }}">Why did I buy this?{% if row.purchase_purpose %} · {{ row.purchase_purpose.count }} saved{% endif %}</a>{% if row.purchase_purpose and row.purchase_purpose.notes %}<div class="text-secondary">{{ row.purchase_purpose.notes }}</div>{% endif %}</div>
               {% else %}
                 <span class="fw-semibold">{{ row.display_name }}</span>
                 <span class="badge text-bg-secondary ms-1">no TVW page</span>
@@ -175,7 +176,7 @@
           <div class="d-flex justify-content-between gap-2">
             <div>
               {% if row.flavour_id %}
-                <a class="fw-semibold text-light text-decoration-none" href="{{ url_for('tvw_recipes.tvw_flavour_detail', flavour_id=row.flavour_id) }}">{{ row.display_name }}</a>
+                <a class="fw-semibold text-light text-decoration-none" href="{{ url_for('tvw_recipes.tvw_flavour_detail', flavour_id=row.flavour_id) }}">{{ row.display_name }}</a><div class="small mt-1"><a href="{{ url_for('tvw_recipes.tvw_purchase_purpose',flavour_id=row.flavour_id) }}">Why did I buy this?{% if row.purchase_purpose %} · {{ row.purchase_purpose.count }} saved{% endif %}</a>{% if row.purchase_purpose and row.purchase_purpose.notes %}<div class="text-secondary">{{ row.purchase_purpose.notes }}</div>{% endif %}</div>
               {% else %}
                 <span class="fw-semibold">{{ row.display_name }}</span>
                 <span class="badge text-bg-secondary ms-1">no TVW page</span>

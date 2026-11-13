@@ -16,7 +16,7 @@
       <div><strong id="stashSummaryQty">{{ '%.1f'|format(stash_binding.quantity_ml|float) }} ml</strong><span>in your stash</span></div>
     </div>
     <p class="text-secondary">{% if stash_binding.is_lab_linked %}Your quantities come from the linked Lab holdings.{% else %}Your personal stash, ready for your next mix.{% endif %}</p>
-    <div class="d-flex flex-wrap gap-2"><a class="btn btn-warning" href="#stash-actions">{{ 'Update stash' if stash_binding.quantity_ml > 0 else 'Add to stash' }}</a><a class="btn btn-outline-light" href="#my-notebook">My notebook</a><a class="btn btn-outline-light" href="{{ url_for('tvw_recipes.tvw_stash') }}">Open My Stash</a></div>
+    <div class="d-flex flex-wrap gap-2"><a class="btn btn-warning" href="#stash-actions">{{ 'Update stash' if stash_binding.quantity_ml > 0 else 'Add to stash' }}</a><a class="btn btn-outline-light" href="{{ url_for('tvw_recipes.tvw_purchase_purpose',flavour_id=flavour.id) }}">Why did I buy this?</a><a class="btn btn-outline-light" href="#my-notebook">My notebook</a><a class="btn btn-outline-light" href="{{ url_for('tvw_recipes.tvw_stash') }}">Open My Stash</a></div>
     </div>
   </header>
   <nav class="flavour-section-nav" aria-label="Flavour sections"><a href="#tasting-tests">My tasting tests</a><a href="#usage-insights">Usage data</a><a href="#pairings">Pairings</a><a href="#my-notebook">Private notebook</a><a href="#recipes">Recipes · {{ recipes_total }}</a><a href="#notes">Community notes · {{ community_counts.notes_visible }}</a><a href="#reviews">Reviews · {{ community_counts.reviews_visible }}</a></nav>

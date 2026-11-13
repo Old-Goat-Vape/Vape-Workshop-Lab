@@ -34,6 +34,9 @@ def run_startup_migrations() -> dict:
     from services.flavour_testing_service import SCHEMA as tasting_schema
     db.executescript(tasting_schema)
 
+    from services.purchase_purpose_service import SCHEMA as purchase_schema
+    db.executescript(purchase_schema)
+
     # Ensure base reference rows exist for logging (FK on mix_history_items.ingredient_id).
     try:
         db.execute(
