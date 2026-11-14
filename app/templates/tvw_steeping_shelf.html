@@ -1,0 +1,24 @@
+{% extends 'base_public.html' %}
+{% block title %}My steeping shelf | TVW{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static',filename='tvw-steeping.css') }}">
+<div class="steep-page">
+  <header class="steep-hero"><div class="steep-bottle" aria-hidden="true"><div class="steep-fill" style="height:75%"></div></div><div><p class="steep-kicker">Give good flavours a little time</p><h1>My steeping shelf</h1><p class="mb-0">Your bottles, your plan. Check a batch when its planned steep ends, then record what you taste.</p></div></header>
+  <p><a class="btn btn-outline-light" href="{{ url_for('tvw_recipes.tvw_my_mixes') }}">All my mixes →</a></p>
+  <p class="text-secondary">Reminders are private, opt-in alerts inside TVW when you return. They stay visible until acknowledged. A ready date is a tasting checkpoint, not a guarantee of flavour readiness.</p>
+  <div class="steep-grid">
+    {% for batch in batches %}<article class="steep-card">
+      <p class="steep-kicker">Batch #{{ batch.session_id }} · {{ '%g'|format(batch.target_ml) }} ml · v{{ batch.version_number }}</p><h2 class="h4">{{ batch.recipe_name }}</h2>
+      <div class="d-flex gap-3 my-3"><div class="steep-bottle" aria-hidden="true"><div class="steep-fill" style="height:{{ batch.progress_percent }}%"></div></div><div>
+        <p class="steep-state {{ 'steep-ready' if batch.state in ['ready','shake_vape'] else '' }}">{{ batch.state_label }}</p>
+        {% if batch.ready_at %}<p>Planned check: <time class="batch-time" datetime="{{ batch.ready_at }}">{{ batch.ready_at }} UTC</time></p>{% endif %}
+        {% if batch.state=='steeping' %}<p>{{ batch.days_remaining }} day{{ 's' if batch.days_remaining!=1 else '' }} remaining</p>{% endif %}
+        {% if batch.reminder_due %}<strong class="text-info">Reminder due</strong>{% elif batch.reminder_enabled %}<span class="text-secondary">{{ 'Reminder acknowledged' if batch.reminder_acknowledged else 'Reminder on' }}</span>{% endif %}
+      </div></div>
+      <a class="btn btn-outline-warning" href="{{ url_for('tvw_recipes.tvw_batch_steeping',session_id=batch.session_id) }}">Open batch & tasting notes →</a>
+    </article>{% else %}<article class="steep-card"><h2 class="h4">Your shelf is waiting</h2><p>Finish a guided mix, or open a quick mix in My mixes and confirm you’ve mixed the bottle. Its recipe guidance will be copied into a private batch plan.</p></article>{% endfor %}
+  </div>
+  <nav class="d-flex gap-3 mt-4" aria-label="Steeping shelf pages">{% if page>1 %}<a href="{{ url_for('tvw_recipes.tvw_steeping_shelf',page=page-1) }}">Previous</a>{% endif %}<span>Page {{ page }} · {{ total }} batches</span>{% if page*50<total %}<a href="{{ url_for('tvw_recipes.tvw_steeping_shelf',page=page+1) }}">Next</a>{% endif %}</nav>
+</div>
+<script src="{{ url_for('static',filename='tvw-steeping.js') }}"></script>
+{% endblock %}

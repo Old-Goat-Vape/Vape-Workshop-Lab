@@ -271,6 +271,7 @@ def inject_global_data():
         "can_access_lab_bridge": False,
         "can_access_production_jobs": False,
         "can_access_tvw_admin": False,
+        "steeping_reminders": 0,
     }
     if "user_id" in session:
         role = session.get("role")
@@ -284,6 +285,8 @@ def inject_global_data():
             role, session.get("user_id")
         )
         data["can_access_tvw_admin"] = can_access_tvw_admin(role)
+        from services.batch_steeping_service import due_count
+        data['steeping_reminders']=due_count(int(session['user_id']))
     return data
 
 # -----------------------------

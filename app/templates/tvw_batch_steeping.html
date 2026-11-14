@@ -1,0 +1,47 @@
+{% extends 'base_public.html' %}
+{% block title %}Batch steeping | TVW{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static',filename='tvw-steeping.css') }}">
+<div class="steep-page">
+  <p><a href="{{ url_for('tvw_recipes.tvw_steeping_shelf') }}">← My steeping shelf</a> · <a href="{{ url_for('tvw_recipes.tvw_my_mixes') }}">My mixes</a></p>
+  <header class="steep-hero"><div class="steep-bottle" aria-hidden="true"><div class="steep-fill" style="height:{{ batch.progress_percent }}%"></div></div><div><p class="steep-kicker">Private batch #{{ batch.session_id }} · {{ '%g'|format(batch.target_ml) }} ml · v{{ batch.version_number }}</p><h1>{{ batch.recipe_name }}</h1><p class="steep-state {{ 'steep-ready' if batch.state in ['ready','shake_vape'] else '' }}">{{ batch.state_label }}</p>
+    {% if batch.started_at %}<p>Mixed: <time class="batch-time" datetime="{{ batch.started_at }}">{{ batch.started_at }} UTC</time></p>{% endif %}
+    {% if batch.ready_at %}<p class="mb-0">Planned tasting check: <time class="batch-time" datetime="{{ batch.ready_at }}">{{ batch.ready_at }} UTC</time></p>{% endif %}
+  </div></header>
+  {% if batch.reminder_due %}<form method="post" class="alert alert-info"><input type="hidden" name="steeping_token" value="{{ steeping_token }}"><input type="hidden" name="action" value="acknowledge"><p><strong>Your planned steep time has ended.</strong> Taste a little and see how this batch is developing.</p><button class="btn btn-outline-dark">Acknowledge reminder</button></form>{% endif %}
+  {% if batch.state=='not_mixed' %}<section class="steep-card mb-3">
+    {% if batch.mode=='quick' and not batch.abandoned_at %}<h2 class="h4">Have you mixed the bottle?</h2><p>A quick-mix log can be a calculation rather than a finished bottle. Confirm only when you have actually mixed it; the timer starts now.</p><form method="post"><input type="hidden" name="steeping_token" value="{{ steeping_token }}"><button name="action" value="confirm" class="btn btn-warning">I’ve mixed this bottle now</button></form>
+    {% else %}<p class="mb-0">The timer starts when this guided mix is complete. Abandoned or reopened mixes do not generate steeping reminders.</p>{% endif %}
+  </section>{% endif %}
+  <div class="steep-grid">
+    <section class="steep-card">
+      <h2 class="h4">This bottle’s steep plan</h2>
+      <p>Recipe guidance saved for this batch: <strong>{{ 'Not set' if batch.source_days is none else 'Shake & vape' if batch.source_days==0 else (batch.source_days|string) ~ ' days' }}</strong>.</p>
+      <p>Changes here affect this batch only. Later recipe edits do not change this saved plan.</p>
+      <form method="post">
+        <input type="hidden" name="steeping_token" value="{{ steeping_token }}"><input type="hidden" name="action" value="save">
+        <label for="batchDays" class="form-label">Steep time (days)</label><input id="batchDays" type="number" name="steep_days" min="0" max="365" step="1" value="{{ '' if batch.steep_days is none else batch.steep_days }}" placeholder="Not set" class="form-control">
+        <p class="text-secondary mt-2">Blank means unknown / Not set. Zero means Shake & vape. This is a tasting checkpoint you can adjust.</p>
+        <label class="d-flex gap-2 align-items-start my-3"><input type="checkbox" name="remind" value="1" {% if batch.reminder_enabled %}checked{% endif %}><span>Remind me inside TVW when this batch reaches its planned steep time.</span></label>
+        <button class="btn btn-warning">Save batch plan</button>
+      </form>
+    </section>
+    <section class="steep-card">
+      <h2 class="h4">How does it taste today?</h2><p>Your batch observations stay private. They do not automatically become flavour recommendations or community ratings.</p>
+      {% if batch.age_days is not none %}
+      <form method="post">
+        <input type="hidden" name="steeping_token" value="{{ steeping_token }}"><input type="hidden" name="action" value="taste">
+        <p>Batch age: {{ batch.age_days }} days</p>
+        <label class="form-label" for="batchReadiness">Readiness</label><select class="form-select mb-3" name="readiness" id="batchReadiness">{% for key,label in readiness_options.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select>
+        <label class="form-label" for="batchScore">Enjoyment score (0–10, optional)</label><input class="form-control mb-3" name="score" id="batchScore" type="number" min="0" max="10" step=".1">
+        <label class="form-label" for="batchNotes">Tasting notes</label><textarea class="form-control mb-3" name="notes" id="batchNotes" maxlength="4000" rows="4" required placeholder="What changed? What still needs time?"></textarea>
+        <button class="btn btn-outline-warning">Save private tasting</button>
+      </form>{% else %}<p>Finish the mix or confirm your quick-mix bottle first.</p>{% endif %}
+    </section>
+  </div>
+  <section class="steep-card mt-3"><h2 class="h4">Private tasting history</h2><p class="text-secondary">Latest 50 observations. If a batch needs longer, adjust its plan above.</p>
+    {% for tasting in tastings %}<article class="border-top border-secondary py-3"><p><strong>Day {{ tasting.age_days }} · {{ readiness_options[tasting.readiness] }}</strong>{% if tasting.score is not none %} · {{ '%g'|format(tasting.score) }}/10{% endif %} · <time class="batch-time" datetime="{{ tasting.tasted_at }}">{{ tasting.tasted_at }} UTC</time></p><p class="mb-0" style="white-space:pre-wrap;overflow-wrap:anywhere">{{ tasting.notes }}</p></article>{% else %}<p class="mb-0">No tasting notes yet.</p>{% endfor %}
+  </section>
+</div>
+<script src="{{ url_for('static',filename='tvw-steeping.js') }}"></script>
+{% endblock %}

@@ -1864,6 +1864,8 @@ def create_guided_mix_session(
                         ),
                     )
                     session_id = int(cur.lastrowid)
+                    from services.batch_steeping_service import snapshot as snapshot_steep
+                    snapshot_steep(session_id,db)
                     stage = "step_insert"
                     if step_rows:
                         db.executemany(
@@ -1954,6 +1956,8 @@ def record_quick_mix_session(
         ),
     )
     session_id = int(cur.lastrowid)
+    from services.batch_steeping_service import snapshot as snapshot_steep
+    snapshot_steep(session_id,db)
     db.commit()
     return session_id
 

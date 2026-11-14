@@ -196,6 +196,7 @@
   <div tabindex="-1" id="completionSummary" class="tvw-ws-panel tvw-ws-complete tvw-ws-batch-report {% if not prog.all_done %}d-none{% endif %}">
 
     <div class="tvw-ws-complete-actions">
+      <a class="tvw-ws-exit-primary" href="{{ url_for('tvw_recipes.tvw_batch_steeping',session_id=session_id) }}">STEEP THIS BATCH & SET REMINDER</a>
       <a class="tvw-ws-exit" href="#mixSummaryDetail">VIEW BATCH REPORT</a>
 
       <a class="tvw-ws-exit-primary" href="{{ mix_again_href }}">MIX AGAIN</a>
