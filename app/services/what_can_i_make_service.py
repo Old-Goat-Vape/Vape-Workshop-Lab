@@ -128,8 +128,9 @@ def fetch_stash_reference_qty_ml(
 def _fetch_public_recipes_for_scan(*, limit: int, viewer_user_id: int | None = None) -> list[dict[str, Any]]:
     db = get_db()
     pub = recipes_repo.tvw_recipe_public_list_predicate_sql("r")
-    visibility = f"(({pub}) OR r.created_by = ?)" if viewer_user_id is not None else f"({pub})"
-    visibility_params = [int(viewer_user_id)] if viewer_user_id is not None else []
+    from services.recipe_sharing_service import grant_sql
+    visibility = f"(({pub}) OR r.created_by = ? OR (({recipes_repo.tvw_recipe_analytics_predicate_sql('r')}) AND {grant_sql()}))" if viewer_user_id is not None else f"({pub})"
+    visibility_params = [int(viewer_user_id),int(viewer_user_id)] if viewer_user_id is not None else []
     lim = max(1, min(int(limit or DEFAULT_MAX_RECIPES), 20_000))
     rows = db.execute(
         f"""

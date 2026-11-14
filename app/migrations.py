@@ -36,6 +36,8 @@ def run_startup_migrations() -> dict:
 
     from services.purchase_purpose_service import SCHEMA as purchase_schema
     db.executescript(purchase_schema)
+    from services.recipe_sharing_service import SCHEMA as recipe_sharing_schema
+    db.executescript(recipe_sharing_schema)
 
     from services.expert_flavour_review_service import SCHEMA as expert_review_schema
     db.executescript(expert_review_schema)

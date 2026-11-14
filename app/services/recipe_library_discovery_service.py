@@ -126,6 +126,8 @@ def fetch_tvw_library_stash_sorted_page(
     username: str | None,
     target_batch_ml: float | None = None,
     favorites_user_id: int | None = None,
+    owner_user_id: int | None = None,
+    shared_with_user_id: int | None = None,
 ) -> tuple[list[dict[str, Any]], int, dict[str, Any]]:
     """Stash-priority sort over the most recent `STASH_RANK_SCAN_CAP` matches (V1-safe)."""
     page = max(1, int(page or 1))
@@ -136,6 +138,8 @@ def fetch_tvw_library_stash_sorted_page(
         visibility=visibility,
         tag=tag,
         favorites_user_id=favorites_user_id,
+        owner_user_id=owner_user_id,
+        shared_with_user_id=shared_with_user_id,
         viewer_user_id=user_id,
         viewer_is_old_goat=viewer_is_old_goat,
     )

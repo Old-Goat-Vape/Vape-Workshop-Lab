@@ -85,6 +85,19 @@ def _gate_recipe_response(recipe_id: int) -> Tuple[Response, int] | None:
     return None
 
 
+def _gate_session_recipe_response(session_id):
+    row=get_db().execute("""SELECT rv.recipe_id FROM mix_sessions ms
+        JOIN recipe_versions rv ON rv.id=ms.recipe_version_id
+        WHERE ms.id=? AND ms.user_id=? AND ms.abandoned_at IS NULL""",(session_id,_current_user_id())).fetchone()
+    if not row:return jsonify(status='error',message='Mix session not found.'),404
+    return _gate_recipe_response(row['recipe_id'])
+
+
+def _recipe_history_user(recipe_id):
+    from services.recipe_sharing_service import history_user
+    return history_user(recipes_repo.fetch_recipe(recipe_id),_current_user_id(),is_old_goat_role(session.get('role')))
+
+
 def _resolve_version_id(*, recipe_id: int, requested_version_id: int | None) -> int:
     return recipes_repo.resolve_recipe_version_id_for_mix(
         recipe_id=recipe_id, requested_version_id=requested_version_id
@@ -917,6 +930,8 @@ def get_guided_mix_session(session_id: int):
 @tvw_api_bp.route("/mix/guided/session/<int:session_id>/notes", methods=["POST"])
 @login_required
 def save_guided_mix_session_notes(session_id: int):
+    denied=_gate_session_recipe_response(session_id)
+    if denied:return denied
     user_id = _current_user_id()
     if not user_id:
         return jsonify({"status": "error", "message": "Not logged in."}), 401
@@ -958,6 +973,7 @@ def get_recipe_mixer_notes(recipe_id: int):
     notes, total = guided_mix_session_service.list_recipe_mixer_notes(
         recipe_id=int(recipe_id),
         limit=limit,
+        only_user_id=_recipe_history_user(recipe_id),
     )
     return jsonify({"status": "success", "notes": notes, "total": total}), 200
 
@@ -980,6 +996,7 @@ def get_recipe_batch_history(recipe_id: int):
         recipe_id=int(recipe_id),
         page=page,
         page_size=page_size,
+        only_user_id=_recipe_history_user(recipe_id),
     )
     return jsonify({"status": "success", "items": entries, "total": total, "page": max(1, page)}), 200
 
@@ -987,6 +1004,8 @@ def get_recipe_batch_history(recipe_id: int):
 @tvw_api_bp.route("/mix/guided/session/<int:session_id>/steps/<int:step_no>/complete", methods=["POST"])
 @login_required
 def complete_guided_mix_step(session_id: int, step_no: int):
+    denied=_gate_session_recipe_response(session_id)
+    if denied:return denied
     user_id = _current_user_id()
     if not user_id:
         return jsonify({"status": "error", "message": "Not logged in."}), 401
@@ -1105,6 +1124,8 @@ def complete_guided_mix_step(session_id: int, step_no: int):
 @tvw_api_bp.route("/mix/guided/session/<int:session_id>/events", methods=["POST"])
 @login_required
 def insert_guided_mix_event(session_id: int):
+    denied=_gate_session_recipe_response(session_id)
+    if denied:return denied
     user_id = _current_user_id()
     if not user_id:
         return jsonify({"status": "error", "message": "Not logged in."}), 401

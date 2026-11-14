@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import sqlite3
+import secrets
 import uuid
 
 from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, session, url_for, send_file
@@ -16,6 +17,7 @@ from services import guided_mix_start_service
 from services import recipe_library_discovery_service
 from services import recipe_library_presentation
 from services import stash_service
+from services import recipe_sharing_service
 from services import what_can_i_make_service
 from services import recipe_builder_service, recipe_story_service, recipe_artwork_service
 from services.guided_mix_start_service import GuidedMixFormError
@@ -66,6 +68,7 @@ def _render_recipe_builder(
     return render_template(
         "tvw_recipe_builder.html",
         mode=mode,
+        privacy_locked=bool(recipe and int(recipe.get('created_by') or 0)!=int(session.get('user_id') or 0)),
         profile_options=recipe_story_service.PROFILES,
         artwork_options=recipe_artwork_service.preview_artworks(),
         recipe=recipe,
@@ -133,6 +136,7 @@ def tvw_recipe_library():
     favorites_user_id = uid if favorites_only and uid is not None else None
     mine_only = (request.args.get("mine") or "").strip() in ("1", "true", "yes")
     owner_user_id = uid if mine_only and uid is not None else None
+    shared_only = request.args.get('shared') == '1'
 
     stash_meta: dict | None = None
     if sort_by == "stash":
@@ -149,6 +153,8 @@ def tvw_recipe_library():
             username=username_s,
             target_batch_ml=target_batch_ml,
             favorites_user_id=favorites_user_id,
+            owner_user_id=owner_user_id,
+            shared_with_user_id=uid if shared_only else None,
         )
         total_pages = recipe_library_discovery_service.stash_sorted_total_pages(
             ranked_pool_size=int((stash_meta or {}).get("stash_rank_pool") or 0),
@@ -168,6 +174,7 @@ def tvw_recipe_library():
             viewer_is_old_goat=viewer_is_old_goat,
             favorites_user_id=favorites_user_id,
             owner_user_id=owner_user_id,
+            shared_with_user_id=uid if shared_only else None,
         )
         recipe_library_discovery_service.enrich_recipes_with_stash_summary(
             recipes,
@@ -192,6 +199,7 @@ def tvw_recipe_library():
         mine_only=mine_only,
         visibility=visibility,
     )
+    if shared_only:active_scope='shared'
     sort_label = recipe_library_presentation.sort_label(sort_by=sort_by, sort_dir=sort_dir)
     advanced_filters_active = bool(
         status or tag or (visibility and active_scope not in {"public", "private"}) or sort_by != "updated" or sort_dir != "desc"
@@ -213,6 +221,7 @@ def tvw_recipe_library():
             "batch_ml": batch_ml_raw,
             "favorites": favorites_only,
             "mine": mine_only,
+            "shared": shared_only,
         },
         scope_counts=scope_counts,
         active_scope=active_scope,
@@ -507,13 +516,7 @@ def _render_recipe_detail(
     collab = recipes_repo.fetch_recipe_collab_snapshot(int(recipe["id"]))
 
     user_id_session = session.get("user_id")
-    can_edit = bool(
-        user_id_session
-        and (
-            int(user_id_session) == int(recipe.get("created_by") or 0)
-            or can_access_tvw_admin(role)
-        )
-    )
+    can_edit = recipes_repo.can_edit_recipe(recipe,user_id_session,admin=can_access_tvw_admin(role))
     is_owner = bool(uid is not None and int(recipe.get("created_by") or 0) == int(uid))
     can_cost_recipe = bool(
         current_app.config.get("TVW_ENABLE_LAB_MODULES")
@@ -539,6 +542,7 @@ def _render_recipe_detail(
     mixer_notes_preview, mixer_notes_total = guided_mix_session_service.list_recipe_mixer_notes(
         recipe_id=int(recipe["id"]),
         limit=3,
+        only_user_id=recipe_sharing_service.history_user(recipe,uid,is_old_goat_role(role)),
     )
     tags = recipes_repo.fetch_recipe_tags(int(recipe["id"]))
     detail = recipe_library_presentation.build_recipe_detail_presentation(
@@ -593,6 +597,29 @@ def tvw_recipe_detail(slug: str):
     return _render_recipe_detail(slug)
 
 
+@tvw_recipes_bp.route('/recipes/<int:recipe_id>/sharing',methods=['GET','POST'])
+@login_required
+def tvw_recipe_sharing(recipe_id):
+    from services import recipe_sharing_service as sharing
+    actor=int(session['user_id'])
+    recipe=sharing.owner_recipe(recipe_id,actor)
+    if not recipe:abort(404)
+    if 'recipe_sharing_token' not in session:session['recipe_sharing_token']=secrets.token_urlsafe(32)
+    if request.method=='POST':
+        token=request.form.get('sharing_token','')
+        if not token or not secrets.compare_digest(token,session['recipe_sharing_token']):abort(403)
+        try:
+            permission='revoke' if request.form.get('action')=='revoke' else request.form.get('permission','')
+            sharing.change(recipe_id,actor,int(request.form.get('user_id') or 0),permission)
+            flash('Recipe access updated.','success')
+        except PermissionError:abort(403)
+        except ValueError as exc:flash(str(exc),'warning')
+        return redirect(url_for('.tvw_recipe_sharing',recipe_id=recipe_id))
+    query=request.args.get('q','').strip()[:80]
+    return render_template('tvw_recipe_sharing.html',recipe=recipe,recipients=sharing.recipients(recipe_id,actor),
+        matches=sharing.search_users(query,actor),query=query,sharing_token=session['recipe_sharing_token'])
+
+
 @tvw_recipes_bp.route("/recipes/<slug>/mix-logs")
 @login_required
 def tvw_recipe_mix_logs(slug: str):
@@ -616,6 +643,7 @@ def tvw_recipe_mix_logs(slug: str):
         recipe_id=int(recipe["id"]),
         page=page,
         page_size=page_size,
+        only_user_id=recipe_sharing_service.history_user(recipe,uid,is_old_goat_role(session.get('role'))),
     )
     total_pages = (total + page_size - 1) // page_size if total else 1
     if page > total_pages and total > 0:
@@ -652,9 +680,7 @@ def tvw_recipe_edit(slug: str):
         abort(404)
     user_id = session.get("user_id")
     role = str(session.get("role") or "")
-    can_edit = user_id and (
-        int(user_id) == int(recipe.get("created_by") or 0) or can_access_tvw_admin(role)
-    )
+    can_edit = recipes_repo.can_edit_recipe(recipe,user_id,admin=can_access_tvw_admin(role))
     if not can_edit:
         flash("You can only edit your own recipes.", "warning")
         return redirect(url_for("tvw_recipes.tvw_recipe_detail", slug=recipe.get("slug") or recipe["id"]))
@@ -705,9 +731,7 @@ def tvw_recipe_save():
         existing = recipes_repo.fetch_recipe(int(recipe_id_raw))
         if not existing:
             abort(404)
-        can_edit = int(existing.get("created_by") or 0) == user_id or can_access_tvw_admin(
-            session.get("role")
-        )
+        can_edit = recipes_repo.can_edit_recipe(existing,user_id,admin=can_access_tvw_admin(session.get('role')))
         if not recipes_repo.can_view_recipe_in_tvw_community(
             dict(existing),
             viewer_user_id=user_id,
@@ -723,6 +747,9 @@ def tvw_recipe_save():
 
     try:
         payload = recipe_builder_service.parse_recipe_builder_form(request.form, is_edit=is_edit)
+        if existing and int(existing.get('created_by') or 0)!=user_id:
+            if payload.visibility!=str(existing.get('visibility') or 'private').lower():
+                abort(403,description='Only the recipe owner can change its visibility.')
         try:
             prepared_image = recipe_story_service.prepare_image(request.files.get('recipe_image'))
         except ValueError as image_error:
