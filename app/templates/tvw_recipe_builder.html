@@ -134,6 +134,7 @@
             <div><label class="tvw-rb-label" for="steepDays">Recommended steep time (days)</label><input id="steepDays" name="steep_days" type="number" min="0" max="365" step="1" placeholder="Not set" class="tvw-rb-input" value="{{ fv.get('steep_days','') }}"><small class="text-secondary">Blank means Not set. Zero means Shake &amp; vape. This is your recommendation; reminders will come later.</small><div class="mt-2"><button type="button" id="shakeVape" class="btn btn-outline-light btn-sm">Shake &amp; vape</button> <button type="button" id="clearSteep" class="btn btn-outline-secondary btn-sm">Not set</button></div></div>
             <div><label class="tvw-rb-label" for="recipeImage">Recipe photo</label><input id="recipeImage" name="recipe_image" type="file" accept="image/jpeg,image/png,image/webp" class="tvw-rb-input"><small class="text-secondary">Choose your JPG, PNG or WebP. Large photos are resized and compressed automatically; your original stays unchanged. The saved copy is centre-cropped to landscape.</small>{% if fv.get('has_image') %}<label class="d-block mt-2"><input type="checkbox" name="remove_image" id="removeImage" value="1"> Remove existing photo</label>{% endif %}<p id="imageMessage" role="status" class="text-secondary"></p></div>
           </div>
+          <div id="reviewSteepGuidance" class="card card-body my-3" hidden><strong>Steeping guidance from your flavours</strong><p id="reviewSteepText" class="mt-2"></p><button type="button" id="useReviewSteep" class="btn btn-outline-info" style="min-height:44px">Use suggestion</button><small class="text-secondary mt-2">Uses the longest explicit steep recommendation from matched reviews. Some ingredients may have no guidance. This is a starting point; your own choice always stays editable.</small></div>
           <details class="tvw-rb-extra" {% if fv.get('description') or notes_val %}open{% endif %}><summary>The story &amp; mixing notes</summary>
             <label class="tvw-rb-label" for="recipeDescription">Full description</label><textarea id="recipeDescription" name="description" maxlength="10000" class="tvw-rb-textarea" rows="4" placeholder="What inspired this recipe? What should it taste like?">{{ fv.get('description','') }}</textarea>
             <label class="tvw-rb-label mt-3" for="recipeNotes">Mixing notes &amp; version changes</label><textarea id="recipeNotes" name="notes" maxlength="20000" class="tvw-rb-textarea" rows="3" placeholder="Substitutions, steeping advice, or what changed this time…">{{ notes_val }}</textarea><small class="text-secondary">These notes are visible to anyone who can view your recipe. Community comments live on the saved recipe page.</small>
@@ -266,6 +267,7 @@
     <div class="row-usage" aria-live="polite">
       <span class="row-usage-text"></span>
       <button type="button" class="row-use-average btn btn-sm btn-outline-info" hidden>Use average</button>
+      <details class="row-review-knowledge w-100" hidden><summary>Reviewer guidance</summary><div class="row-review-facts py-2"></div></details>
     </div>
   </div>
 </template>

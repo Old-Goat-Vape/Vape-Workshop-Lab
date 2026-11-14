@@ -408,6 +408,9 @@
 .row-usage { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; text-align: left; font-size: 1rem; line-height: 1.4; color: #d4e5f4; }
 .row-use-average { white-space: normal; min-height: 36px; }
 .row-use-average[hidden] { display: none; }
+#reviewSteepGuidance[hidden], .row-review-knowledge[hidden] { display: none !important; }
+.row-review-knowledge summary { min-height:44px; padding:.6rem 0; cursor:pointer; }
+.row-review-facts { font-size:1rem; line-height:1.5; overflow-wrap:anywhere; }
 
 /* Creative recipe details stay optional; the existing calculator remains familiar. */
 .tvw-rb-draft-bar { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.75rem; padding:.9rem 1.2rem; margin-bottom:1rem; border:1px solid #405365; border-radius:12px; background:#1c2730; color:#c5e5f8; }

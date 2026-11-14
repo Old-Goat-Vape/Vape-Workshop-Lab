@@ -80,16 +80,76 @@
   };
 
   const usageControllers = new WeakMap();
+  let reviewSteepSuggestion = null;
+  const updateReviewSteep = () => {
+    const plan = window.TVWFlavourUsage.steepPlan([...rowsWrap.querySelectorAll('.ingredient-row')].map(row =>
+      ({percentage:row.querySelector('.ingredient-pct').value, knowledge:row.reviewKnowledge})));
+    const box = document.getElementById('reviewSteepGuidance');
+    reviewSteepSuggestion = plan.days;
+    box.hidden = reviewSteepSuggestion === null;
+    if (box.hidden) return;
+    document.getElementById('reviewSteepText').textContent =
+      reviewSteepSuggestion + ' days as a planning suggestion. Explicit guidance covers ' + plan.covered + ' of ' + plan.total + ' selected flavours. See each flavour’s reviewer guidance for ranges and sources.';
+    document.getElementById('useReviewSteep').textContent = 'Use ' + reviewSteepSuggestion + ' days';
+  };
+  const renderReviewKnowledge = (row, knowledge) => {
+    row.reviewKnowledge = knowledge;
+    const box = row.querySelector('.row-review-knowledge');
+    const content = row.querySelector('.row-review-facts');
+    content.replaceChildren();
+    box.hidden = !knowledge?.observation_count;
+    updateReviewSteep();
+    if (box.hidden) return;
+    const note = document.createElement('p');
+    note.textContent = knowledge.review_count + ' matched reviews by ' + knowledge.reviewer_count + ' reviewers. Test conditions are not recipe recommendations.';
+    content.append(note);
+    for (const group of knowledge.groups) {
+      const detail = document.createElement('details');
+      const summary = document.createElement('summary');
+      summary.textContent = group.label + ' · ' + group.facts.length;
+      detail.append(summary);
+      for (const fact of group.facts) {
+        const entry = document.createElement('div');
+        entry.className = 'my-3';
+        const p = document.createElement('p');
+        p.style.whiteSpace = 'pre-wrap'; p.style.overflowWrap = 'anywhere';
+        p.textContent = fact.reviewer + ': ' + fact.evidence;
+        const link = document.createElement('a');
+        link.href = fact.source_url; link.target = '_blank'; link.rel = 'noopener noreferrer';
+        link.textContent = 'Original source ↗';
+        entry.append(p, link);
+        if (group.kind === 'mix_percent' && Number.isFinite(fact.low) && fact.low > 0 && fact.low <= 100) {
+          const use = document.createElement('button');
+          use.type = 'button'; use.className = 'btn btn-sm btn-outline-info ms-2';
+          use.textContent = 'Use ' + fact.low + '%' + (fact.low !== fact.high ? ' (low end of range)' : '');
+          use.addEventListener('click', () => {
+            const input = row.querySelector('.ingredient-pct');
+            input.value = fact.low;
+            input.dispatchEvent(new Event('input', {bubbles:true}));
+          });
+          entry.append(use);
+        }
+        detail.append(entry);
+      }
+      content.append(detail);
+    }
+  };
+  document.getElementById('useReviewSteep').addEventListener('click', () => {
+    if (reviewSteepSuggestion === null) return;
+    const input = document.getElementById('steepDays');
+    input.value = reviewSteepSuggestion;
+    input.dispatchEvent(new Event('input', {bubbles:true}));
+  });
   const fetchUsage = async (id) => {
     const response = await fetch(`/api/recipes/flavour-usage/${id}`, {
       credentials: 'same-origin', cache: 'no-store', headers: {Accept: 'application/json'},
     });
     const body = await response.json();
     if (!response.ok || body.status !== 'success') throw new Error('Usage unavailable');
-    return body.usage;
+    return {...body.usage, knowledge:body.knowledge};
   };
   const usageFor = (row) => {
-    if (!usageControllers.has(row)) usageControllers.set(row, new window.TVWFlavourUsage(row, fetchUsage, queueCalc));
+    if (!usageControllers.has(row)) usageControllers.set(row, new window.TVWFlavourUsage(row, fetchUsage, () => { queueCalc(); updateReviewSteep(); }, renderReviewKnowledge));
     return usageControllers.get(row);
   };
 
@@ -450,13 +510,14 @@
     if (e.target.classList.contains("remove-row")) {
       const row = e.target.closest(".ingredient-row");
       if (row) row.remove();
+      updateReviewSteep();
       if (!allRows().length) buildRow();
       queueCalc();
     }
   });
 
   rowsWrap.addEventListener("input", (e) => {
-    if (e.target.classList.contains("ingredient-pct")) queueCalc();
+    if (e.target.classList.contains("ingredient-pct")) { queueCalc(); updateReviewSteep(); }
   });
 
   rowsWrap.addEventListener("blur", (e) => {

@@ -869,7 +869,8 @@ def recipe_builder_flavour_usage(reference_id):
     usage = builder_flavour_usage(reference_id)
     if usage is None:
         return jsonify(status="error", message="Flavour not available."), 404
-    response = jsonify(status="success", usage=usage)
+    from services.flavour_review_knowledge_service import for_reference
+    response = jsonify(status="success", usage=usage, knowledge=for_reference(reference_id))
     # Refresh on selection while the importer adds recipes; no stale catalogue hint.
     response.headers["Cache-Control"] = "no-store"
     return response, 200

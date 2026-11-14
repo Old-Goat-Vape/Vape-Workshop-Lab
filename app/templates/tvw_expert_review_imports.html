@@ -3,6 +3,7 @@
 {% block content %}<link rel="stylesheet" href="{{ url_for('static',filename='tvw.css') }}">
 <div class="tvw-page"><h1>Reference review imports</h1><p>Old Goat only · Uncertain matches stay out of flavour pages. Original text and source links are preserved.</p>
 <p>{% for row in reviewer_totals %}<strong>{{ row.reviewer }}</strong>: {{ row.total }} collected · {{ row.matched }} matched{% if not loop.last %} | {% endif %}{% endfor %}</p>
+<details class="card card-body mb-3"><summary>Structured knowledge · {{ knowledge_coverage.reviews_with_findings }} reviews with findings</summary><p>Extractor version {{ knowledge_coverage.version }}. Counts are reviews containing each field, not independent community samples. Findings from unmatched reviews are stored but do not inform flavour guidance.</p><ul>{% for field,n in knowledge_coverage.fields.items() %}<li>{{ field|replace('_',' ') }}: {{ n }} reviews</li>{% endfor %}</ul></details>
 <div class="d-flex flex-wrap gap-3 mb-4">{% for status,n in counts.items() %}<div class="card p-3"><strong>{{ n }}</strong><span>{{ status|replace('_',' ') }}</span></div>{% endfor %}</div>
 <p>Source review needed means the source text could not be verified against the indexed flavour name. Unmatched means no exact catalogue identity was found; ambiguous means more than one active entry matches. No fuzzy matches are published.</p>
 <form method="post" class="mb-3"><button class="btn btn-outline-warning">Recheck exact matches after catalogue changes</button></form>
