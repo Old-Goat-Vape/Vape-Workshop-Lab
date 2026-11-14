@@ -38,6 +38,8 @@ def run_startup_migrations() -> dict:
     db.executescript(purchase_schema)
     from services.recipe_sharing_service import SCHEMA as recipe_sharing_schema
     db.executescript(recipe_sharing_schema)
+    from services.batch_steeping_service import SCHEMA as batch_steep_schema
+    db.executescript(batch_steep_schema)
 
     from services.expert_flavour_review_service import SCHEMA as expert_review_schema
     db.executescript(expert_review_schema)
@@ -1233,5 +1235,8 @@ def run_startup_migrations() -> dict:
     knowledge_count = refresh_review_knowledge()
     if knowledge_count:
         print(f"[review-knowledge] extracted {knowledge_count} reviews")
+    from services.batch_steeping_service import snapshot as snapshot_batch_steep
+    snapshot_batch_steep(db=db)
+    db.commit()
     return {"added_columns": added, "count": len(added)}
 

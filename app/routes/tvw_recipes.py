@@ -269,6 +269,9 @@ def tvw_my_mixes():
         page_size=page_size,
         filter_mode=filt,
     )
+    from services import batch_steeping_service as steeping
+    for row in rows:
+        row['steeping']=steeping.fetch(row['id'],uid)
     total_pages = (total + page_size - 1) // page_size if total else 1
     if page > total_pages and total > 0:
         return redirect(url_for("tvw_recipes.tvw_my_mixes", filter=filt, page=total_pages))
@@ -280,6 +283,40 @@ def tvw_my_mixes():
         total=total,
         total_pages=total_pages,
     )
+
+
+@tvw_recipes_bp.route('/steeping')
+@login_required
+def tvw_steeping_shelf():
+    from services import batch_steeping_service as steeping
+    page=max(1,request.args.get('page',1,type=int) or 1)
+    batches=steeping.list_for(int(session['user_id']),page=page)
+    return render_template('tvw_steeping_shelf.html',batches=batches,page=page,total=steeping.shelf_count(int(session['user_id'])))
+
+
+@tvw_recipes_bp.route('/my-mixes/<int:session_id>/steeping',methods=['GET','POST'])
+@login_required
+def tvw_batch_steeping(session_id):
+    from services import batch_steeping_service as steeping
+    uid=int(session['user_id'])
+    try:batch=steeping.fetch(session_id,uid)
+    except LookupError:abort(404)
+    if 'batch_steeping_token' not in session:session['batch_steeping_token']=secrets.token_urlsafe(32)
+    if request.method=='POST':
+        token=request.form.get('steeping_token','')
+        if not token or not secrets.compare_digest(token,session['batch_steeping_token']):abort(403)
+        action=request.form.get('action','save')
+        try:
+            if action=='save':steeping.save(session_id,uid,request.form.get('steep_days',''),request.form.get('remind')=='1')
+            elif action=='confirm':steeping.confirm_quick(session_id,uid)
+            elif action=='acknowledge':steeping.acknowledge(session_id,uid)
+            elif action=='taste':steeping.add_tasting(session_id,uid,request.form.get('notes'),request.form.get('readiness'),request.form.get('score',''))
+            else:abort(400)
+        except ValueError as exc:flash(str(exc),'warning')
+        else:flash('Batch updated.','success')
+        return redirect(url_for('.tvw_batch_steeping',session_id=session_id))
+    return render_template('tvw_batch_steeping.html',batch=batch,tastings=steeping.tastings(session_id,uid),
+        readiness_options=steeping.READINESS,steeping_token=session['batch_steeping_token'])
 
 
 @tvw_recipes_bp.route("/my-mixes/<int:session_id>/<action>", methods=["POST"])
