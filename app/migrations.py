@@ -39,6 +39,8 @@ def run_startup_migrations() -> dict:
 
     from services.expert_flavour_review_service import SCHEMA as expert_review_schema
     db.executescript(expert_review_schema)
+    from services.flavour_review_knowledge_service import SCHEMA as review_knowledge_schema
+    db.executescript(review_knowledge_schema)
 
     # Ensure base reference rows exist for logging (FK on mix_history_items.ingredient_id).
     try:
@@ -1225,5 +1227,9 @@ def run_startup_migrations() -> dict:
     review_result = import_bundled_once()
     if review_result is not None:
         print(f"[expert-reviews] {review_result}")
+    from services.flavour_review_knowledge_service import refresh as refresh_review_knowledge
+    knowledge_count = refresh_review_knowledge()
+    if knowledge_count:
+        print(f"[review-knowledge] extracted {knowledge_count} reviews")
     return {"added_columns": added, "count": len(added)}
 

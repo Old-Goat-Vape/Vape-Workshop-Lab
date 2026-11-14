@@ -34,7 +34,9 @@ class BuilderUsageTests(unittest.TestCase):
             self.assertEqual(builder_flavour_usage(101)['average'],flavour_insights([101])['average'])
         response=self.client.get('/api/recipes/flavour-usage/101')
         self.assertEqual(response.status_code,200)
-        self.assertEqual(response.json,{'status':'success','usage':{'ingredient_id':101,'count':3,'average':4}})
+        self.assertEqual(response.json['status'],'success')
+        self.assertEqual(response.json['usage'],{'ingredient_id':101,'count':3,'average':4})
+        self.assertIn('knowledge',response.json)
         self.assertEqual(response.headers['Cache-Control'],'no-store')
         self.assertNotIn('SECRET RECIPE',response.get_data(as_text=True))
 

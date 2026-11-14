@@ -1,7 +1,15 @@
 /* Exact-ingredient usage suggestions. Isolated so async input behaviour can be tested. */
 ((root) => {
   class FlavourUsage {
-    constructor(row, fetchUsage, onChange) {
+    static steepPlan(ingredients) {
+      const selected = ingredients.filter(i => Number(i.percentage) > 0);
+      const supported = selected.map(i => (i.knowledge?.steep_sources || []).filter(
+        s => s.kind === 'steep_days' && Number.isFinite(s.high) && s.high >= 0 && s.high <= 365));
+      const sources = supported.flat();
+      return {days:sources.length ? Math.ceil(Math.max(...sources.map(s => s.high))) : null,
+        covered:supported.filter(s => s.length).length, total:selected.length};
+    }
+    constructor(row, fetchUsage, onChange, onKnowledge = () => {}) {
       this.row = row;
       this.pct = row.querySelector('.ingredient-pct');
       this.id = row.querySelector('.ingredient-id');
@@ -9,6 +17,7 @@
       this.button = row.querySelector('.row-use-average');
       this.fetchUsage = fetchUsage;
       this.onChange = onChange;
+      this.onKnowledge = onKnowledge;
       this.sequence = 0;
       this.editRevision = 0;
       this.selectedId = 0;
@@ -32,6 +41,7 @@
       if (id === this.selectedId) return;
       const sequence = ++this.sequence;
       this.selectedId = id;
+      this.onKnowledge(this.row, null);
       // Remove only a value supplied by the previous flavour's suggestion.
       if (this.automaticValue !== null && this.pct.value === this.automaticValue) {
         this.pct.value = '';
@@ -46,6 +56,7 @@
       try {
         const usage = await this.fetchUsage(id);
         if (sequence !== this.sequence || !this.row.isConnected || Number(this.id.value) !== id) return;
+        this.onKnowledge(this.row, usage.knowledge || null);
         const average = usage.average;
         const count = usage.count;
         if (!Number.isFinite(average) || average <= 0 || average > 100 || !Number.isInteger(count) || count <= 0) {

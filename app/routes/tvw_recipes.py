@@ -971,6 +971,7 @@ def tvw_flavour_detail(flavour_id: int):
     )
     uid = int(session.get("user_id")) if session.get("user_id") is not None else None
     from services import expert_flavour_review_service as expert_reviews
+    from services.flavour_review_knowledge_service import for_flavours as review_knowledge
     notes = recipes_repo.fetch_tvw_flavour_notes(flavour_id, viewer_user_id=uid)
     reviews = recipes_repo.fetch_tvw_flavour_reviews(flavour_id, viewer_user_id=uid)
     stash_binding = stash_service.fetch_stash_binding_for_flavour(
@@ -996,6 +997,7 @@ def tvw_flavour_detail(flavour_id: int):
         notes=notes,
         reviews=reviews,
         expert_reviews=expert_reviews.for_flavour(flavour_id),
+        review_knowledge=review_knowledge([flavour_id]),
         insights=insights,
         recipes_using=recipes_using,
         recipes_total=recipes_total,
@@ -1172,4 +1174,5 @@ def tvw_flavour_review_imports():
     search=request.args.get('search','').strip()[:200]
     reviewer=request.args.get('reviewer','').strip()[:100]
     counts,rows,total=expert.report(search,page,reviewer)
-    return render_template('tvw_expert_review_imports.html',counts=counts,rows=rows,total=total,page=page,search=search,reviewer=reviewer,reviewer_totals=expert.reviewer_totals())
+    from services.flavour_review_knowledge_service import coverage
+    return render_template('tvw_expert_review_imports.html',counts=counts,rows=rows,total=total,page=page,search=search,reviewer=reviewer,reviewer_totals=expert.reviewer_totals(),knowledge_coverage=coverage())

@@ -1,0 +1,21 @@
+<section class="card shadow-sm mb-3" id="review-knowledge">
+  <div class="card-body">
+    <p class="flavour-eyebrow">Learn from the reviews</p><h2 class="h4">What to expect from this flavour</h2>
+    {% if review_knowledge.observation_count %}
+    <p>{{ review_knowledge.observation_count }} extracted observations from {{ review_knowledge.review_count }} matched reviews by {{ review_knowledge.reviewer_count }} reviewers. These are individual experiences; open any field to see the original evidence.</p>
+    {% if review_knowledge.suggested_steep_days is not none %}<p><strong>Steep planning suggestion: {{ '%g'|format(review_knowledge.suggested_steep_days) }} days.</strong> Uses the longest explicit guidance below. Test steep times are listed separately. Your recipe may need a different time.</p>{% endif %}
+    {% for group in review_knowledge.groups %}
+    <details class="border-top border-secondary py-3"><summary><strong>{{ group.label }}</strong> · {{ group.facts|length }} observations</summary>
+      {% for fact in group.facts %}<div class="mt-3">
+        <p class="mb-1"><strong>{{ fact.reviewer }}</strong>
+          {% if fact.low is defined %} · {{ '%g'|format(fact.low) }}{% if fact.high != fact.low %}–{{ '%g'|format(fact.high) }}{% endif %} {{ fact.unit }}{% endif %}
+          {% if fact.scale is defined %} · {{ fact.value }}/{{ fact.scale }} · {{ fact.dimension }}{% endif %}
+        </p>
+        <blockquote class="border-start border-secondary ps-3" style="white-space:pre-wrap;overflow-wrap:anywhere">{{ fact.evidence }}</blockquote>
+        <a href="{{ fact.source_url }}" target="_blank" rel="noopener noreferrer">Original source ↗</a>
+      </div>{% endfor %}
+    </details>{% endfor %}
+    <p class="small text-secondary mt-3 mb-0">Tested percentages, recipe recommendations and reviewer scores remain separate. Missing information means unknown. Pairings are suggestions from the reviewer, separate from observed recipe combinations.</p>
+    {% else %}<p class="mb-0">No structured review observations for this exact flavour yet. We keep unknowns blank rather than borrow data from another version or manufacturer.</p>{% endif %}
+  </div>
+</section>
