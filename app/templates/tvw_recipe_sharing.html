@@ -1,0 +1,47 @@
+{% extends 'base_public.html' %}
+{% block title %}Share {{ recipe.name }} | TVW{% endblock %}
+{% block content %}
+<div class="container py-4" style="max-width:960px">
+  <a class="btn btn-outline-light mb-3" href="{{ url_for('tvw_recipes.tvw_recipe_detail',slug=recipe.slug or recipe.id) }}">← Back to recipe</a>
+  <h1>Share {{ recipe.name }}</h1>
+  <p>Give selected mixers access without changing this recipe’s <strong>{{ recipe.visibility }}</strong> visibility. Sharing covers the recipe and its versions. Your private notebook stays yours.</p>
+  <section class="card card-body my-4">
+    <h2 class="h4">Who has access?</h2>
+    <p>You are the owner. Only you can add people, change their permissions or revoke sharing.</p>
+    {% for person in recipients %}
+    <div class="border-top border-secondary py-3">
+      <strong>{{ person.username }}</strong>
+      <form method="post" class="d-flex flex-wrap gap-2 mt-2">
+        <input type="hidden" name="sharing_token" value="{{ sharing_token }}"><input type="hidden" name="user_id" value="{{ person.user_id }}">
+        <select name="permission" class="form-select" style="width:auto;min-height:44px" aria-label="Access for {{ person.username }}">
+          <option value="view" {% if not person.can_edit %}selected{% endif %}>View and mix</option>
+          <option value="edit" {% if person.can_edit %}selected{% endif %}>View, mix and edit</option>
+        </select>
+        <button class="btn btn-outline-info" style="min-height:44px">Save permission</button>
+        <button name="action" value="revoke" class="btn btn-outline-danger" style="min-height:44px" onclick="return confirm('Revoke access for this mixer?');">Revoke access</button>
+      </form>
+    </div>
+    {% else %}<p>No individual access grants yet.</p>{% endfor %}
+    <p class="text-secondary mt-3 mb-0">Authorised administrator access is unchanged. If the recipe is public, removing a grant does not remove public viewing access. Revoking a private recipe blocks future access and mix actions, but cannot erase a recipe someone has already seen.</p>
+  </section>
+  <section class="card card-body">
+    <h2 class="h4">Add a mixer</h2>
+    <form method="get" class="d-flex flex-wrap gap-2 my-3">
+      <label class="visually-hidden" for="shareSearch">Search usernames</label>
+      <input id="shareSearch" name="q" value="{{ query }}" minlength="2" maxlength="80" placeholder="Search a username, e.g. PaulyWallnuts" class="form-control" style="flex:1;min-width:220px;min-height:44px" required>
+      <button class="btn btn-warning">Find user</button>
+    </form>
+    {% for user in matches %}
+    <form method="post" class="border-top border-secondary py-3">
+      <strong>{{ user.username }}</strong>
+      <input type="hidden" name="sharing_token" value="{{ sharing_token }}"><input type="hidden" name="user_id" value="{{ user.id }}">
+      <div class="d-flex flex-wrap gap-2 mt-2">
+        <select name="permission" class="form-select" style="width:auto;min-height:44px" aria-label="Permission for {{ user.username }}"><option value="view">View and mix</option><option value="edit">View, mix and edit</option></select>
+        <button class="btn btn-warning" style="min-height:44px">Share with {{ user.username }}</button>
+      </div>
+    </form>
+    {% else %}{% if query|length>=2 %}<p>No available users match that username.</p>{% endif %}{% endfor %}
+    <p class="text-secondary mb-0 mt-3">Editors can save new recipe versions. They cannot change visibility, manage sharing or delete your original. No message or email is sent.</p>
+  </section>
+</div>
+{% endblock %}

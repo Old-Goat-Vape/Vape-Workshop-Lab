@@ -125,6 +125,8 @@
         <button type="button" class="btn btn-outline-warning tvw-rd-btn-quick js-quick-mix">Quick mix</button>
       </div>
       <div class="tvw-rd-hero-secondary-row">
+        {% if is_owner %}<a class="btn btn-outline-info" href="{{ url_for('tvw_recipes.tvw_recipe_sharing',recipe_id=recipe.id) }}">Share recipe</a>{% endif %}
+        {% if not is_owner and recipe.visibility != 'public' %}<span class="tvw-rd-pill">Shared access · {{ 'Editing allowed' if can_edit else 'View and mix' }}</span>{% endif %}
         {% if can_edit %}
           <a class="btn btn-outline-light" href="{{ url_for('tvw_recipes.tvw_recipe_edit', slug=(recipe.slug or recipe.id)) }}">Edit recipe</a>
         {% endif %}

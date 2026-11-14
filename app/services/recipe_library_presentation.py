@@ -77,6 +77,7 @@ def library_scope_counts(
         "total": _count(),
         "mine": _count(owner_user_id=uid) if uid is not None else 0,
         "public": _count(visibility="public"),
+        "shared": _count(shared_with_user_id=uid) if uid is not None else 0,
     }
 
 

@@ -61,7 +61,21 @@ def can_view_recipe_in_tvw_community(
     owner_id = recipe.get("created_by")
     if viewer_user_id is not None and owner_id is not None and int(viewer_user_id) == int(owner_id):
         return True
+    from services.recipe_sharing_service import access
+    if viewer_user_id is not None and access(recipe['id'],viewer_user_id):
+        return (int(recipe.get('active') if recipe.get('active') is not None else 1)==1
+                and not int(recipe.get('is_hidden') or 0)
+                and str(recipe.get('moderation_status') or 'active').lower() not in ('hidden','archived','removed'))
     return recipe_dict_visible_in_public_lists(recipe)
+
+
+def can_edit_recipe(recipe, user_id, *, admin=False):
+    if not recipe or not user_id:return False
+    if int(recipe.get('created_by') or 0)==int(user_id) or admin:return True
+    from services.recipe_sharing_service import access
+    grant=access(recipe['id'],user_id)
+    return bool(grant and grant['can_edit'] and can_view_recipe_in_tvw_community(
+        recipe,viewer_user_id=user_id,viewer_is_old_goat=False))
 
 
 def _table_has_column(table: str, column: str) -> bool:
@@ -1051,6 +1065,7 @@ def build_tvw_library_where(
     tag: str = "",
     favorites_user_id: int | None = None,
     owner_user_id: int | None = None,
+    shared_with_user_id: int | None = None,
     viewer_user_id: int | None = None,
     viewer_is_old_goat: bool = False,
     exclude_recipe_ids: Sequence[int] | None = None,
@@ -1068,8 +1083,9 @@ def build_tvw_library_where(
         where.append(public_gate)
     else:
         if viewer_user_id is not None:
-            where.append(f"(({public_gate}) OR r.created_by = ?)")
-            params.append(int(viewer_user_id))
+            from services.recipe_sharing_service import grant_sql
+            where.append(f"(({public_gate}) OR r.created_by = ? OR (({tvw_recipe_analytics_predicate_sql('r')}) AND {grant_sql()}))")
+            params.extend([int(viewer_user_id),int(viewer_user_id)])
         else:
             where.append(public_gate)
     if search:
@@ -1095,6 +1111,10 @@ def build_tvw_library_where(
     if owner_user_id is not None:
         where.append("r.created_by = ?")
         params.append(int(owner_user_id))
+    if shared_with_user_id is not None:
+        from services.recipe_sharing_service import grant_sql
+        where.append(f"({tvw_recipe_analytics_predicate_sql('r')}) AND {grant_sql()}")
+        params.append(int(shared_with_user_id))
     if exclude_recipe_ids:
         ids = sorted({int(x) for x in exclude_recipe_ids if x is not None})
         if ids:
@@ -1243,6 +1263,7 @@ def fetch_tvw_library(
     viewer_is_old_goat: bool = False,
     favorites_user_id: int | None = None,
     owner_user_id: int | None = None,
+    shared_with_user_id: int | None = None,
     exclude_recipe_ids: Sequence[int] | None = None,
     public_discovery_only: bool = False,
     min_rating_count: int = 0,
@@ -1259,6 +1280,7 @@ def fetch_tvw_library(
         tag=tag,
         favorites_user_id=favorites_user_id,
         owner_user_id=owner_user_id,
+        shared_with_user_id=shared_with_user_id,
         viewer_user_id=viewer_user_id,
         viewer_is_old_goat=viewer_is_old_goat,
         exclude_recipe_ids=exclude_recipe_ids,

@@ -1426,10 +1426,12 @@ def list_recipe_mixer_notes(
     recipe_id: int,
     limit: int = 3,
     offset: int = 0,
+    only_user_id: int | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     """Latest user-written mixer notes from completed guided sessions for a recipe."""
     db = get_db()
     rows = db.execute(_RECIPE_COMPLETED_GUIDED_SESSIONS_SQL, (int(recipe_id),)).fetchall()
+    if only_user_id is not None:rows=[r for r in rows if int(r['user_id'] or 0)==int(only_user_id)]
     all_notes: list[dict[str, Any]] = []
     for row in rows:
         parsed = _recipe_session_note_row(row)
@@ -1486,10 +1488,12 @@ def list_recipe_batch_history(
     recipe_id: int,
     page: int = 1,
     page_size: int = 20,
+    only_user_id: int | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     """Completed guided mix sessions for a recipe with readable batch reports."""
     db = get_db()
     rows = db.execute(_RECIPE_COMPLETED_GUIDED_SESSIONS_SQL, (int(recipe_id),)).fetchall()
+    if only_user_id is not None:rows=[r for r in rows if int(r['user_id'] or 0)==int(only_user_id)]
     total = len(rows)
     page_i = max(1, int(page or 1))
     page_size_i = max(1, min(50, int(page_size or 20)))

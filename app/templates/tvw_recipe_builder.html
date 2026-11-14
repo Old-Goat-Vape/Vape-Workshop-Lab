@@ -61,7 +61,9 @@
             </div>
             <div>
               <span class="tvw-rb-label">Visibility</span>
-              {% if vis == 'unlisted' and mode == 'edit' %}
+              {% if privacy_locked %}
+              <input type="hidden" name="visibility" value="{{ vis }}"><p>Visibility: <strong>{{ vis }}</strong> · Only the owner can change this.</p>
+              {% elif vis == 'unlisted' and mode == 'edit' %}
               <input type="hidden" name="visibility" value="unlisted">
               <p class="mb-0 mt-1" style="color: var(--tvw-text-secondary);">Unlisted (legacy visibility preserved).</p>
               {% else %}
@@ -69,7 +71,7 @@
                 <label class="tvw-rb-choice">
                   <input type="radio" name="visibility" value="private" {% if vis == 'private' %}checked{% endif %}>
                   <strong>Private</strong>
-                  <span>Only you and authorised admins can see it.</span>
+                  <span>Only you, selected mixers you share with and authorised admins can see it.</span>
                 </label>
                 <label class="tvw-rb-choice">
                   <input type="radio" name="visibility" value="public" {% if vis == 'public' %}checked{% endif %}>
@@ -84,7 +86,7 @@
               <label class="tvw-rb-label" for="recipeStatus">Status</label>
               <select id="recipeStatus" name="status" class="tvw-rb-select{% if form_errors.get('status') %} is-invalid{% endif %}">
                 <option value="wip" {% if st in ('wip', 'work in progress') %}selected{% endif %}>Work in progress</option>
-                <option value="help" {% if st == 'help' %}selected{% endif %}>I need help</option>
+                <option value="help" {% if st == 'help' %}selected{% endif %} {% if privacy_locked and vis != 'public' %}disabled{% endif %}>I need help</option>
                 <option value="ready" {% if st == 'ready' %}selected{% endif %}>Ready</option>
               </select>
               <p id="helpVisibilityNote">Choosing “I need help” makes this recipe public so the community can respond.</p>

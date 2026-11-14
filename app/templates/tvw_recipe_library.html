@@ -27,6 +27,7 @@
   dir=filters.dir or none,
   batch_ml=filters.batch_ml or none,
   mine=1 if filters.mine else none,
+  shared=1 if filters.shared else none,
   favorites=1 if filters.favorites else none) }}
 {%- endmacro %}
 
@@ -41,6 +42,8 @@
   {{ url_for('tvw_recipes.tvw_recipe_library', favorites=1, search=filters.search or none, status=filters.status or none, tag=filters.tag or none, sort=filters.sort or none, dir=filters.dir or none, batch_ml=filters.batch_ml or none) }}
 {% elif scope_key == 'private' %}
   {{ url_for('tvw_recipes.tvw_recipe_library', visibility='private', search=filters.search or none, status=filters.status or none, tag=filters.tag or none, sort=filters.sort or none, dir=filters.dir or none, batch_ml=filters.batch_ml or none) }}
+{% elif scope_key == 'shared' %}
+  {{ url_for('tvw_recipes.tvw_recipe_library',shared=1,search=filters.search or none,status=filters.status or none,tag=filters.tag or none,sort=filters.sort or none,dir=filters.dir or none,batch_ml=filters.batch_ml or none) }}
 {% endif %}
 {%- endmacro %}
 
@@ -73,6 +76,7 @@
 
   <form class="tvw-lib-search-form" method="get" action="{{ url_for('tvw_recipes.tvw_recipe_library') }}" role="search">
     {% if filters.mine %}<input type="hidden" name="mine" value="1">{% endif %}
+    {% if filters.shared %}<input type="hidden" name="shared" value="1">{% endif %}
     {% if filters.favorites %}<input type="hidden" name="favorites" value="1">{% endif %}
     {% if filters.visibility and active_scope in ['public', 'private'] %}
       <input type="hidden" name="visibility" value="{{ filters.visibility }}">
@@ -97,6 +101,7 @@
 
   <div class="tvw-lib-scope-row">
     <nav class="tvw-lib-scope-tabs" aria-label="Recipe scope">
+      <a class="tvw-lib-scope-tab{% if active_scope=='shared' %} is-active{% endif %}" href="{{ scope_href('shared') }}" {% if active_scope=='shared' %}aria-current="true"{% endif %}>Shared with me · {{ scope_counts.shared }}</a>
       <a class="tvw-lib-scope-tab{% if active_scope == 'all' %} is-active{% endif %}"
          href="{{ scope_href('all') }}"
          {% if active_scope == 'all' %}aria-current="true"{% endif %}>All recipes</a>
@@ -129,6 +134,7 @@
     <form method="get" action="{{ url_for('tvw_recipes.tvw_recipe_library') }}">
       {% if filters.search %}<input type="hidden" name="search" value="{{ filters.search }}">{% endif %}
       {% if filters.mine %}<input type="hidden" name="mine" value="1">{% endif %}
+      {% if filters.shared %}<input type="hidden" name="shared" value="1">{% endif %}
       {% if filters.favorites %}<input type="hidden" name="favorites" value="1">{% endif %}
       {% if filters.visibility and active_scope in ['public', 'private'] %}
         <input type="hidden" name="visibility" value="{{ filters.visibility }}">
