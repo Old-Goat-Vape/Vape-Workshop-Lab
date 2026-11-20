@@ -3,10 +3,11 @@ from __future__ import annotations
 import json
 from math import isfinite
 import sqlite3
+from uuid import UUID, uuid4
 from datetime import UTC, datetime
 from typing import Tuple
 
-from flask import Blueprint, Response, current_app, jsonify, request, session
+from flask import Blueprint, Response, current_app, jsonify, request, session, url_for
 
 from core.calculator import tvw_mix_policy
 from db import get_db, is_sqlite_busy_error, SQLITE_BUSY_BENCH_MESSAGE, SQLITE_BUSY_USER_MESSAGE
@@ -742,6 +743,10 @@ def quick_mix():
     data = request.get_json(silent=True) or {}
     uid = _current_user_id()
     try:
+        mode = data.get("mode", "legacy")
+        if mode not in ("legacy", "preview", "mixed"):
+            raise ValueError("Choose whether to calculate or record a mixed batch.")
+        batch_key = UUID(data.get("batch_key", "")).hex if mode == "mixed" else None
         recipe_id = int(data.get("recipe_id") or 0)
         denied = _gate_recipe_response(recipe_id)
         if denied:
@@ -769,8 +774,14 @@ def quick_mix():
             vg_ratio=vg_ratio,
             nicotine_carrier=nicotine_carrier,
         )
-        if uid:
-            guided_mix_session_service.record_quick_mix_session(
+        hard_stops = payload["policy"]["hard_stops"]
+        if hard_stops:
+            return jsonify(status="error", message=" ".join(hard_stops)), 422
+        response = dict(status="success", resolved_version_id=resolved_version_id, result=payload)
+        if mode == "preview":
+            response["batch_key"] = uuid4().hex
+        elif uid:
+            session_id = guided_mix_session_service.record_quick_mix_session(
                 user_id=int(uid),
                 recipe_version_id=int(resolved_version_id),
                 target_ml=target_ml,
@@ -779,8 +790,10 @@ def quick_mix():
                 pg_ratio=pg_ratio,
                 vg_ratio=vg_ratio,
                 nicotine_carrier=nicotine_carrier,
+                batch_key=batch_key,
             )
-        return jsonify({"status": "success", "resolved_version_id": resolved_version_id, "result": payload}), 200
+            response["batch_plan_url"] = url_for("tvw_recipes.tvw_batch_steeping", session_id=session_id)
+        return jsonify(response), 200
     except Exception as exc:
         return jsonify({"status": "error", "message": str(exc)}), 400
 

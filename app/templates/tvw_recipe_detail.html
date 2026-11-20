@@ -630,7 +630,7 @@
     const rowsHtml = lineItems.length
       ? lineItems.map((li) => `
           <tr>
-            <td>${esc(li.name || "Flavour")}</td>
+            <td>${esc([li.brand, li.name].filter(Boolean).join(" · ") || "Flavour")}</td>
             <td class="text-secondary">${esc(li.carrier_label || li.carrier || "PG")}</td>
             <td class="text-end">${fmtN(li.percent, 2)}%</td>
             <td class="text-end">${fmtN(li.ml)} ml</td>
@@ -641,15 +641,16 @@
     mixOutput.classList.remove("d-none");
     mixOutput.innerHTML = `
       <div class="border border-secondary rounded-3 p-3 bg-black">
-        <p class="small text-secondary text-uppercase mb-1">Quick mix</p>
+        <p class="small text-secondary text-uppercase mb-1">Quick mix · calculated amounts</p>
         <h3 class="h5 mb-3">${esc(recipeName)}</h3>
         <dl class="row small mb-3">
-          <dt class="col-sm-5">Batch size</dt><dd class="col-sm-7">${fmtN(targets.target_ml, 0)} ml</dd>
+          <dt class="col-sm-5">Batch size</dt><dd class="col-sm-7">${esc(targets.target_ml)} ml</dd>
           <dt class="col-sm-5">Target nicotine strength</dt><dd class="col-sm-7">${fmtN(targets.target_nic_mg_ml, 1)} mg/ml</dd>
           <dt class="col-sm-5">Target PG/VG</dt><dd class="col-sm-7">${fmtN(targets.pg_ratio, 0)}/${fmtN(targets.vg_ratio, 0)}</dd>
           <dt class="col-sm-5">Estimated final PG/VG</dt><dd class="col-sm-7">${esc(ratioLabel)}</dd>
           <dt class="col-sm-5">Nicotine base</dt><dd class="col-sm-7">${fmtN(targets.nic_base_mg_ml, 0)} mg/ml · ${esc(targets.nicotine_carrier)}</dd>
         </dl>
+        ${Number(totals.nicotine_ml) > 0 ? `<p><strong>Nicotine first:</strong> ${fmtN(totals.nicotine_ml)} ml · ${fmtN(weights.nicotine_g)} g</p>` : ""}
         <div class="table-responsive mb-3">
           <table class="table table-sm table-dark align-middle mb-0">
             <thead><tr><th>Ingredient</th><th>Carrier</th><th class="text-end">%</th><th class="text-end">ml</th><th class="text-end">g</th></tr></thead>
@@ -659,13 +660,15 @@
         <dl class="row small mb-0">
           <dt class="col-sm-5">Standalone PG</dt><dd class="col-sm-7">${fmtN(totals.pg_ml)} ml · ${fmtN(weights.pg_g)} g</dd>
           <dt class="col-sm-5">Standalone VG</dt><dd class="col-sm-7">${fmtN(totals.vg_ml)} ml · ${fmtN(weights.vg_g)} g</dd>
-          <dt class="col-sm-5">Nicotine pour</dt><dd class="col-sm-7">${fmtN(totals.nicotine_ml)} ml · ${fmtN(weights.nicotine_g)} g</dd>
+          ${Number(totals.nicotine_ml) > 0 ? "" : '<dt class="col-sm-5">Nicotine pour</dt><dd class="col-sm-7">None</dd>'}
           <dt class="col-sm-5">Total flavour</dt><dd class="col-sm-7">${fmtN(totals.total_flavor_percent, 2)}% · ${fmtN(totals.flavor_ml)} ml</dd>
         </dl>
         ${warnings.length ? `<div class="alert alert-warning py-2 mt-3 mb-0 small">${warnings.map(esc).join("<br>")}</div>` : ""}
         <div class="mt-3 d-flex flex-wrap gap-2">
           <button type="submit" form="guidedMixForm" class="btn btn-sm btn-warning js-guided-mix-submit">Start guided mix with these settings</button>
+          <button type="button" class="btn btn-outline-info" id="logQuickBatch">I’ve mixed this batch</button>
         </div>
+        <p class="small text-secondary mt-2 mb-0" id="quickBatchStatus" role="status">Record the batch when you finish mixing to start its steeping plan.</p>
       </div>`;
   };
 
@@ -910,23 +913,50 @@
     nicotine_carrier: (document.getElementById("mix_nic_carrier").value || "PG").toUpperCase(),
   });
 
+  let quickMixPending = false;
+  const quickButtons = document.querySelectorAll(".js-quick-mix");
+  const setQuickBusy = (busy) => {
+    quickMixPending = busy;
+    quickButtons.forEach(button => { button.disabled = busy; });
+  };
   const runQuickMix = async () => {
+    if (quickMixPending) return;
+    setQuickBusy(true);
     try {
       const t = mixTargets();
+      const settings = {recipe_id: recipeId, version_id: currentVersionId(), ...t};
       const body = await apiJson("/api/mix/quick", {
         method: "POST",
-        body: JSON.stringify({
-          recipe_id: recipeId,
-          version_id: currentVersionId(),
-          target_ml: t.target_ml,
-          target_nic_mg_ml: t.target_nic_mg_ml,
-          nic_base_mg_ml: t.nic_base_mg_ml,
-          pg_ratio: t.pg_ratio,
-          vg_ratio: t.vg_ratio,
-          nicotine_carrier: t.nicotine_carrier,
-        }),
+        body: JSON.stringify({...settings, mode: "preview"}),
       });
+      if (JSON.stringify(t) !== JSON.stringify(mixTargets())) {
+        showMixError("Mix settings changed. Run Quick Mix again to see the updated amounts.");
+        return;
+      }
       renderQuickMixGui(body, t);
+      const logButton = document.getElementById("logQuickBatch");
+      const status = document.getElementById("quickBatchStatus");
+      logButton.addEventListener("click", async () => {
+        if (quickMixPending) return;
+        setQuickBusy(true);
+        logButton.disabled = true;
+        try {
+          const saved = await apiJson("/api/mix/quick", {
+            method: "POST",
+            body: JSON.stringify({...settings, version_id: body.resolved_version_id, mode: "mixed", batch_key: body.batch_key}),
+          });
+          logButton.textContent = "Batch recorded";
+          const link = document.createElement("a");
+          link.href = saved.batch_plan_url;
+          link.textContent = "Open steep plan and set a reminder";
+          status.replaceChildren(link);
+        } catch (err) {
+          status.textContent = err.message || "Could not record the batch. Try again.";
+          logButton.disabled = false;
+        } finally {
+          setQuickBusy(false);
+        }
+      });
       const mixHandoffHint = document.getElementById("mixHandoffHint");
       if (mixHandoffHint) mixHandoffHint.hidden = false;
       document.getElementById("mix-card")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -934,8 +964,17 @@
       showMixError(err.message || "Quick mix failed.");
       const mixHandoffHint = document.getElementById("mixHandoffHint");
       if (mixHandoffHint) mixHandoffHint.hidden = true;
+    } finally {
+      setQuickBusy(false);
     }
   };
+
+  guidedMixForm?.addEventListener("input", () => {
+    if (!mixOutput?.classList.contains("d-none")) {
+      mixOutput.classList.add("d-none");
+      document.getElementById("mixHandoffHint").hidden = true;
+    }
+  });
 
   document.querySelectorAll(".js-quick-mix").forEach((btn) => {
     btn.addEventListener("click", runQuickMix);

@@ -79,6 +79,38 @@ class BatchSteepingTests(unittest.TestCase):
             self.assertEqual(steep.fetch(sid,1)['started_at'],steep.stamp(START))
             self.assertEqual(len(steep.list_for(1)),1)
 
+    def test_quick_preview_is_read_only_and_recording_is_retry_safe(self):
+        params = dict(recipe_id=1, version_id=1, target_ml=10, target_nic_mg_ml=0,
+                      pg_ratio=30, vg_ratio=70)
+        path = '/api/mix/quick'
+        for _ in range(2):
+            preview = self.client.post(path, json=dict(params, mode='preview'))
+            self.assertEqual(preview.status_code, 200)
+        with base.flask_app.app_context():
+            self.assertEqual(get_db().execute('SELECT COUNT(*) FROM mix_sessions').fetchone()[0], 0)
+        record = dict(params, mode='mixed', batch_key=preview.json['batch_key'])
+        first = self.client.post(path, json=record)
+        second = self.client.post(path, json=record)
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.json['batch_plan_url'], first.json['batch_plan_url'])
+        self.assertEqual(self.client.get(first.json['batch_plan_url']).status_code, 200)
+        with base.flask_app.app_context():
+            batches = steep.list_for(1)
+            self.assertEqual(len(batches), 1)
+            self.assertEqual(batches[0]['steep_days'], 14)
+            self.assertFalse(batches[0]['reminder_enabled'])
+            self.assertEqual(get_db().execute('SELECT COUNT(*) FROM mix_sessions').fetchone()[0], 1)
+        self.assertIn(b'Quick mixed', self.client.get('/my-mixes?filter=completed').data)
+
+    def test_unsafe_quick_result_cannot_be_recorded(self):
+        from uuid import uuid4
+        response = self.client.post('/api/mix/quick', json=dict(
+            recipe_id=1, version_id=1, target_ml=10, target_nic_mg_ml=200,
+            nic_base_mg_ml=100, pg_ratio=30, vg_ratio=70, mode='mixed', batch_key=uuid4().hex))
+        self.assertIn(response.status_code, (400, 422))
+        with base.flask_app.app_context():
+            self.assertEqual(get_db().execute('SELECT COUNT(*) FROM mix_sessions').fetchone()[0], 0)
+
     def test_reminders_opt_in_acknowledge_change_cancel_and_restart(self):
         sid=self.create();self.complete(sid)
         with base.flask_app.app_context():
