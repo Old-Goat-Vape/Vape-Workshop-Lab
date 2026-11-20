@@ -1929,6 +1929,7 @@ def record_quick_mix_session(
     pg_ratio: float,
     vg_ratio: float,
     nicotine_carrier: str,
+    batch_key: str | None = None,
 ) -> int:
     """Append a quick-mix row (no steps) for personal mix history."""
     db = get_db()
@@ -1939,8 +1940,19 @@ def record_quick_mix_session(
             "kind": "quick",
             "nicotine_carrier": carrier_norm,
             "nic_base_mg_ml": float(nic_base_mg_ml),
+            "batch_key": batch_key,
         }
     )
+    if batch_key:
+        db.execute("BEGIN IMMEDIATE")
+        existing = db.execute(
+            """SELECT id FROM mix_sessions WHERE user_id=? AND mode='quick'
+               AND CASE WHEN json_valid(result_json) THEN json_extract(result_json, '$.batch_key') END=?""",
+            (user_id, batch_key),
+        ).fetchone()
+        if existing:
+            db.commit()
+            return int(existing["id"])
     cur = db.execute(
         """
         INSERT INTO mix_sessions (user_id, recipe_version_id, mode, target_ml, target_nic, target_pgvg, result_json, created_at, completed_at)
@@ -1958,6 +1970,8 @@ def record_quick_mix_session(
     session_id = int(cur.lastrowid)
     from services.batch_steeping_service import snapshot as snapshot_steep
     snapshot_steep(session_id,db)
+    if batch_key:
+        db.execute("UPDATE batch_steeping SET mixed_at=CURRENT_TIMESTAMP WHERE session_id=?", (session_id,))
     db.commit()
     return session_id
 
@@ -2006,7 +2020,8 @@ def list_user_mix_sessions(
         status_where = "LOWER(COALESCE(base.mode, 'quick')) = 'guided' AND base.open_steps > 0"
     elif f == "completed":
         status_where = (
-            "(LOWER(COALESCE(base.mode, 'quick')) = 'quick' "
+            "((LOWER(COALESCE(base.mode, 'quick')) = 'quick' AND EXISTS ("
+            "SELECT 1 FROM batch_steeping b WHERE b.session_id = base.id AND b.mixed_at IS NOT NULL)) "
             "OR (LOWER(COALESCE(base.mode, 'quick')) = 'guided' AND base.open_steps = 0))"
         )
 
