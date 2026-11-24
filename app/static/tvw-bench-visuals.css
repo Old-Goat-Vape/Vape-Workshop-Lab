@@ -1,5 +1,5 @@
 /* Bench illustration: scoped to guided mixing; existing controls retain their IDs. */
-body.tvw-bench-mode .tvw-workstation{background:radial-gradient(ellipse at 50% 20%,#26313a,#171b20 48%,#101215)}
+body.tvw-bench-mode .tvw-workstation{background:radial-gradient(ellipse at 50% 20%,#26313a,#171b20 48%,#101215);overflow-wrap:anywhere}
 body.tvw-bench-mode .tvw-ws-bench-layout{gap:16px;padding:18px;background:linear-gradient(#1e242b,#181a1b);border:0;align-items:start}
 body.tvw-bench-mode .tvw-ws-bench-layout .tvw-ws-panel{border-radius:18px;background:linear-gradient(145deg,#252a31,#181d23);border:1px solid #49505a}
 body.tvw-bench-mode .tvw-ws-bench-layout .tvw-ws-face{background:radial-gradient(ellipse at 50% 20%,#303333,#1b2027 70%);border-color:#876138;box-shadow:0 15px 45px #0005}
@@ -37,6 +37,163 @@ body.tvw-bench-mode .tvw-ws-kicker,body.tvw-bench-mode .tvw-ws-version,body.tvw-
 @media(max-width:1099px){body.tvw-bench-mode .tvw-ws-bench-layout{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:'center center' 'used todo';gap:10px;padding:10px}.bench-bottle-tray{grid-template-columns:repeat(auto-fit,minmax(90px,1fr))}}
 @media(max-width:480px){body.tvw-bench-mode .tvw-ws-bench-layout .tvw-ws-used,body.tvw-bench-mode .tvw-ws-bench-layout .tvw-ws-todo{padding:12px}.bench-bottle-tray{grid-template-columns:1fr}.bench-rack-title{font-size:1.1rem}.bench-scene{gap:20px}}
 @media(prefers-reduced-motion:reduce){.bench-liquid{transition:none}}
+
+.tvw-batch-recovery {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+  max-width: 1000px;
+  margin: 1rem auto;
+  padding: clamp(.85rem, 3vw, 1.5rem);
+  border: 2px solid #d4ae5a;
+  border-radius: 12px;
+  background: #171b1d;
+  color: #f6f3e9;
+  font-size: 1.125rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.tvw-batch-recovery .tvw-ws-commit {
+  margin-block: .5rem;
+}
+
+.tvw-batch-recovery input[type="number"] {
+  display: block;
+  width: 10rem;
+  max-width: 100%;
+  min-height: 44px;
+  margin-block: .25rem .75rem;
+  padding: .35rem .6rem;
+  border: 1px solid #6b8794;
+  border-radius: .4rem;
+  background: #17232c;
+  color: #f6f3e9;
+}
+
+.tvw-batch-recovery-table {
+  width: 100%;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+  text-align: left;
+}
+
+.tvw-batch-recovery-table :is(th, td) {
+  padding: .45rem;
+  border-bottom: 1px solid #49505a;
+}
+
+.tvw-batch-recovery-table :is(th, td):last-child {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.tvw-recovery-mobile-meta {
+  display: none;
+}
+
+@media (max-width: 767.98px) {
+  .tvw-batch-recovery-table .tvw-recovery-extra-column {
+    display: none;
+  }
+
+  .tvw-recovery-mobile-meta {
+    display: block;
+    font-size: .875rem;
+    font-weight: 400;
+    color: #c4c9d4;
+  }
+
+  body.tvw-bench-mode .tvw-ws-bench-layout .tvw-ws-face {
+    min-height: 0;
+    padding: .85rem;
+  }
+
+  .bench-illustration {
+    order: 1;
+    margin-top: .75rem;
+  }
+
+  #benchCurrentBottle {
+    flex: 0 1 130px;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .bench-receiver-wrap {
+    flex: 0 0 min(96px, 42%);
+    min-width: 0;
+  }
+
+  .bench-receiver {
+    width: 100%;
+    height: 118px;
+    border-radius: 16px 16px 10px 10px;
+  }
+
+  .bench-receiver-label {
+    top: 44px;
+    left: 4px;
+    right: 4px;
+    font-size: .75rem;
+  }
+
+  .tvw-ws-telemetry {
+    flex-wrap: wrap;
+  }
+
+  .tvw-ws-lcd-live .tvw-ws-lcd-value {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+  }
+
+  .tvw-ws-lcd-live .tvw-ws-input {
+    min-width: 0;
+    min-height: 48px;
+    border: 1px solid #6b8794;
+    border-radius: .4rem;
+    background: #17232c;
+    padding: .25rem .35rem;
+  }
+
+  .tvw-ws-lcd-live .tvw-ws-input::placeholder {
+    font: 1rem system-ui;
+  }
+
+  .tvw-ws-lcd-live .tvw-ws-input:focus-visible {
+    outline: 2px solid #d4af37;
+    outline-offset: 2px;
+  }
+
+  .tvw-ws-lcd-live .tvw-ws-unit {
+    color: #b9dbea;
+  }
+
+  .tvw-ws-complete-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .5rem;
+    margin-top: 0;
+  }
+
+  .tvw-ws-complete-actions a {
+    display: grid;
+    align-items: center;
+    min-height: 44px;
+    padding: .5rem;
+    text-align: center;
+    font-size: .9375rem;
+  }
+
+  .tvw-ws-complete-actions a:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .tvw-ws-report-stats {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  }
+}
 
 /* Live bench QA: keep helper text readable on the brighter work surface. */
 body.tvw-bench-mode .tvw-workstation :is(.tvw-ws-center-batch,.tvw-ws-face-role,.tvw-ws-face-brand,.tvw-ws-face-phase,.tvw-ws-face-why,.tvw-ws-pct,.tvw-ws-next,.tvw-ws-next strong){color:#d1d8e0}

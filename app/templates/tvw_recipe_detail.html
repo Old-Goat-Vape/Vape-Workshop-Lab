@@ -340,15 +340,12 @@
 
         <div class="tvw-rd-mix-actions">
           <button class="btn btn-warning js-guided-mix-submit" type="submit" id="btnGuidedMix">Start guided mix</button>
-          <button class="btn btn-outline-warning js-quick-mix" type="button" id="btnQuickMix">Quick mix</button>
+          <button class="btn btn-outline-warning js-quick-mix" type="button" id="btnQuickMix">Calculate quick mix</button>
         </div>
         <p class="small text-secondary mt-2 mb-0" id="guidedMixSubmitStatus" hidden aria-live="polite">
           Starting mix…
         </p>
       </form>
-      <p class="small text-secondary mt-2 mb-0" id="mixHandoffHint" hidden>
-        Want pours instead? <a class="link-info" href="#" id="mixHandoffLink">Start guided mix with these settings</a>.
-      </p>
       <div id="mixOutput" class="tvw-rd-quick-mix-result d-none mt-3" aria-live="polite"></div>
     </section>
 
@@ -611,7 +608,9 @@
   const showMixError = (text) => {
     if (!mixOutput) return;
     mixOutput.classList.remove("d-none");
-    mixOutput.innerHTML = `<div class="alert alert-danger py-2 mb-0">${esc(text)}</div>`;
+    mixOutput.innerHTML = `<div class="alert alert-danger py-2 mb-0" tabindex="-1">${esc(text)}</div>`;
+    mixOutput.firstElementChild.focus({ preventScroll: true });
+    mixOutput.scrollIntoView({ block: "start" });
   };
 
   const renderQuickMixGui = (body, targets) => {
@@ -630,43 +629,47 @@
     const rowsHtml = lineItems.length
       ? lineItems.map((li) => `
           <tr>
-            <td>${esc([li.brand, li.name].filter(Boolean).join(" · ") || "Flavour")}</td>
-            <td class="text-secondary">${esc(li.carrier_label || li.carrier || "PG")}</td>
-            <td class="text-end">${fmtN(li.percent, 2)}%</td>
-            <td class="text-end">${fmtN(li.ml)} ml</td>
-            <td class="text-end">${fmtN(li.grams)} g</td>
+            <th scope="row">
+              ${esc([li.brand, li.name].filter(Boolean).join(" · ") || "Flavour")}
+              <span class="tvw-quick-mix-mobile-meta">${esc(li.carrier_label || li.carrier || "PG")} carrier · ${fmtN(li.percent, 2)}%</span>
+            </th>
+            <td class="text-secondary tvw-quick-mix-extra-column">${esc(li.carrier_label || li.carrier || "PG")}</td>
+            <td class="text-end tvw-quick-mix-extra-column">${fmtN(li.percent, 2)}%</td>
+            <td class="text-end text-nowrap">${fmtN(li.ml)} ml</td>
+            <td class="text-end text-nowrap">${fmtN(li.grams)} g</td>
           </tr>`).join("")
       : `<tr><td colspan="5" class="text-secondary">No flavour lines returned.</td></tr>`;
 
     mixOutput.classList.remove("d-none");
     mixOutput.innerHTML = `
-      <div class="border border-secondary rounded-3 p-3 bg-black">
-        <p class="small text-secondary text-uppercase mb-1">Quick mix · calculated amounts</p>
-        <h3 class="h5 mb-3">${esc(recipeName)}</h3>
-        <dl class="row small mb-3">
-          <dt class="col-sm-5">Batch size</dt><dd class="col-sm-7">${esc(targets.target_ml)} ml</dd>
-          <dt class="col-sm-5">Target nicotine strength</dt><dd class="col-sm-7">${fmtN(targets.target_nic_mg_ml, 1)} mg/ml</dd>
-          <dt class="col-sm-5">Target PG/VG</dt><dd class="col-sm-7">${fmtN(targets.pg_ratio, 0)}/${fmtN(targets.vg_ratio, 0)}</dd>
-          <dt class="col-sm-5">Estimated final PG/VG</dt><dd class="col-sm-7">${esc(ratioLabel)}</dd>
-          <dt class="col-sm-5">Nicotine base</dt><dd class="col-sm-7">${fmtN(targets.nic_base_mg_ml, 0)} mg/ml · ${esc(targets.nicotine_carrier)}</dd>
+      <div class="border border-secondary rounded-3 p-2 p-sm-3 bg-black">
+        <h3 class="h5 mb-1" id="quickMixResultTitle" tabindex="-1">Quick mix results</h3>
+        <p class="text-secondary mb-3">${esc(recipeName)}</p>
+        <dl class="tvw-quick-mix-facts small mb-3">
+          <dt>Batch size</dt><dd>${esc(targets.target_ml)} ml</dd>
+          <dt>Target nicotine strength</dt><dd>${fmtN(targets.target_nic_mg_ml, 1)} mg/ml</dd>
+          <dt>Target PG/VG</dt><dd>${fmtN(targets.pg_ratio, 0)}/${fmtN(targets.vg_ratio, 0)}</dd>
+          <dt>Estimated final PG/VG</dt><dd>${esc(ratioLabel)}</dd>
+          <dt>Nicotine base</dt><dd>${fmtN(targets.nic_base_mg_ml, 0)} mg/ml · ${esc(targets.nicotine_carrier)}</dd>
         </dl>
         ${Number(totals.nicotine_ml) > 0 ? `<p><strong>Nicotine first:</strong> ${fmtN(totals.nicotine_ml)} ml · ${fmtN(weights.nicotine_g)} g</p>` : ""}
         <div class="table-responsive mb-3">
-          <table class="table table-sm table-dark align-middle mb-0">
-            <thead><tr><th>Ingredient</th><th>Carrier</th><th class="text-end">%</th><th class="text-end">ml</th><th class="text-end">g</th></tr></thead>
+          <table class="table table-sm table-dark align-middle mb-0 tvw-quick-mix-table">
+            <caption class="visually-hidden">Calculated flavour amounts</caption>
+            <thead><tr><th scope="col">Ingredient</th><th scope="col" class="tvw-quick-mix-extra-column">Carrier</th><th scope="col" class="text-end tvw-quick-mix-extra-column">%</th><th scope="col" class="text-end">ml</th><th scope="col" class="text-end">g</th></tr></thead>
             <tbody>${rowsHtml}</tbody>
           </table>
         </div>
-        <dl class="row small mb-0">
-          <dt class="col-sm-5">Standalone PG</dt><dd class="col-sm-7">${fmtN(totals.pg_ml)} ml · ${fmtN(weights.pg_g)} g</dd>
-          <dt class="col-sm-5">Standalone VG</dt><dd class="col-sm-7">${fmtN(totals.vg_ml)} ml · ${fmtN(weights.vg_g)} g</dd>
-          ${Number(totals.nicotine_ml) > 0 ? "" : '<dt class="col-sm-5">Nicotine pour</dt><dd class="col-sm-7">None</dd>'}
-          <dt class="col-sm-5">Total flavour</dt><dd class="col-sm-7">${fmtN(totals.total_flavor_percent, 2)}% · ${fmtN(totals.flavor_ml)} ml</dd>
+        <dl class="tvw-quick-mix-facts small mb-0">
+          <dt>Standalone PG</dt><dd>${fmtN(totals.pg_ml)} ml · ${fmtN(weights.pg_g)} g</dd>
+          <dt>Standalone VG</dt><dd>${fmtN(totals.vg_ml)} ml · ${fmtN(weights.vg_g)} g</dd>
+          ${Number(totals.nicotine_ml) > 0 ? "" : '<dt>Nicotine pour</dt><dd>None</dd>'}
+          <dt>Total flavour</dt><dd>${fmtN(totals.total_flavor_percent, 2)}% · ${fmtN(totals.flavor_ml)} ml</dd>
         </dl>
         ${warnings.length ? `<div class="alert alert-warning py-2 mt-3 mb-0 small">${warnings.map(esc).join("<br>")}</div>` : ""}
-        <div class="mt-3 d-flex flex-wrap gap-2">
-          <button type="submit" form="guidedMixForm" class="btn btn-sm btn-warning js-guided-mix-submit">Start guided mix with these settings</button>
-          <button type="button" class="btn btn-outline-info" id="logQuickBatch">I’ve mixed this batch</button>
+        <div class="tvw-quick-mix-actions mt-3">
+          <button type="button" class="btn btn-info" id="logQuickBatch">I’ve mixed this batch</button>
+          <button type="submit" form="guidedMixForm" class="btn btn-outline-warning js-guided-mix-submit">Start guided mix with these settings</button>
         </div>
         <p class="small text-secondary mt-2 mb-0" id="quickBatchStatus" role="status">Record the batch when you finish mixing to start its steeping plan.</p>
       </div>`;
@@ -949,7 +952,10 @@
           const link = document.createElement("a");
           link.href = saved.batch_plan_url;
           link.textContent = "Open steep plan and set a reminder";
-          status.replaceChildren(link);
+          const historyLink = document.createElement("a");
+          historyLink.href = {{ url_for('tvw_recipes.tvw_my_mixes', filter='quick')|tojson }};
+          historyLink.textContent = "View in My Mixes";
+          status.replaceChildren(link, document.createElement("br"), historyLink);
         } catch (err) {
           status.textContent = err.message || "Could not record the batch. Try again.";
           logButton.disabled = false;
@@ -957,13 +963,10 @@
           setQuickBusy(false);
         }
       });
-      const mixHandoffHint = document.getElementById("mixHandoffHint");
-      if (mixHandoffHint) mixHandoffHint.hidden = false;
-      document.getElementById("mix-card")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      document.getElementById("quickMixResultTitle").focus({ preventScroll: true });
+      mixOutput.scrollIntoView({ block: "start" });
     } catch (err) {
       showMixError(err.message || "Quick mix failed.");
-      const mixHandoffHint = document.getElementById("mixHandoffHint");
-      if (mixHandoffHint) mixHandoffHint.hidden = true;
     } finally {
       setQuickBusy(false);
     }
@@ -972,18 +975,11 @@
   guidedMixForm?.addEventListener("input", () => {
     if (!mixOutput?.classList.contains("d-none")) {
       mixOutput.classList.add("d-none");
-      document.getElementById("mixHandoffHint").hidden = true;
     }
   });
 
   document.querySelectorAll(".js-quick-mix").forEach((btn) => {
     btn.addEventListener("click", runQuickMix);
-  });
-
-  document.getElementById("mixHandoffLink")?.addEventListener("click", (ev) => {
-    ev.preventDefault();
-    syncGuidedMixVersion();
-    guidedMixForm?.requestSubmit();
   });
 
   document.getElementById("btnSubmitFeedback")?.addEventListener("click", async () => {
