@@ -248,7 +248,18 @@ def add_recipe_feedback(recipe_id: int):
         return denied
     data = request.get_json(silent=True) or {}
     db = get_db()
-    version_id = int(data.get("recipe_version_id") or 0) or None
+    raw_version = data.get("recipe_version_id")
+    version_id = None
+    if raw_version not in (None, "", 0, "0"):
+        try:
+            version_id = int(str(raw_version))
+        except (TypeError, ValueError):
+            return jsonify(status="error", message="Choose a valid recipe version."), 400
+        if db.execute(
+            "SELECT 1 FROM recipe_versions WHERE id = ? AND recipe_id = ?",
+            (version_id, recipe_id),
+        ).fetchone() is None:
+            return jsonify(status="error", message="That version does not belong to this recipe."), 400
     main = str(data.get("body") or "").strip()
     extras: list[str] = []
     dev = str(data.get("device") or "").strip()
@@ -413,6 +424,27 @@ def set_recipe_favorite_api(recipe_id: int):
     recipes_repo.set_recipe_favorite(user_id=int(uid), recipe_id=recipe_id, favorited=favorited)
     snap = recipes_repo.fetch_recipe_engagement_for_viewer(recipe_id=recipe_id, viewer_user_id=int(uid))
     return jsonify({"status": "success", **snap}), 200
+
+
+@tvw_api_bp.route("/recipes/<int:recipe_id>/like", methods=["POST"])
+@login_required
+def set_recipe_like_api(recipe_id: int):
+    denied = _muted_ugc_block() or _gate_recipe_response(recipe_id)
+    if denied:
+        return denied
+    if not recipes_repo.is_public_community_recipe(recipe_id):
+        return jsonify(status="error", message="Recipe not found."), 404
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not isinstance(data.get("liked"), bool):
+        return jsonify(status="error", message="Choose whether to like this recipe."), 400
+    uid = _current_user_id()
+    if uid is None:
+        return jsonify(status="error", message="Not logged in."), 401
+    recipes_repo.set_recipe_like(user_id=uid, recipe_id=recipe_id, liked=data["liked"])
+    snapshot = recipes_repo.fetch_recipe_engagement_for_viewer(recipe_id=recipe_id, viewer_user_id=uid)
+    if not snapshot["is_community_public"]:
+        return jsonify(status="error", message="Recipe not found."), 404
+    return jsonify(status="success", **snapshot), 200
 
 
 @tvw_api_bp.route("/recipes/<int:recipe_id>/rating", methods=["POST"])

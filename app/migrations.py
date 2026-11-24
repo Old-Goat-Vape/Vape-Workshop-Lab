@@ -620,6 +620,12 @@ def run_startup_migrations() -> dict:
         CREATE INDEX IF NOT EXISTS idx_recipe_favorites_user ON recipe_favorites(user_id, recipe_id);
         CREATE INDEX IF NOT EXISTS idx_recipe_favorites_recipe ON recipe_favorites(recipe_id);
 
+        CREATE TABLE IF NOT EXISTS recipe_likes (
+            recipe_id INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            PRIMARY KEY (recipe_id, user_id)
+        );
+
         CREATE TABLE IF NOT EXISTS recipe_cost_ingredient_overrides (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             recipe_id INTEGER NOT NULL,
@@ -852,6 +858,7 @@ def run_startup_migrations() -> dict:
             CREATE INDEX IF NOT EXISTS idx_flavour_aliases_norm ON flavour_aliases(alias_normalized);
             CREATE INDEX IF NOT EXISTS idx_user_stash_user ON user_stash_items(user_id, is_favorite);
             CREATE INDEX IF NOT EXISTS idx_mix_sessions_user ON mix_sessions(user_id, created_at);
+            CREATE INDEX IF NOT EXISTS idx_mix_sessions_recipe_version ON mix_sessions(recipe_version_id);
             CREATE INDEX IF NOT EXISTS idx_mix_sessions_user_completed ON mix_sessions(user_id, completed_at);
             CREATE INDEX IF NOT EXISTS idx_tvw_admin_audit_created ON tvw_admin_audit_logs(created_at);
             CREATE INDEX IF NOT EXISTS idx_tvw_admin_audit_actor ON tvw_admin_audit_logs(actor_user_id, created_at);

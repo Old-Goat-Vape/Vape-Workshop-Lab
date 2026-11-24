@@ -101,7 +101,10 @@
       {% for item in help_recipes %}
       <a class="tvw-help-request" href="{{ item.detail_href }}#communityFeedback"><span><strong>{{ item.name }}</strong><span>{{ item.owner_username or 'A community mixer' }} · Help needed</span></span><span aria-hidden="true">→</span></a>
       {% else %}<p class="tvw-help-empty">No one needs a hand right now. When a mixer asks for help, you'll find their recipe here.</p>{% endfor %}
-      <a class="tvw-bench-text-link" href="{{ url_for('tvw_recipes.tvw_recipe_library', status='help') }}">View all help requests →</a>
+      <div class="d-flex flex-wrap gap-3">
+        <a class="tvw-bench-text-link" href="{{ url_for('tvw_recipes.tvw_recipe_library', status='help') }}">View all help requests →</a>
+        <a class="tvw-bench-text-link" href="https://thevapeworkshop.com/xf/">Visit the forum →</a>
+      </div>
     </section>
   </div>
   {% include "partials/tvw_discovery_section.html" %}
