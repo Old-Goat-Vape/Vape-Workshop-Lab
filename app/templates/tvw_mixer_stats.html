@@ -1,0 +1,54 @@
+{% extends "base_public.html" %}
+{% block title %}My Mixer Stats | The Vape Workshop Calculator{% endblock %}
+{% block content %}
+<div class="tvw-page pb-4">
+  <header class="mb-4">
+    <h1>My Mixer Stats</h1>
+    <p class="text-secondary mb-0">Your personal mixing activity and milestones.</p>
+  </header>
+
+  <div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6">
+      <dl class="card card-body h-100 mb-0">
+        <dt>Completed mixes</dt>
+        <dd class="display-6 mb-1">{{ completed_mixes }}</dd>
+        <dd class="mb-0 text-secondary">{{ activity.guided_mixes }} guided · {{ activity.quick_mixes }} quick</dd>
+      </dl>
+    </div>
+    <div class="col-12 col-sm-6">
+      <dl class="card card-body h-100 mb-0">
+        <dt>Recipes created</dt>
+        <dd class="display-6 mb-1">{{ activity.recipes_created }}</dd>
+        <dd class="mb-0 text-secondary">Your public and private recipes</dd>
+      </dl>
+    </div>
+  </div>
+
+  <section class="card mb-4" aria-labelledby="mixerLevel">
+    <div class="card-body">
+      <p class="text-secondary mb-1">Your mixer level</p>
+      <h2 class="h3" id="mixerLevel">{{ level }}</h2>
+      {% if next_milestone %}
+        <h3 class="h5 mt-4">Next milestone · {{ next_milestone.name }}</h3>
+        <label for="mixerMixProgress" class="d-block">
+          Completed mixes · {{ [completed_mixes, next_milestone.mix_goal]|min }} of {{ next_milestone.mix_goal }}
+        </label>
+        <progress class="w-100 mb-2" id="mixerMixProgress"
+                  value="{{ [completed_mixes, next_milestone.mix_goal]|min }}" max="{{ next_milestone.mix_goal }}"></progress>
+        <label for="mixerRecipeProgress" class="d-block">
+          Recipes created · {{ [activity.recipes_created, next_milestone.recipe_goal]|min }} of {{ next_milestone.recipe_goal }}
+        </label>
+        <progress class="w-100" id="mixerRecipeProgress"
+                  value="{{ [activity.recipes_created, next_milestone.recipe_goal]|min }}" max="{{ next_milestone.recipe_goal }}"></progress>
+      {% else %}
+        <p class="mb-0">You’ve reached the highest mixer level.</p>
+      {% endif %}
+    </div>
+  </section>
+
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-light" href="{{ url_for('tvw_recipes.tvw_my_mixes') }}">My mixes</a>
+    <a class="btn btn-outline-warning" href="{{ url_for('tvw_recipes.tvw_recipe_library', mine=1) }}">My recipes</a>
+  </div>
+</div>
+{% endblock %}

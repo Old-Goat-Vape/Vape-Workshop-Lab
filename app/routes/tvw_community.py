@@ -52,6 +52,37 @@ def community_feed():
     )
 
 
+# Progression is based on recorded personal activity, independent of account roles.
+_MIXER_MILESTONES = (
+    ("Apprentice", 3, 1),
+    ("Bench Regular", 10, 3),
+    ("Seasoned Mixer", 25, 5),
+)
+
+
+@tvw_community_bp.route("/my-mixer-stats")
+@login_required
+def mixer_stats():
+    activity = recipes_repo.fetch_mixer_activity_counts(int(session["user_id"]))
+    completed_mixes = activity["quick_mixes"] + activity["guided_mixes"]
+    recipes_created = activity["recipes_created"]
+    level = "Kid"
+    next_milestone = None
+    for name, mix_goal, recipe_goal in _MIXER_MILESTONES:
+        if completed_mixes >= mix_goal and recipes_created >= recipe_goal:
+            level = name
+        else:
+            next_milestone = {"name": name, "mix_goal": mix_goal, "recipe_goal": recipe_goal}
+            break
+    return render_template(
+        "tvw_mixer_stats.html",
+        activity=activity,
+        completed_mixes=completed_mixes,
+        level=level,
+        next_milestone=next_milestone,
+    ), 200, {"Cache-Control": "private, no-store"}
+
+
 @tvw_community_bp.route("/profile/<username>")
 @login_required
 def profile(username: str):
