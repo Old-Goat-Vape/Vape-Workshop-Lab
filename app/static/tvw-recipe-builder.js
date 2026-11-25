@@ -66,7 +66,12 @@
       menu.innerHTML = "";
     }
     if (input) input.setAttribute("aria-expanded", "false");
-    if (activeAcWrap === wrap) activeAcWrap = null;
+    if (activeAcWrap === wrap) {
+      clearTimeout(searchTimer);
+      searchTimer = null;
+      ++searchSeq;
+      activeAcWrap = null;
+    }
   };
 
   const updateRowBrand = (row, flavour) => {
@@ -166,17 +171,26 @@
     queueCalc();
   };
 
+  const openFlavorMenu = (wrap) => {
+    wrap.querySelector(".tvw-flavor-ac-menu").classList.remove("d-none");
+    wrap.querySelector(".flavor-input").setAttribute("aria-expanded", "true");
+  };
+
+  const renderFlavorMessage = (wrap, message) => {
+    const notice = document.createElement("div");
+    notice.className = "tvw-flavor-ac-empty";
+    notice.textContent = message;
+    wrap.querySelector(".tvw-flavor-ac-menu").replaceChildren(notice);
+    openFlavorMenu(wrap);
+  };
+
   const renderFlavorMenu = (wrap, query, items) => {
-    const menu = wrap.querySelector(".tvw-flavor-ac-menu");
-    const input = wrap.querySelector(".flavor-input");
-    menu.innerHTML = "";
     if (!items.length) {
-      menu.innerHTML = `<div class="tvw-flavor-ac-empty">No flavours found for '${String(query).replace(/</g, "&lt;")}'.</div>`;
-      menu.classList.remove("d-none");
-      input.setAttribute("aria-expanded", "true");
-      activeAcWrap = wrap;
+      renderFlavorMessage(wrap, "No flavours found for '" + query + "'.");
       return;
     }
+    const menu = wrap.querySelector(".tvw-flavor-ac-menu");
+    menu.replaceChildren();
     for (const f of items) {
       const btn = document.createElement("button");
       btn.type = "button";
@@ -184,40 +198,49 @@
       btn.setAttribute("role", "option");
       btn.dataset.id = String(f.id);
       btn.textContent = (f.suggestion ? "Similar spelling: " : "") + mkLabel(f);
-      btn.addEventListener("mousedown", (ev) => {
-        ev.preventDefault();
-        selectFlavor(wrap, f);
-      });
+      btn.addEventListener("mousedown", (ev) => ev.preventDefault());
+      btn.addEventListener("click", () => selectFlavor(wrap, f));
       menu.appendChild(btn);
     }
-    menu.classList.remove("d-none");
-    input.setAttribute("aria-expanded", "true");
-    activeAcWrap = wrap;
+    openFlavorMenu(wrap);
   };
 
-  const searchFlavours = async (wrap, query) => {
-    const q = String(query || "").trim();
-    if (q.length < 1) {
-      closeFlavorMenu(wrap);
-      return;
-    }
+  const scheduleFlavorSearch = (wrap, input, delay) => {
+    closeFlavorMenu(activeAcWrap);
+    const query = input.value.trim();
+    if (!query) return;
+
+    activeAcWrap = wrap;
     const seq = ++searchSeq;
-    try {
-      const res = await fetch(`/api/recipes/flavour-search?q=${encodeURIComponent(q)}&limit=100`, {
-        credentials: "same-origin",
-        headers: { Accept: "application/json" },
-      });
-      const body = await res.json();
-      if (seq !== searchSeq) return;
-      if (!res.ok) throw new Error(body.message || "Search failed");
-      const items = body.items || [];
-      for (const f of items) registerFlavor(f);
-      renderFlavorMenu(wrap, q, items);
-    } catch (e) {
-      if (seq !== searchSeq) return;
-      const menu = wrap.querySelector(".tvw-flavor-ac-menu");
-      menu.innerHTML = `<div class="tvw-flavor-ac-empty">${e.message || "Search failed"}</div>`;
-      menu.classList.remove("d-none");
+    const stillCurrent = () =>
+      seq === searchSeq && activeAcWrap === wrap && wrap.isConnected
+      && wrap.contains(document.activeElement) && input.value.trim() === query;
+
+    const search = async () => {
+      if (!stillCurrent()) return;
+      try {
+        const res = await fetch(`/api/recipes/flavour-search?q=${encodeURIComponent(query)}&limit=100`, {
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+        });
+        const body = await res.json();
+        if (!stillCurrent()) return;
+        if (!res.ok) throw new Error(body.message || "Search failed");
+        const items = body.items || [];
+        for (const f of items) registerFlavor(f);
+        renderFlavorMenu(wrap, query, items);
+      } catch (e) {
+        if (stillCurrent()) renderFlavorMessage(wrap, e.message || "Search failed");
+      }
+    };
+
+    if (delay) {
+      searchTimer = setTimeout(() => {
+        searchTimer = null;
+        search();
+      }, delay);
+    } else {
+      search();
     }
   };
 
@@ -228,11 +251,7 @@
     idEl.value = id > 0 ? String(id) : "";
     if (id <= 0) updateRowBrand(row, null);
     usageFor(row).select(id);
-    if (searchTimer) clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => {
-      activeAcWrap = wrap;
-      searchFlavours(wrap, input.value);
-    }, 120);
+    scheduleFlavorSearch(wrap, input, 120);
     queueCalc();
   };
 
@@ -241,16 +260,18 @@
     const input = row.querySelector(".flavor-input");
     if (!wrap || !input) return;
     input.addEventListener("input", () => onFlavorInput(wrap, input));
-    input.addEventListener("focus", () => {
-      const q = String(input.value || "").trim();
-      if (q.length >= 1) searchFlavours(wrap, q);
-    });
+    input.addEventListener("focus", () => scheduleFlavorSearch(wrap, input, 0));
     input.addEventListener("blur", () => {
       setTimeout(() => {
         if (!wrap.contains(document.activeElement)) closeFlavorMenu(wrap);
       }, 150);
     });
     input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape" && activeAcWrap === wrap) {
+        ev.preventDefault();
+        closeFlavorMenu(wrap);
+        return;
+      }
       const menu = wrap.querySelector(".tvw-flavor-ac-menu");
       const items = Array.from(menu.querySelectorAll(".tvw-flavor-ac-item"));
       if (!items.length) return;
@@ -266,9 +287,6 @@
         ev.preventDefault();
         const id = Number(items[idx].dataset.id || 0);
         if (id > 0 && byId.has(id)) selectFlavor(wrap, byId.get(id));
-        return;
-      } else if (ev.key === "Escape") {
-        closeFlavorMenu(wrap);
         return;
       } else {
         return;
@@ -509,7 +527,10 @@
   rowsWrap.addEventListener("click", (e) => {
     if (e.target.classList.contains("remove-row")) {
       const row = e.target.closest(".ingredient-row");
-      if (row) row.remove();
+      if (row) {
+        closeFlavorMenu(row.querySelector(".tvw-flavor-ac"));
+        row.remove();
+      }
       updateReviewSteep();
       if (!allRows().length) buildRow();
       queueCalc();
