@@ -390,6 +390,18 @@
       </div>
       <div class="modal-body">
         <p class="text-secondary">Help the mixer improve this recipe. Share what to change and why. Tasting notes for <strong>v{{ active_version.version_number }}</strong>. Visible items follow community moderation rules.</p>
+        {% if is_owner and st == 'HELP' and recipe_engagement.is_community_public %}
+          <details class="mb-3">
+            <summary>Prepare a Help Needed forum post</summary>
+            <label class="form-label mt-2" for="forumHelpDraft">Copy this draft, then add what you’d like help with.</label>
+            <textarea id="forumHelpDraft" class="form-control mb-2" rows="5" readonly>Help needed: {{ recipe.name }}
+
+I’d appreciate feedback on version {{ active_version.version_number }} of this recipe.
+
+{{ url_for('tvw_recipes.tvw_recipe_detail', slug=(recipe.slug or recipe.id), version_id=active_version.id, _external=True, _anchor='communityFeedback') }}</textarea>
+            <a href="https://thevapeworkshop.com/xf/forums/diy-e-liquid-calculators-recipes.130/" target="_blank" rel="noopener">Open DIY E-Liquid, Calculators &amp; Recipes</a>
+          </details>
+        {% endif %}
         <div class="row g-2 mb-2">
           <div class="col-12">
             <label class="form-label small text-secondary mb-0" for="feedback_body">Main message</label>
@@ -427,7 +439,15 @@
   <div class="tvw-rd-secondary-grid">
     <section class="tvw-rd-panel" id="recipeEngagementPanel">
       <p class="tvw-rd-panel-kicker">Community</p>
-      <h2 class="tvw-rd-panel-title">Rating &amp; favourites</h2>
+      <h2 class="tvw-rd-panel-title">Community activity</h2>
+      {% if recipe_engagement.is_community_public %}
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+          <button type="button" id="btnRecipeLike" class="btn btn-sm btn-outline-light{% if recipe_engagement.is_liked %} active{% endif %}" aria-pressed="{{ 'true' if recipe_engagement.is_liked else 'false' }}">Like recipe</button>
+          <span id="recipeLikeCount">{{ recipe_engagement.like_count }} {{ 'like' if recipe_engagement.like_count == 1 else 'likes' }}</span>
+          <span class="text-secondary" aria-hidden="true">·</span>
+          <span>Times mixed: {{ recipe_engagement.times_mixed }}</span>
+        </div>
+      {% endif %}
       <div class="tvw-rd-community-row">
         <div class="tvw-rd-rating-block" id="recipeAvgRatingLabel">
           {% if recipe_engagement.rating_count and recipe_engagement.avg_rating is not none %}
@@ -567,6 +587,8 @@
   const feedbackList = document.getElementById("feedbackList");
   const statusHistory = document.getElementById("statusHistory");
   const engagementHint = document.getElementById("recipeEngagementHint");
+  const btnRecipeLike = document.getElementById("btnRecipeLike");
+  const recipeLikeCount = document.getElementById("recipeLikeCount");
   const reportHint = document.getElementById("reportHint");
   const btnFavorite = document.getElementById("btnRecipeFavorite");
   const avgRatingLabel = document.getElementById("recipeAvgRatingLabel");
@@ -744,6 +766,27 @@
       selMyRating.value = mine === "" ? "" : mine;
     }
   };
+
+  btnRecipeLike?.addEventListener("click", async () => {
+    if (btnRecipeLike.disabled) return;
+    const liked = btnRecipeLike.getAttribute("aria-pressed") !== "true";
+    btnRecipeLike.disabled = true;
+    try {
+      const body = await apiJson(`/api/recipes/${recipeId}/like`, {
+        method: "POST",
+        body: JSON.stringify({ liked }),
+      });
+      btnRecipeLike.setAttribute("aria-pressed", String(body.is_liked));
+      btnRecipeLike.classList.toggle("active", body.is_liked);
+      const count = Number(body.like_count);
+      recipeLikeCount.textContent = `${count} ${count === 1 ? "like" : "likes"}`;
+      if (engagementHint) engagementHint.textContent = body.is_liked ? "Recipe liked." : "Like removed.";
+    } catch (err) {
+      if (engagementHint) engagementHint.textContent = err.message;
+    } finally {
+      btnRecipeLike.disabled = false;
+    }
+  });
 
   btnFavorite?.addEventListener("click", async () => {
     const next = btnFavorite.dataset.favorited !== "1";
@@ -1034,7 +1077,9 @@
     });
   });
 
-  renderFeedback();
+  renderFeedback().catch(() => {
+    feedbackList.textContent = "Comments couldn’t load. Reload the recipe to try again.";
+  });
   renderStatusHistory();
 })();
 </script>

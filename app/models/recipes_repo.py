@@ -1329,6 +1329,56 @@ def fetch_user_recipe_star_rating(*, user_id: int, recipe_id: int) -> int | None
     return int(round(float(row["rating"])))
 
 
+def is_public_community_recipe(recipe_id: int) -> bool:
+    predicate = tvw_recipe_public_list_predicate_sql("r")
+    return get_db().execute(
+        f"SELECT 1 FROM recipes r WHERE r.id = ? AND {predicate}", (recipe_id,)
+    ).fetchone() is not None
+
+
+def count_recorded_recipe_mixes(recipe_id: int) -> int:
+    """Count completed personal batches across versions, including confirmed Quick Mixes."""
+    row = get_db().execute(
+        """
+        SELECT COUNT(*) AS total
+        FROM recipe_versions rv
+        JOIN mix_sessions ms ON ms.recipe_version_id = rv.id
+        LEFT JOIN batch_steeping bs ON bs.session_id = ms.id
+        WHERE rv.recipe_id = ?
+          AND ms.user_id IS NOT NULL
+          AND ms.abandoned_at IS NULL
+          AND ms.production_job_id IS NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM production_job_batches pb WHERE pb.guided_mix_session_id = ms.id
+          )
+          AND (
+              (ms.mode = 'quick' AND bs.mixed_at IS NOT NULL)
+              OR (ms.mode = 'guided' AND ms.completed_at IS NOT NULL AND NOT EXISTS (
+                  SELECT 1 FROM mix_session_steps step
+                  WHERE step.mix_session_id = ms.id AND step.completed_at IS NULL
+              ))
+          )
+        """,
+        (recipe_id,),
+    ).fetchone()
+    return int(row["total"])
+
+
+def set_recipe_like(*, user_id: int, recipe_id: int, liked: bool) -> None:
+    db = get_db()
+    if liked:
+        db.execute(
+            "INSERT OR IGNORE INTO recipe_likes (recipe_id, user_id) VALUES (?, ?)",
+            (recipe_id, user_id),
+        )
+    else:
+        db.execute(
+            "DELETE FROM recipe_likes WHERE recipe_id = ? AND user_id = ?",
+            (recipe_id, user_id),
+        )
+    db.commit()
+
+
 def fetch_recipe_engagement_for_viewer(*, recipe_id: int, viewer_user_id: int | None) -> dict[str, Any]:
     agg = fetch_recipe_rating_aggregate(recipe_id=int(recipe_id))
     out: dict[str, Any] = {
@@ -1336,7 +1386,18 @@ def fetch_recipe_engagement_for_viewer(*, recipe_id: int, viewer_user_id: int | 
         "rating_count": agg["rating_count"],
         "is_favorited": False,
         "my_rating": None,
+        "is_community_public": is_public_community_recipe(recipe_id),
     }
+    if out["is_community_public"]:
+        likes = get_db().execute(
+            "SELECT COUNT(*) AS total, MAX(user_id = ?) AS liked FROM recipe_likes WHERE recipe_id = ?",
+            (viewer_user_id, recipe_id),
+        ).fetchone()
+        out.update(
+            like_count=int(likes["total"]),
+            is_liked=bool(likes["liked"]),
+            times_mixed=count_recorded_recipe_mixes(recipe_id),
+        )
     if viewer_user_id is not None:
         uid = int(viewer_user_id)
         out["is_favorited"] = is_recipe_favorited_by(user_id=uid, recipe_id=int(recipe_id))
