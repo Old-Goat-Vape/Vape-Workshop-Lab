@@ -52,7 +52,7 @@ def community_feed():
     )
 
 
-# Progression is based on recorded personal activity, independent of account roles.
+# Badges reflect recorded personal activity. Account roles are managed separately.
 _MIXER_MILESTONES = (
     ("Apprentice", 3, 1),
     ("Bench Regular", 10, 3),
@@ -66,11 +66,11 @@ def mixer_stats():
     activity = recipes_repo.fetch_mixer_activity_counts(int(session["user_id"]))
     completed_mixes = activity["quick_mixes"] + activity["guided_mixes"]
     recipes_created = activity["recipes_created"]
-    level = "Kid"
+    earned_badges = ["Kid"]
     next_milestone = None
     for name, mix_goal, recipe_goal in _MIXER_MILESTONES:
         if completed_mixes >= mix_goal and recipes_created >= recipe_goal:
-            level = name
+            earned_badges.append(name)
         else:
             next_milestone = {"name": name, "mix_goal": mix_goal, "recipe_goal": recipe_goal}
             break
@@ -78,7 +78,7 @@ def mixer_stats():
         "tvw_mixer_stats.html",
         activity=activity,
         completed_mixes=completed_mixes,
-        level=level,
+        earned_badges=earned_badges,
         next_milestone=next_milestone,
     ), 200, {"Cache-Control": "private, no-store"}
 

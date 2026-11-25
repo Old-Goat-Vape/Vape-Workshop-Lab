@@ -4,7 +4,7 @@
 <div class="tvw-page pb-4">
   <header class="mb-4">
     <h1>My Mixer Stats</h1>
-    <p class="text-secondary mb-0">Your personal mixing activity and milestones.</p>
+    <p class="text-secondary mb-0">Your personal mixing activity and badges.</p>
   </header>
 
   <div class="row g-3 mb-4">
@@ -24,12 +24,16 @@
     </div>
   </div>
 
-  <section class="card mb-4" aria-labelledby="mixerLevel">
+  <section class="card mb-4" aria-labelledby="mixerBadgesHeading">
     <div class="card-body">
-      <p class="text-secondary mb-1">Your mixer level</p>
-      <h2 class="h3" id="mixerLevel">{{ level }}</h2>
+      <h2 class="h4" id="mixerBadgesHeading">Earned badges</h2>
+      <ul class="d-flex flex-wrap gap-2 list-unstyled mb-0" id="mixerBadges">
+        {% for badge in earned_badges %}
+          <li><span class="badge rounded-pill fs-6 px-3 py-2 {{ 'text-bg-warning' if loop.last else 'text-bg-secondary' }}"{% if loop.last %} aria-current="true"{% endif %}>{{ badge }}</span></li>
+        {% endfor %}
+      </ul>
       {% if next_milestone %}
-        <h3 class="h5 mt-4">Next milestone · {{ next_milestone.name }}</h3>
+        <h3 class="h5 mt-4">Next badge · {{ next_milestone.name }}</h3>
         <label for="mixerMixProgress" class="d-block">
           Completed mixes · {{ [completed_mixes, next_milestone.mix_goal]|min }} of {{ next_milestone.mix_goal }}
         </label>
@@ -41,7 +45,7 @@
         <progress class="w-100" id="mixerRecipeProgress"
                   value="{{ [activity.recipes_created, next_milestone.recipe_goal]|min }}" max="{{ next_milestone.recipe_goal }}"></progress>
       {% else %}
-        <p class="mb-0">You’ve reached the highest mixer level.</p>
+        <p class="mt-3 mb-0">You’ve earned every mixer badge.</p>
       {% endif %}
     </div>
   </section>

@@ -51,16 +51,21 @@ class MixerStatsTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("no-store", response.headers["Cache-Control"])
         page = BeautifulSoup(response.data, "html.parser")
-        self.assertEqual(page.select_one("#mixerLevel").get_text(strip=True), "Apprentice")
+        badges = page.select('#mixerBadges .badge')
+        self.assertEqual([badge.get_text(strip=True) for badge in badges], ["Kid", "Apprentice"])
+        self.assertEqual(badges[-1]["aria-current"], "true")
+        self.assertIn("Next badge · Bench Regular", page.get_text(" ", strip=True))
         self.assertEqual(page.select_one("#mixerMixProgress")["value"], "3")
         self.assertEqual(page.select_one("#mixerMixProgress")["max"], "10")
         with base.flask_app.app_context():
             self.assertEqual(users_repo.fetch_user_role(1), "member")
 
-    def test_new_mixer_starts_at_kid_and_signed_out_requests_redirect(self):
+    def test_new_mixer_gets_kid_badge_and_signed_out_requests_redirect(self):
         response = self.client.get("/my-mixer-stats")
         page = BeautifulSoup(response.data, "html.parser")
-        self.assertEqual(page.select_one("#mixerLevel").get_text(strip=True), "Kid")
+        badges = page.select('#mixerBadges .badge')
+        self.assertEqual([badge.get_text(strip=True) for badge in badges], ["Kid"])
+        self.assertIn("Next badge · Apprentice", page.get_text(" ", strip=True))
         self.assertEqual(page.select_one("#mixerMixProgress")["value"], "0")
         with self.client.session_transaction() as session:
             session.clear()
