@@ -275,6 +275,8 @@ def inject_global_data():
         "pending_flavour_requests": 0,
     }
     if "user_id" in session:
+        from services.member_notification_service import unread_count
+        data["unread_notification_count"] = unread_count(int(session["user_id"]))
         role = session.get("role")
         data["user"] = {
             "username": session.get("username"),

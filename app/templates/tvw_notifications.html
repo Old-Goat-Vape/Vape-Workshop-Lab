@@ -1,0 +1,49 @@
+{% extends "base_public.html" %}
+{% block title %}Notifications | The Vape Workshop{% endblock %}
+{% block content %}
+<section class="tvw-page">
+  <header class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <h1 class="h3 mb-0">Notifications</h1>
+    {% if unread_notification_count %}
+      <form method="post" action="{{ url_for('tvw_community.notifications') }}">
+        <input type="hidden" name="notification_token" value="{{ notification_token }}">
+        <button class="btn btn-outline-light" name="action" value="read_all">Mark all as read</button>
+      </form>
+    {% endif %}
+  </header>
+
+  {% if items %}
+    <ul class="list-group mb-3">
+      {% for item in items %}
+        <li class="list-group-item d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <div class="text-break">
+            {% if item.kind == 'recipe_shared' %}
+              <div>{{ item.actor or 'A mixer' }} shared <strong>{{ item.title }}</strong> with you.</div>
+            {% else %}
+              <div><strong>{{ item.title }}</strong> reached its planned steep time.</div>
+            {% endif %}
+            {% if item.occurred_at %}<time class="small text-secondary" datetime="{{ item.occurred_at|replace(' ', 'T') }}Z">{{ item.occurred_at[:10] }}</time>{% endif %}
+            {% if item.unread %}<span class="badge text-bg-warning ms-1">Unread</span>{% endif %}
+          </div>
+          <form method="post" action="{{ url_for('tvw_community.notifications') }}">
+            <input type="hidden" name="notification_token" value="{{ notification_token }}">
+            <input type="hidden" name="kind" value="{{ item.kind }}">
+            <input type="hidden" name="event_key" value="{{ item.event_key }}">
+            <button class="btn btn-outline-light" name="action" value="open">{{ 'Open recipe' if item.kind == 'recipe_shared' else 'Open batch' }}</button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>You have no notifications yet.</p>
+  {% endif %}
+
+  {% if page > 1 or has_next %}
+    <nav class="d-flex align-items-center gap-2" aria-label="Notification pages">
+      {% if page > 1 %}<a class="btn btn-outline-light" href="{{ url_for('tvw_community.notifications', page=page-1) }}">Previous</a>{% endif %}
+      <span>Page {{ page }}</span>
+      {% if has_next %}<a class="btn btn-outline-light" href="{{ url_for('tvw_community.notifications', page=page+1) }}">Next</a>{% endif %}
+    </nav>
+  {% endif %}
+</section>
+{% endblock %}
