@@ -87,6 +87,42 @@ def fetch(request_id):
     return get_db().execute("SELECT * FROM flavour_requests WHERE id = ?", (request_id,)).fetchone()
 
 
+def search_matches(item, search, *, page, page_size):
+    """Search all eligible catalogue rows and prioritize the requested identity."""
+    _, _, requested_key = canonical_item(item["brand"], item["name"])
+    params = {
+        "exact_key": requested_key,
+        "search": search,
+        "include_exact": search.casefold() == item["name"].casefold(),
+        "fuzzy": 0,
+    }
+    identity = "tvw_catalogue_key(f.brand, f.canonical_name, f.category) = :exact_key"
+    score = "tvw_flavour_search_score(f.brand, f.canonical_name, :search, :fuzzy)"
+    matching = f"""
+        FROM flavours f
+        WHERE {visible_flavour_sql('f')}
+          AND ({score} > 0 OR (:include_exact AND {identity}))
+    """
+    db = get_db()
+    total = db.execute("SELECT COUNT(*) " + matching, params).fetchone()[0]
+    if not total:
+        params["fuzzy"] = 1
+        total = db.execute("SELECT COUNT(*) " + matching, params).fetchone()[0]
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    page = min(page, total_pages)
+    rows = db.execute(
+        f"""
+        SELECT f.id, f.brand, f.canonical_name, COALESCE({identity}, 0) AS exact_match
+        {matching}
+        ORDER BY exact_match DESC, {score} DESC, f.canonical_name COLLATE NOCASE,
+                 f.brand COLLATE NOCASE, f.id
+        LIMIT :limit OFFSET :offset
+        """,
+        {**params, "limit": page_size, "offset": (page - 1) * page_size},
+    ).fetchall()
+    return rows, total, page, total_pages, bool(params["fuzzy"] and total)
+
+
 def _create_flavour(db, request):
     brand, name, key = canonical_item(request["brand"], request["name"])
     if not recipe_product_allowed(brand, name, "Flavor"):

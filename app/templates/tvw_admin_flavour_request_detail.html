@@ -17,24 +17,44 @@
     <form class="mb-3 d-flex flex-wrap align-items-end gap-2" method="get">
       <div>
         <label class="form-label" for="requestMatchSearch">Search the catalogue</label>
-        <input class="form-control" id="requestMatchSearch" name="search" value="{{ search }}" maxlength="160" required>
+        <input class="form-control" id="requestMatchSearch" name="search" value="{{ search }}" maxlength="160" placeholder="e.g. FLV Cream" required>
       </div>
       <button type="submit" class="btn btn-outline-light">Search</button>
     </form>
     {% if matches %}
-      <form method="post" class="d-flex flex-wrap align-items-end gap-2">
+      <p role="status" class="mb-2">
+        Showing {{ first_match }}–{{ last_match }} of {{ total }} {{ 'similar spellings' if suggestions else 'matches' }}.
+      </p>
+      <form method="post">
         <input type="hidden" name="review_token" value="{{ review_token }}">
-        <div>
-          <label class="form-label" for="requestMatch">Matching flavour</label>
-          <select class="form-select" name="flavour_id" id="requestMatch" required>
-            <option value="">Choose a flavour</option>
+        <fieldset>
+          <legend class="h6">Choose a matching flavour</legend>
+          <div class="list-group mb-3 overflow-auto" style="max-height: 22rem;">
             {% for flavour in matches %}
-              <option value="{{ flavour.id }}">{{ flavour.brand }} · {{ flavour.canonical_name }} (#{{ flavour.id }})</option>
+              <label class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2">
+                <input class="form-check-input flex-shrink-0 mt-0" type="radio" name="flavour_id" value="{{ flavour.id }}" required>
+                <span class="text-break">
+                  {{ flavour.brand }} · {{ flavour.canonical_name }}
+                  <span class="small text-secondary">(#{{ flavour.id }})</span>
+                  {% if flavour.exact_match %}<span class="badge text-bg-warning ms-1">Exact match</span>{% endif %}
+                </span>
+              </label>
             {% endfor %}
-          </select>
-        </div>
+          </div>
+        </fieldset>
         <button class="btn btn-outline-warning" name="action" value="match">Mark as existing</button>
       </form>
+      {% if total_pages > 1 %}
+        <nav class="d-flex flex-wrap align-items-center gap-2 mt-3" aria-label="Catalogue search pages">
+          {% if page > 1 %}
+            <a class="btn btn-outline-light" href="{{ url_for('tvw_admin.review_flavour_request', request_id=item.id, search=search, page=page-1) }}">Previous</a>
+          {% endif %}
+          <span>Page {{ page }} of {{ total_pages }}</span>
+          {% if page < total_pages %}
+            <a class="btn btn-outline-light" href="{{ url_for('tvw_admin.review_flavour_request', request_id=item.id, search=search, page=page+1) }}">Next</a>
+          {% endif %}
+        </nav>
+      {% endif %}
     {% else %}
       <p class="text-secondary mb-0">No visible catalogue flavours match this search.</p>
     {% endif %}
