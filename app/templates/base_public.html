@@ -1,3 +1,4 @@
+{% set tvw_forum_url = "https://thevapeworkshop.com/xf/" %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -36,13 +37,16 @@
     <header class="tvw-app-header" id="tvwAppHeader">
         <div class="tvw-shell tvw-header-inner">
             <a class="tvw-brand" href="{{ url_for('tvw_community.community_feed') }}">The Vape Workshop</a>
-            <button type="button"
-                    class="tvw-nav-toggle"
-                    id="tvwNavToggle"
-                    aria-expanded="false"
-                    aria-controls="tvwHeaderNav tvwHeaderActions">
-                Menu
-            </button>
+            <div class="tvw-header-shortcuts">
+                <a class="tvw-nav-link tvw-header-forum" href="{{ tvw_forum_url }}" aria-label="The Vape Workshop forum">Forum</a>
+                <button type="button"
+                        class="tvw-nav-toggle"
+                        id="tvwNavToggle"
+                        aria-expanded="false"
+                        aria-controls="tvwHeaderNav tvwHeaderActions">
+                    Menu
+                </button>
+            </div>
             <nav class="tvw-header-nav" id="tvwHeaderNav" aria-label="Main navigation">
                 <a class="tvw-nav-link{% if nav_home_active %} is-active{% endif %}"
                    href="{{ url_for('tvw_community.community_feed') }}"
