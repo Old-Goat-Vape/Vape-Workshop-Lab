@@ -12,7 +12,15 @@
         .lab-return-link { min-height: 44px; display: inline-flex; align-items: center; }
         @media(max-width:575px) { .navbar > .container-fluid { flex-wrap: wrap; gap: .5rem; } .navbar .ms-auto { width: 100%; flex-wrap: wrap; } .lab-return-link { flex: 1 1 100%; order: -1; } }
         .app-shell { display: flex; min-height: 100vh; }
-        .flash-messages { position: fixed; top: 1rem; right: 1rem; z-index: 10000; width: min(420px, calc(100vw - 2rem)); }
+        .lab-navbar .flash-messages {
+            position: absolute;
+            top: 100%;
+            right: 1rem;
+            width: min(420px, calc(100vw - 2rem));
+            margin: .5rem 0 0;
+            padding: 0;
+            pointer-events: none;
+        }
         .table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
     </style>
 </head>
@@ -64,7 +72,7 @@
 
     <div class="flex-grow-1 d-flex flex-column min-vw-0">
         <!-- Mobile navbar -->
-        <nav class="navbar navbar-expand-lg border-bottom sticky-top">
+        <nav class="lab-navbar navbar navbar-expand-lg border-bottom sticky-top">
             <div class="container-fluid">
                 <button class="btn btn-outline-secondary d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasNav" aria-controls="offcanvasNav">
                     Menu
@@ -79,6 +87,19 @@
                     {% endif %}
                 </div>
             </div>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-messages">
+                        {% for category, message in messages %}
+                            {% if category in ['danger','error'] %}{% set bs = 'danger' %}
+                            {% elif category in ['warning'] %}{% set bs = 'warning' %}
+                            {% elif category in ['success'] %}{% set bs = 'success' %}
+                            {% else %}{% set bs = 'info' %}{% endif %}
+                            <div class="alert alert-{{ bs }} flash py-2 px-3 mb-2" role="alert">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
         </nav>
 
         <!-- Mobile offcanvas nav -->
@@ -104,20 +125,6 @@
                 </div>
             </div>
         </div>
-
-    <div class="flash-messages">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    {% set bs = 'info' %}
-                    {% if category in ['danger','error'] %}{% set bs = 'danger' %}{% endif %}
-                    {% if category in ['warning'] %}{% set bs = 'warning' %}{% endif %}
-                    {% if category in ['success'] %}{% set bs = 'success' %}{% endif %}
-                    <div class="alert alert-{{ bs }} flash py-2 px-3 mb-2" role="alert">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-    </div>
 
     <div id="modal-overlay">
         <div id="modal-content"></div>
