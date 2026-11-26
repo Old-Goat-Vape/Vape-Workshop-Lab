@@ -113,6 +113,20 @@ body[data-bs-theme="dark"] {
   border-radius: var(--tvw-radius-control);
 }
 
+.tvw-header-shortcuts {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 0.5rem;
+}
+
+.tvw-nav-link.tvw-header-forum {
+  width: auto;
+  padding-inline: 0.75rem;
+  color: var(--tvw-accent-orange);
+  border-color: var(--tvw-border-subtle);
+}
+
 .tvw-nav-toggle {
   display: none;
   margin-left: auto;
@@ -300,6 +314,15 @@ body[data-bs-theme="dark"] {
 }
 
 @media (max-width: 991px) {
+  .tvw-header-inner {
+    gap: 0.5rem;
+  }
+
+  .tvw-brand {
+    flex: 1 1 min-content;
+    font-size: clamp(1rem, 4.4vw, 1.375rem);
+  }
+
   .tvw-nav-toggle {
     display: inline-flex;
     align-items: center;
