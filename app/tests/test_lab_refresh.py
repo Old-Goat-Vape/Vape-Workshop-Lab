@@ -69,7 +69,13 @@ class LabRefreshTests(unittest.TestCase):
         self.assertIn('Schedule details and diagnostics',page.get_text())
         technical=next(d for d in page.find_all('details') if d.summary and 'Technical run history' in d.summary.get_text())
         self.assertFalse(technical.has_attr('open'))
-        with self.client.session_transaction() as state:state.update(user_id=1,role='member',username='member1')
+        return_href = page.select_one('.lab-return-link')['href']
+        calculator = self.client.get(return_href)
+        self.assertEqual(calculator.status_code, 200)
+        self.assertIn(b'Welcome back, Old Goat', calculator.data)
+        with self.client.session_transaction() as state:
+            state.clear()
+            state.update(user_id=1, role='member', username='member1')
         self.assertEqual(self.client.get('/master-admin').status_code,302)
 
     def test_tvw_dashboard_photo_in_both_mix_states(self):
