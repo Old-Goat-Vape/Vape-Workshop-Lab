@@ -1,0 +1,32 @@
+{% extends "base_public.html" %}
+{% block title %}Flavour requests | TVW Admin{% endblock %}
+{% block content %}
+<section class="tvw-page">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">Flavour requests</h1>
+    <a class="btn btn-outline-light" href="{{ url_for('tvw_admin.flavour_moderation') }}">Flavour Moderation</a>
+  </div>
+  {% if rows %}
+    <ul class="list-group mb-3">
+      {% for item in rows %}
+        <li class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <div class="text-break">
+            <strong>{{ item.brand }} · {{ item.name }}</strong>
+            <div class="small text-secondary">{{ item.username or 'Former member' }} · {{ item.created_at[:10] }}</div>
+          </div>
+          <a class="btn btn-outline-warning" href="{{ url_for('tvw_admin.review_flavour_request', request_id=item.id) }}">Review request</a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No flavour requests awaiting review.</p>
+  {% endif %}
+  {% if total_pages > 1 %}
+    <nav class="d-flex align-items-center gap-2" aria-label="Request pages">
+      {% if page > 1 %}<a class="btn btn-outline-light" href="{{ url_for('tvw_admin.flavour_requests', page=page-1) }}">Previous</a>{% endif %}
+      <span>Page {{ page }} of {{ total_pages }}</span>
+      {% if page < total_pages %}<a class="btn btn-outline-light" href="{{ url_for('tvw_admin.flavour_requests', page=page+1) }}">Next</a>{% endif %}
+    </nav>
+  {% endif %}
+</section>
+{% endblock %}

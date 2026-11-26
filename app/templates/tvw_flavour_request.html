@@ -1,0 +1,42 @@
+{% extends "base_public.html" %}
+{% block title %}Request a flavour | The Vape Workshop{% endblock %}
+{% block content %}
+<section class="tvw-page">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">Request a flavour</h1>
+    <a class="btn btn-outline-light" href="{{ url_for('tvw_recipes.tvw_flavours') }}">Flavour Library</a>
+  </div>
+  <form class="card card-body mb-4" method="post" action="{{ url_for('tvw_recipes.tvw_flavour_request') }}">
+    <p>Send a missing flavour to the catalogue admins for review.</p>
+    {% if error %}<p class="alert alert-warning" role="alert">{{ error }}</p>{% endif %}
+    <input type="hidden" name="request_token" value="{{ request_token }}">
+    <div class="row g-3">
+      <div class="col-md-5">
+        <label class="form-label" for="requestBrand">Brand</label>
+        <input class="form-control" id="requestBrand" name="brand" value="{{ values.brand }}" maxlength="100" required>
+      </div>
+      <div class="col-md-7">
+        <label class="form-label" for="requestName">Flavour name</label>
+        <input class="form-control" id="requestName" name="name" value="{{ values.name }}" maxlength="160" required>
+      </div>
+      <div class="col-12">
+        <label class="form-label" for="requestProductUrl">Product link <span class="text-secondary">(optional)</span></label>
+        <input class="form-control" id="requestProductUrl" name="product_url" type="url" value="{{ values.product_url }}" maxlength="500">
+      </div>
+    </div>
+    <div class="mt-3"><button class="btn btn-warning" type="submit">Send request</button></div>
+  </form>
+
+  {% if recent_requests %}
+  <h2 class="h5">Your recent requests</h2>
+  <ul class="list-group">
+    {% for item in recent_requests %}
+      <li class="list-group-item d-flex flex-wrap justify-content-between gap-2">
+        <span class="text-break">{{ item.brand }} · {{ item.name }}</span>
+        <span>{{ {'pending': 'Awaiting review', 'added': 'Added to catalogue', 'matched': 'Already in catalogue', 'declined': 'Declined'}[item.status] }}</span>
+      </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+{% endblock %}

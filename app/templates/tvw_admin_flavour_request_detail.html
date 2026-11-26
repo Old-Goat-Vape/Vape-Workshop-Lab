@@ -1,0 +1,52 @@
+{% extends "base_public.html" %}
+{% block title %}Review flavour request | TVW Admin{% endblock %}
+{% block content %}
+<section class="tvw-page">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">Review flavour request</h1>
+    <a class="btn btn-outline-light" href="{{ url_for('tvw_admin.flavour_requests') }}">Flavour requests</a>
+  </div>
+  <h2 class="h5 text-break">{{ item.brand }} · {{ item.name }}</h2>
+  {% if item.product_url %}
+    <p><a href="{{ item.product_url }}" target="_blank" rel="noopener noreferrer">Open submitted product link</a></p>
+  {% endif %}
+
+  {% if item.status == 'pending' %}
+  <section class="card card-body mb-3">
+    <h3 class="h6">Match an existing flavour</h3>
+    <form class="mb-3 d-flex flex-wrap align-items-end gap-2" method="get">
+      <div>
+        <label class="form-label" for="requestMatchSearch">Search the catalogue</label>
+        <input class="form-control" id="requestMatchSearch" name="search" value="{{ search }}" maxlength="160" required>
+      </div>
+      <button type="submit" class="btn btn-outline-light">Search</button>
+    </form>
+    {% if matches %}
+      <form method="post" class="d-flex flex-wrap align-items-end gap-2">
+        <input type="hidden" name="review_token" value="{{ review_token }}">
+        <div>
+          <label class="form-label" for="requestMatch">Matching flavour</label>
+          <select class="form-select" name="flavour_id" id="requestMatch" required>
+            <option value="">Choose a flavour</option>
+            {% for flavour in matches %}
+              <option value="{{ flavour.id }}">{{ flavour.brand }} · {{ flavour.canonical_name }} (#{{ flavour.id }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button class="btn btn-outline-warning" name="action" value="match">Mark as existing</button>
+      </form>
+    {% else %}
+      <p class="text-secondary mb-0">No visible catalogue flavours match this search.</p>
+    {% endif %}
+  </section>
+  <form method="post" class="d-flex flex-wrap gap-2">
+    <input type="hidden" name="review_token" value="{{ review_token }}">
+    <button class="btn btn-warning" name="action" value="add">Approve and add to catalogue</button>
+    <button class="btn btn-outline-danger" name="action" value="decline">Decline request</button>
+  </form>
+  {% else %}
+    <p>{{ {'added': 'Added to catalogue', 'matched': 'Matched to an existing flavour', 'declined': 'Declined'}[item.status] }}</p>
+    {% if item.flavour_id %}<a href="{{ url_for('tvw_recipes.tvw_flavour_detail', flavour_id=item.flavour_id) }}">Open flavour</a>{% endif %}
+  {% endif %}
+</section>
+{% endblock %}

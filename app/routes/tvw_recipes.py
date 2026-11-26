@@ -12,7 +12,7 @@ from flask import Blueprint, abort, current_app, flash, redirect, render_templat
 
 from db import SQLITE_BUSY_USER_MESSAGE, is_sqlite_busy_error, sqlite_retry
 from models import recipes_repo, users_repo
-from services import guided_mix_session_service
+from services import flavour_request_service, guided_mix_session_service
 from services import guided_mix_start_service
 from services import recipe_library_discovery_service
 from services import recipe_library_presentation, recognition_service
@@ -1015,6 +1015,38 @@ def tvw_recipe_save():
             "Could not save recipe. Please try again. "
             f"(Reference {req_id})"
         )
+
+
+@tvw_recipes_bp.route("/flavours/request", methods=["GET", "POST"])
+@login_required
+def tvw_flavour_request():
+    user_id = int(session["user_id"])
+    values = {"brand": "", "name": request.args.get("name", "").strip()[:160], "product_url": ""}
+    error = None
+    if request.method == "POST":
+        token = request.form.get("request_token", "").encode()
+        expected = session.get("flavour_request_token", "").encode()
+        if not expected or not secrets.compare_digest(token, expected) or users_repo.user_is_muted(user_id):
+            abort(403)
+        values = {field: request.form.get(field, "").strip() for field in values}
+        try:
+            submitted = sqlite_retry(lambda: flavour_request_service.submit(user_id, **values))
+        except ValueError as exc:
+            error = str(exc)
+        else:
+            if submitted:
+                flash("Flavour request sent to the catalogue admins.", "success")
+            else:
+                flash("This flavour is already awaiting review.", "info")
+            return redirect(url_for(".tvw_flavour_request"), code=303)
+
+    if "flavour_request_token" not in session:
+        session["flavour_request_token"] = secrets.token_urlsafe(32)
+    return render_template(
+        "tvw_flavour_request.html", values=values, error=error,
+        request_token=session["flavour_request_token"],
+        recent_requests=flavour_request_service.member_requests(user_id),
+    ), 400 if error else 200
 
 
 @tvw_recipes_bp.route("/flavours")

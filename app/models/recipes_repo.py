@@ -328,10 +328,10 @@ def fetch_recipes_library_page(
     return [dict(r) for r in rows], total_count
 
 @contextmanager
-def transaction():
+def transaction(*, immediate: bool = False):
     db = get_db()
     try:
-        db.execute("BEGIN")
+        db.execute("BEGIN IMMEDIATE" if immediate else "BEGIN")
         yield db
         db.commit()
     except Exception:

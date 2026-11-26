@@ -98,6 +98,11 @@
     {% endif %}
     <main id="mainContent" class="tvw-main min-vh-100 d-flex flex-column py-4">
         <div class="tvw-shell">
+            {% if pending_flavour_requests %}
+              <aside class="alert alert-warning" id="flavourRequestNotice" role="status">
+                <a class="alert-link" href="{{ url_for('tvw_admin.flavour_requests') }}">{{ pending_flavour_requests }} flavour request{{ 's' if pending_flavour_requests != 1 else '' }} awaiting review</a>
+              </aside>
+            {% endif %}
             {% if steeping_reminders %}<aside class="alert alert-info" role="status"><strong>Time for a tasting check.</strong> {{ steeping_reminders }} batch{{ 'es' if steeping_reminders != 1 else '' }} reached your planned steep time. <a class="alert-link" href="{{ url_for('tvw_recipes.tvw_steeping_shelf') }}">Open my steeping shelf →</a></aside>{% endif %}
             {% with messages = get_flashed_messages(with_categories=true) %}
               {% if messages %}
