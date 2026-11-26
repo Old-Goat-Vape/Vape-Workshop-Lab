@@ -6,7 +6,7 @@
 <div class="tvw-page flavour-workshop">
 <header class="flavour-hero">
   <div><p class="flavour-eyebrow">Your flavour shelf</p><h1>Find your next great mix.</h1><p>Explore the flavours. See what you own. Find out how mixers use them.</p>
-  <div class="d-flex flex-wrap gap-2"><a class="btn btn-warning" href="{{ url_for('tvw_recipes.tvw_stash') }}">My stash</a><a class="btn btn-outline-light" href="{{ url_for('tvw_recipes.tvw_what_can_i_make') }}">What can I make?</a></div></div>
+  <div class="d-flex flex-wrap gap-2"><a class="btn btn-warning" href="{{ url_for('tvw_recipes.tvw_stash') }}">My stash</a><a class="btn btn-outline-light" href="{{ url_for('tvw_recipes.tvw_what_can_i_make') }}">What can I make?</a><a class="btn btn-outline-light" href="{{ url_for('tvw_recipes.tvw_flavour_request') }}">Request a flavour</a></div></div>
   <img src="{{ url_for('static',filename='img/dashboard/flavour-inspiration.webp') }}" alt="Amber flavour bottles on the mixing bench" width="960" height="540" fetchpriority="high">
 </header>
 <form class="flavour-filters" method="get" action="{{ url_for('tvw_recipes.tvw_flavours') }}" role="search" aria-label="Find flavours">

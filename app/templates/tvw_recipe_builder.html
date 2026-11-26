@@ -282,6 +282,7 @@
     defaultArtwork: {{ recipe_artwork()|tojson }},
     draftKey: {{ ('tvw-recipe-draft:' ~ session.get('user_id') ~ ':' ~ (recipe.id if recipe else ('new-practice' if practice_mode else 'new')))|tojson }},
     flavourCatalog: {{ flavour_options|tojson }},
+    flavourRequestUrl: {{ url_for('tvw_recipes.tvw_flavour_request')|tojson }},
     initialRows: [
       {% if flavour_rows %}
         {% for row in flavour_rows %}

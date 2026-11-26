@@ -57,6 +57,7 @@ def insert_admin_audit_log(
     target_id: int | None,
     reason: str = "",
     details: dict[str, Any] | None = None,
+    commit: bool = True,
 ) -> None:
     db = get_db()
     db.execute(
@@ -75,7 +76,8 @@ def insert_admin_audit_log(
             json.dumps(details or {}),
         ),
     )
-    db.commit()
+    if commit:
+        db.commit()
 
 
 def list_flavour_moderation_rows(

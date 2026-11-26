@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import secrets
 import sqlite3
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
 
 from db import SQLITE_BUSY_USER_MESSAGE, is_sqlite_busy_error, sqlite_retry
-from models import tvw_admin_repo, tvw_reports_repo
+from models import recipes_repo, tvw_admin_repo, tvw_reports_repo
+from services import flavour_request_service
 from utils.auth import (
     can_access_tvw_admin,
     can_perform_destructive_tvw_admin_actions,
@@ -66,6 +68,54 @@ def flavour_moderation():
         status=status,
         manufacturers=manufacturers,
         can_destructive=can_perform_destructive_tvw_admin_actions(session.get("role")),
+    )
+
+
+@tvw_admin_bp.get("/flavours/requests")
+@login_required
+def flavour_requests():
+    _require_tvw_admin()
+    page = max(1, request.args.get("page", 1, type=int))
+    page_size = 30
+    pending = flavour_request_service.pending_count()
+    total_pages = max(1, (pending + page_size - 1) // page_size)
+    page = min(page, total_pages)
+    return render_template(
+        "tvw_admin_flavour_requests.html", rows=flavour_request_service.pending_requests(page, page_size),
+        page=page, total_pages=total_pages,
+    )
+
+
+@tvw_admin_bp.route("/flavours/requests/<int:request_id>", methods=["GET", "POST"])
+@login_required
+def review_flavour_request(request_id):
+    role = _require_tvw_admin()
+    item = flavour_request_service.fetch(request_id)
+    if not item:
+        abort(404)
+    if request.method == "POST":
+        token = request.form.get("review_token", "").encode()
+        expected = session.get("flavour_review_token", "").encode()
+        if not expected or not secrets.compare_digest(token, expected):
+            abort(403)
+        try:
+            sqlite_retry(lambda: flavour_request_service.review(
+                request_id, int(session["user_id"]), str(role),
+                request.form.get("action"), request.form.get("flavour_id", type=int),
+            ))
+        except ValueError as exc:
+            flash(str(exc), "warning")
+            return redirect(url_for(".review_flavour_request", request_id=request_id), code=303)
+        flash("Flavour request reviewed.", "success")
+        return redirect(url_for(".flavour_requests"), code=303)
+
+    if "flavour_review_token" not in session:
+        session["flavour_review_token"] = secrets.token_urlsafe(32)
+    search = request.args.get("search", item["name"]).strip()[:160]
+    matches, _ = recipes_repo.fetch_tvw_flavours(search=search, page_size=20) if search and item["status"] == "pending" else ([], 0)
+    return render_template(
+        "tvw_admin_flavour_request_detail.html", item=item, matches=matches, search=search,
+        review_token=session["flavour_review_token"],
     )
 
 

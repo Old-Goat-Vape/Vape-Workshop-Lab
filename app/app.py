@@ -272,6 +272,7 @@ def inject_global_data():
         "can_access_production_jobs": False,
         "can_access_tvw_admin": False,
         "steeping_reminders": 0,
+        "pending_flavour_requests": 0,
     }
     if "user_id" in session:
         role = session.get("role")
@@ -285,6 +286,9 @@ def inject_global_data():
             role, session.get("user_id")
         )
         data["can_access_tvw_admin"] = can_access_tvw_admin(role)
+        if data["can_access_tvw_admin"]:
+            from services.flavour_request_service import pending_count
+            data["pending_flavour_requests"] = pending_count()
         from services.batch_steeping_service import due_count
         data['steeping_reminders']=due_count(int(session['user_id']))
     return data

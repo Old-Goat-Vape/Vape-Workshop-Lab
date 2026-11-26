@@ -180,16 +180,30 @@
     const notice = document.createElement("div");
     notice.className = "tvw-flavor-ac-empty";
     notice.textContent = message;
-    wrap.querySelector(".tvw-flavor-ac-menu").replaceChildren(notice);
+    const menu = wrap.querySelector(".tvw-flavor-ac-menu");
+    menu.removeAttribute("role");
+    menu.replaceChildren(notice);
     openFlavorMenu(wrap);
   };
 
   const renderFlavorMenu = (wrap, query, items) => {
     if (!items.length) {
       renderFlavorMessage(wrap, "No flavours found for '" + query + "'.");
+      if (cfg.flavourRequestUrl) {
+        const url = new URL(cfg.flavourRequestUrl, window.location.href);
+        url.searchParams.set("name", query);
+        const requestLink = document.createElement("a");
+        requestLink.className = "d-block mt-1 link-warning";
+        requestLink.href = url.href;
+        requestLink.target = "_blank";
+        requestLink.rel = "noopener";
+        requestLink.textContent = "Request a flavour";
+        wrap.querySelector(".tvw-flavor-ac-empty").appendChild(requestLink);
+      }
       return;
     }
     const menu = wrap.querySelector(".tvw-flavor-ac-menu");
+    menu.setAttribute("role", "listbox");
     menu.replaceChildren();
     for (const f of items) {
       const btn = document.createElement("button");
@@ -261,7 +275,7 @@
     if (!wrap || !input) return;
     input.addEventListener("input", () => onFlavorInput(wrap, input));
     input.addEventListener("focus", () => scheduleFlavorSearch(wrap, input, 0));
-    input.addEventListener("blur", () => {
+    wrap.addEventListener("focusout", () => {
       setTimeout(() => {
         if (!wrap.contains(document.activeElement)) closeFlavorMenu(wrap);
       }, 150);
