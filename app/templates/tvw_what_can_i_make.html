@@ -133,7 +133,17 @@
                         <li>
                           {% if m.flavour_id %}
                             <a class="text-decoration-none" href="{{ url_for('tvw_recipes.tvw_flavour_detail', flavour_id=m.flavour_id) }}">{{ m.brand }} — {{ m.name }}</a>
-                            <button type="button" class="btn btn-xs btn-outline-warning ms-1 js-wcm-add-stash" data-flavour-id="{{ m.flavour_id }}">Add</button>
+                            <details class="my-1">
+                              <summary class="link-warning">Set stash quantity</summary>
+                              <form class="js-wcm-set-stash mt-2" data-flavour-id="{{ m.flavour_id }}">
+                                <label class="form-label mb-1">
+                                  {{ m.brand }} · {{ m.name }} in your stash (ml)
+                                  <input name="quantity_ml" type="number" min="0" step="any" class="form-control form-control-sm" required>
+                                </label>
+                                <button type="submit" class="btn btn-sm btn-outline-warning">Save to stash</button>
+                                <span class="d-block mt-1" role="status"></span>
+                              </form>
+                            </details>
                           {% else %}
                             {{ m.brand }} — {{ m.name }} <span class="text-secondary">(no TVW flavour page)</span>
                           {% endif %}
@@ -152,6 +162,7 @@
 
   {{ recipe_section("Can make now", "text-bg-success", wcm.ready, false) }}
   {{ recipe_section("Can make but low stock", "text-bg-info text-dark", wcm.low_stock, false) }}
+  {{ recipe_section("Not enough for this batch", "text-bg-danger", wcm.short_batch, false) }}
   {{ recipe_section("Missing 1 flavour", "text-bg-warning text-dark", wcm.missing_1, true) }}
   {{ recipe_section("Missing 2 flavours", "text-bg-secondary", wcm.missing_2, true) }}
   {{ recipe_section("Missing more", "text-bg-dark", wcm.missing_more, true) }}
@@ -160,30 +171,36 @@
     Large libraries are capped per request (default scan limit). Constants: headroom ≥ {{ wcm.qty_constants.headroom_ratio }}× required or leave ≥ {{ wcm.qty_constants.remaining_after_ml }} ml after mix marks <strong>low stock</strong> when still feasible.
   </p>
 </div>
-<style>
-  .btn-xs { font-size: 0.78rem; line-height: 1.2; }
-</style>
 <script>
 (() => {
-  document.querySelectorAll(".js-wcm-add-stash").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const fid = Number(btn.dataset.flavourId || 0);
-      if (!fid) return;
-      btn.disabled = true;
+  document.querySelectorAll(".js-wcm-set-stash").forEach((form) => {
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const input = form.elements.namedItem("quantity_ml");
+      const button = form.querySelector('button[type="submit"]');
+      const status = form.querySelector('[role="status"]');
+      const quantity = input.valueAsNumber;
+      if (button.disabled) return;
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        status.textContent = "Enter how many ml you have, greater than zero.";
+        input.focus();
+        return;
+      }
+      button.disabled = true;
+      status.textContent = "Saving…";
       try {
-        const res = await fetch("/api/stash", {
-          method: "POST",
+        const response = await fetch({{ url_for('tvw_api.patch_stash_item')|tojson }}, {
+          method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ flavour_id: fid, quantity_ml: 10, is_favorite: false }),
+          body: JSON.stringify({ flavour_id: Number(form.dataset.flavourId), quantity_ml: quantity }),
         });
-        if (!res.ok || res.redirected) throw new Error("stash");
-        const body = await res.json();
-        if (body.status !== "success") throw new Error("stash");
-        btn.textContent = "Added — updating recipes…";
+        if (!response.ok || response.redirected) throw new Error("Could not save the stash quantity.");
+        const result = await response.json();
+        if (result.status !== "success") throw new Error("Could not save the stash quantity.");
         window.location.reload();
-      } catch (_err) {
-        btn.textContent = "Retry add";
-        btn.disabled = false;
+      } catch {
+        status.textContent = "Could not save the stash quantity. Try again.";
+        button.disabled = false;
       }
     });
   });
