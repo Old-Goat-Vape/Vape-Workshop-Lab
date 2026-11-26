@@ -6,7 +6,7 @@ import sqlite3
 from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
 
 from db import SQLITE_BUSY_USER_MESSAGE, is_sqlite_busy_error, sqlite_retry
-from models import recipes_repo, tvw_admin_repo, tvw_reports_repo
+from models import tvw_admin_repo, tvw_reports_repo
 from services import flavour_request_service
 from utils.auth import (
     can_access_tvw_admin,
@@ -111,10 +111,18 @@ def review_flavour_request(request_id):
 
     if "flavour_review_token" not in session:
         session["flavour_review_token"] = secrets.token_urlsafe(32)
-    search = request.args.get("search", item["name"]).strip()[:160]
-    matches, _ = recipes_repo.fetch_tvw_flavours(search=search, page_size=20) if search and item["status"] == "pending" else ([], 0)
+    search = request.args.get("search", "").strip()[:160] or item["name"]
+    page = max(1, request.args.get("page", 1, type=int))
+    page_size = 20
+    matches, total, total_pages, suggestions = [], 0, 1, False
+    if item["status"] == "pending":
+        matches, total, page, total_pages, suggestions = flavour_request_service.search_matches(
+            item, search, page=page, page_size=page_size,
+        )
     return render_template(
         "tvw_admin_flavour_request_detail.html", item=item, matches=matches, search=search,
+        total=total, page=page, total_pages=total_pages, suggestions=suggestions,
+        first_match=(page - 1) * page_size + 1, last_match=(page - 1) * page_size + len(matches),
         review_token=session["flavour_review_token"],
     )
 

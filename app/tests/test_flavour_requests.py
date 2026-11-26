@@ -92,3 +92,38 @@ class FlavourRequestTests(unittest.TestCase):
             db = get_db()
             self.assertEqual(db.execute("SELECT status FROM flavour_requests").fetchone()[0], "declined")
             self.assertEqual(db.execute("SELECT COUNT(*) FROM flavours").fetchone()[0], 1)
+
+    def test_review_search_ranks_exact_alias_and_reaches_every_result(self):
+        self.assertIn(b"Flavour request sent", self.submit(brand="FLV", name="Cream").data)
+        with fixtures.flask_app.app_context():
+            db = get_db()
+            db.executemany(
+                "INSERT INTO flavours (brand, canonical_name, category) VALUES ('Test', ?, 'Flavor')",
+                [(f"Almond Cream {number:02}",) for number in range(25)],
+            )
+            db.execute("INSERT INTO flavours (id, brand, canonical_name, category) VALUES (100, 'Flavorah', 'Cream', 'Flavor')")
+            db.execute(
+                "INSERT INTO flavours (brand, canonical_name, category, is_hidden) VALUES ('Test', 'Hidden Cream', 'Flavor', 1)"
+            )
+            db.commit()
+
+        self.login(2, "Old Goat", "Old Goat")
+        path = self.queue_path + "/1"
+        first = BeautifulSoup(self.client.get(path).data, "html.parser")
+        self.assertEqual(first.select_one("#requestMatchSearch")["value"], "Cream")
+        self.assertIn("Showing 1–20 of 26 matches", first.get_text(" ", strip=True))
+        first_choice = first.select_one('input[name="flavour_id"]')
+        self.assertEqual(first_choice["value"], "100")
+        self.assertIn("Exact match", first_choice.parent.get_text(" ", strip=True))
+
+        next_link = first.select_one('nav[aria-label="Catalogue search pages"] a')
+        second = BeautifulSoup(self.client.get(next_link["href"]).data, "html.parser")
+        self.assertIn("Showing 21–26 of 26 matches", second.get_text(" ", strip=True))
+        all_choices = first.select('input[name="flavour_id"]') + second.select('input[name="flavour_id"]')
+        self.assertEqual(len({choice["value"] for choice in all_choices}), 26)
+
+        narrowed = BeautifulSoup(self.client.get(path, query_string={"search": "Flavorah Cream"}).data, "html.parser")
+        self.assertEqual([choice["value"] for choice in narrowed.select('input[name="flavour_id"]')], ["100"])
+        empty = self.client.get(path, query_string={"search": "watermelon"})
+        self.assertIn(b"No visible catalogue flavours", empty.data)
+        self.assertIn(b"No flavour requests awaiting review", self.review(1, "match", flavour_id=100).data)
