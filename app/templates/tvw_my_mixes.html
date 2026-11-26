@@ -99,6 +99,7 @@
                     {% endif %}
                   </td>
                   <td class="text-end">
+                    {% if row.recipe_available %}
                     <a class="btn btn-sm btn-outline-light py-0" href="{{ recipe_href }}">Recipe</a>
                     {% if row.mode == 'guided' and not row.abandoned %}
                       {% if row.in_progress %}
@@ -109,6 +110,7 @@
                       <a class="btn btn-sm btn-outline-secondary py-0" href="{{ mix_again_guided }}">Mix again</a>
                     {% else %}
                       <a class="btn btn-sm btn-outline-secondary py-0" href="{{ recipe_href }}">Mix again</a>
+                    {% endif %}
                     {% endif %}
                     {{ lifecycle_action(row) }}
                     <a class="btn btn-sm btn-outline-info" href="{{ url_for('tvw_recipes.tvw_batch_steeping',session_id=row.id) }}">{{ row.steeping.state_label }} · Batch plan</a>
@@ -153,6 +155,7 @@
                   {% endif %}
                 </div>
                 <div class="d-grid gap-2 mt-3">
+                  {% if row.recipe_available %}
                   <div class="btn-group">
                     <a class="btn btn-sm btn-outline-light" href="{{ recipe_href }}">Open recipe</a>
                     {% if row.mode == 'guided' and not row.abandoned %}
@@ -166,6 +169,7 @@
                       <a class="btn btn-sm btn-outline-secondary" href="{{ recipe_href }}">Mix again</a>
                     {% endif %}
                   </div>
+                  {% endif %}
                   {{ lifecycle_action(row) }}
             <a class="btn btn-outline-info" href="{{ url_for('tvw_recipes.tvw_batch_steeping',session_id=row.id) }}">{{ row.steeping.state_label }} · Batch plan</a>
                 </div>

@@ -142,6 +142,9 @@
             <li><a class="dropdown-item" href="{{ url_for('tvw_recipes.tvw_recipe_library') }}">Back to library</a></li>
             <li><a class="dropdown-item" href="{{ url_for('tvw_recipes.tvw_recipe_mix_logs', slug=(recipe.slug or recipe.id)) }}">Batch history</a></li>
             <li><a class="dropdown-item" href="{{ url_for('tvw_recipes.tvw_my_mixes') }}">My mixes</a></li>
+            {% if is_owner %}
+              <li><a class="dropdown-item" href="{{ url_for('tvw_recipes.tvw_recipe_manage', recipe_id=recipe.id) }}">Manage recipe</a></li>
+            {% endif %}
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item" href="#communityFeedback">Comments and suggestions</a></li>
             <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#reportModal">Report recipe</button></li>
