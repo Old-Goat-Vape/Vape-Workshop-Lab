@@ -434,6 +434,7 @@ def build_what_can_i_make_bundle(
 
     ready: list[dict[str, Any]] = []
     low_stock: list[dict[str, Any]] = []
+    short_batch: list[dict[str, Any]] = []
     miss1: list[dict[str, Any]] = []
     miss2: list[dict[str, Any]] = []
     miss_more: list[dict[str, Any]] = []
@@ -447,8 +448,10 @@ def build_what_can_i_make_bundle(
             qst = (e.get("wcm_qty") or {}).get("status") or "ok"
             if qst == "ok":
                 ready.append(e)
-            else:
+            elif qst == "tight":
                 low_stock.append(e)
+            else:
+                short_batch.append(e)
         elif n == 1:
             miss1.append(e)
         elif n == 2:
@@ -458,6 +461,7 @@ def build_what_can_i_make_bundle(
 
     ready.sort(key=sort_key)
     low_stock.sort(key=sort_key)
+    short_batch.sort(key=sort_key)
     miss1.sort(key=sort_key)
     miss2.sort(key=sort_key)
     miss_more.sort(key=lambda x: (int(x["missing_count"]), sort_key(x)))
@@ -486,6 +490,7 @@ def build_what_can_i_make_bundle(
         },
         "ready": ready,
         "low_stock": low_stock,
+        "short_batch": short_batch,
         "missing_1": miss1,
         "missing_2": miss2,
         "missing_more": miss_more,
