@@ -1409,7 +1409,7 @@ body[data-bs-theme="dark"] {
 .tvw-community-help { padding: 1.5rem; border: 1px solid #514534; background: linear-gradient(130deg,#25221c,#1c2026); border-radius: 20px; }
 .tvw-help-request { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .9rem 0; border-top: 1px solid var(--tvw-border-subtle); color: var(--tvw-text-primary); text-decoration: none; }
 .tvw-help-request strong { display: block; font-size: 1.1rem; }
-.tvw-help-request span span { display: block; color: var(--tvw-text-secondary); font-size: .95rem; margin-top: .25rem; }
+.tvw-help-request-author { display: block; color: var(--tvw-text-secondary); font-size: .95rem; margin-top: .25rem; }
 .tvw-help-empty { color: var(--tvw-text-secondary); line-height: 1.6; }
 .tvw-create-shortcut:hover, .tvw-workshop-shortcuts a:hover, .tvw-flavour-inspiration:hover { color: #fff; border-color: #bf873c; background-color: #25282e; }
 .tvw-help-request:hover strong { color: #ffd08a; }

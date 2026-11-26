@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from flask import abort, request, Blueprint, current_app, flash, jsonify, redirect, render_template, session, url_for
 
-from services import community_discovery_service, guided_mix_session_service
+from services import community_discovery_service, guided_mix_session_service, recognition_service
 from db import get_db
 from models import recipes_repo
 from utils.auth import (
@@ -52,28 +52,12 @@ def community_feed():
     )
 
 
-# Badges reflect recorded personal activity. Account roles are managed separately.
-_MIXER_MILESTONES = (
-    ("Apprentice", 3, 1),
-    ("Bench Regular", 10, 3),
-    ("Seasoned Mixer", 25, 5),
-)
-
-
 @tvw_community_bp.route("/my-mixer-stats")
 @login_required
 def mixer_stats():
     activity = recipes_repo.fetch_mixer_activity_counts(int(session["user_id"]))
     completed_mixes = activity["quick_mixes"] + activity["guided_mixes"]
-    recipes_created = activity["recipes_created"]
-    earned_badges = ["Kid"]
-    next_milestone = None
-    for name, mix_goal, recipe_goal in _MIXER_MILESTONES:
-        if completed_mixes >= mix_goal and recipes_created >= recipe_goal:
-            earned_badges.append(name)
-        else:
-            next_milestone = {"name": name, "mix_goal": mix_goal, "recipe_goal": recipe_goal}
-            break
+    earned_badges, next_milestone = recognition_service.mixer_progress(activity)
     return render_template(
         "tvw_mixer_stats.html",
         activity=activity,
@@ -95,7 +79,9 @@ def profile(username: str):
         owner_user_id=int(user["id"]), viewer_user_id=int(session["user_id"]),
         page=page, page_size=20,
     )
+    recognition_service.annotate_recipes(recipes, include_mixers=False)
     return render_template("tvw_profile.html", profile_user=dict(user), recipes=recipes,
+                           profile_badge=recognition_service.mixer_badge(int(user["id"])),
                            total=total, page=page, has_next=page * 20 < total)
 
 

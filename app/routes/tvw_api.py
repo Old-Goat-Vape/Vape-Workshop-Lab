@@ -14,6 +14,7 @@ from db import get_db, is_sqlite_busy_error, SQLITE_BUSY_BENCH_MESSAGE, SQLITE_B
 from models import recipes_repo, tvw_reports_repo, users_repo
 from services import guided_mix_session_service
 from services import holdings_bridge_service
+from services import recognition_service
 from services import stash_service
 from services import tvw_mix_service
 from utils.auth import can_access_tvw_admin, is_old_goat_role, login_required, tvw_enforce_account_before_request
@@ -382,8 +383,13 @@ def list_recipe_feedback(recipe_id: int):
         for m in mrows:
             fid = int(m["feedback_id"])
             metrics_by_fb.setdefault(fid, {})[str(m["metric_key"])] = float(m["metric_value"] or 0.0)
+    badges = recognition_service.mixer_badges({
+        row["author_user_id"] for row in row_dicts
+        if row["author_user_id"] and row["author_username"] != "unknown"
+    })
     items = []
     for payload in row_dicts:
+        payload["mixer_badge"] = badges.get(payload["author_user_id"])
         payload["metrics"] = metrics_by_fb.get(int(payload["id"]), {})
         mine = uid is not None and int(payload.get("author_user_id") or 0) == int(uid)
         payload["owner_moderation_visible"] = bool(mine)

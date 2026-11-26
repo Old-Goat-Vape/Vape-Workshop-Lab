@@ -1,13 +1,15 @@
 {% extends "base_public.html" %}
+{% from "partials/tvw_recognition.html" import mixer_badge, recipe_awards %}
 {% block title %}{{ profile_user.username }} | The Vape Workshop{% endblock %}
 {% block content %}
 <div class="tvw-page">
-  <h1>{{ profile_user.username }}</h1>
+  <h1>{{ profile_user.username }} {{ mixer_badge(profile_badge) }}</h1>
   <h2 class="h4">Recipes</h2>
   <p class="text-secondary">{{ total }} recipe(s) visible to you.</p>
   {% for recipe in recipes %}
   <article class="card card-body mb-3">
     <h3 class="h5"><a href="{{ url_for('tvw_recipes.tvw_recipe_detail', slug=recipe.slug or recipe.id) }}">{{ recipe.name }}</a></h3>
+    {{ recipe_awards(recipe.recipe_awards) }}
     <p class="mb-0 text-secondary">{{ recipe.visibility|capitalize }} · {{ recipe.status|replace('_', ' ') }}</p>
   </article>
   {% else %}<p>No recipes to show yet.</p>{% endfor %}

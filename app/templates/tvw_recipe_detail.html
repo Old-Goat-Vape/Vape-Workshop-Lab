@@ -1,4 +1,5 @@
 {% extends "base_public.html" %}
+{% from "partials/tvw_recognition.html" import mixer_badge, recipe_awards %}
 {% from "partials/tvw_recipe_picture.html" import recipe_picture %}
 {% block title %}{{ recipe.name }} | The Vape Workshop Calculator{% endblock %}
 
@@ -71,6 +72,7 @@
   <header class="tvw-rd-hero">
     <div class="tvw-rd-hero-main">
       <h1 class="tvw-rd-title">{{ recipe.name }}</h1>
+      {{ recipe_awards(recipe.recipe_awards) }}
 
       <p class="tvw-rd-subtitle">
         {% if detail.category %}
@@ -83,7 +85,7 @@
             · Source: {{ detail.imported_source_label }}
           {% endif %}
         {% elif detail.owner_username %}
-          <span>By <a class="tvw-rd-author-link" href="{{ url_for('tvw_community.profile', username=detail.owner_username) }}">{{ detail.owner_username }}</a></span>
+          <span>By <a class="tvw-rd-author-link" href="{{ url_for('tvw_community.profile', username=detail.owner_username) }}">{{ detail.owner_username }}</a> {{ mixer_badge(recipe.mixer_badge) }}</span>
         {% else %}
           <span>Community recipe</span>
         {% endif %}
@@ -150,6 +152,21 @@
       </div>
     </div>
   </header>
+
+  {% if award_token %}
+  <details class="tvw-rd-panel mb-3">
+    <summary>Record a recipe award</summary>
+    <form method="post" action="{{ url_for('tvw_recipes.tvw_recipe_award', recipe_id=recipe.id) }}" class="mt-2">
+      <input type="hidden" name="award_token" value="{{ award_token }}">
+      <label for="recipeAwardPeriod" class="form-label">Award period</label>
+      <div class="d-flex flex-wrap gap-2">
+        <input id="recipeAwardPeriod" name="period" class="form-control w-auto" placeholder="YYYY-MM or YYYY" maxlength="7" required aria-describedby="recipeAwardHint">
+        <button class="btn btn-outline-light" type="submit">Record award</button>
+      </div>
+      <div id="recipeAwardHint" class="form-text">Use YYYY-MM for Recipe of the Month or YYYY for Recipe of the Year.</div>
+    </form>
+  </details>
+  {% endif %}
 
   <div class="tvw-rd-facts" aria-label="Recipe mix facts">
     <div class="tvw-rd-fact">
@@ -883,6 +900,13 @@ I’d appreciate feedback on version {{ active_version.version_number }} of this
       line1.appendChild(document.createTextNode(when));
       line1.appendChild(document.createTextNode(" · "));
       line1.appendChild(document.createTextNode(who));
+      if (item.mixer_badge) {
+        const badge = document.createElement("span");
+        badge.className = "badge rounded-pill text-bg-warning tvw-mixer-badge ms-1";
+        badge.title = "Mixer badge";
+        badge.textContent = item.mixer_badge;
+        line1.appendChild(badge);
+      }
       const line2 = document.createElement("div");
       line2.className = "mt-1";
       line2.style.whiteSpace = "pre-wrap";

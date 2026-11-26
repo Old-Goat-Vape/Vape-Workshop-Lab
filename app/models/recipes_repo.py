@@ -1369,27 +1369,41 @@ def count_recorded_recipe_mixes(recipe_id: int) -> int:
 
 
 def fetch_mixer_activity_counts(user_id: int) -> dict[str, int]:
+    return fetch_mixer_activity_counts_for_users({user_id})[user_id]
+
+
+def fetch_mixer_activity_counts_for_users(user_ids: set[int]) -> dict[int, dict[str, int]]:
+    if not user_ids:
+        return {}
+    ids = tuple(user_ids)
+    marks = ", ".join("?" for _ in ids)
+    counts = {user_id: {"quick_mixes": 0, "guided_mixes": 0, "recipes_created": 0} for user_id in ids}
     db = get_db()
-    mixes = db.execute(
+    for row in db.execute(
         f"""
-        SELECT COUNT(CASE WHEN ms.mode = 'quick' THEN 1 END) AS quick_mixes,
+        SELECT ms.user_id,
+               COUNT(CASE WHEN ms.mode = 'quick' THEN 1 END) AS quick_mixes,
                COUNT(CASE WHEN ms.mode = 'guided' THEN 1 END) AS guided_mixes
         FROM mix_sessions ms
         LEFT JOIN batch_steeping bs ON bs.session_id = ms.id
-        WHERE ms.user_id = ? AND {_RECORDED_PERSONAL_MIX}
+        WHERE ms.user_id IN ({marks}) AND {_RECORDED_PERSONAL_MIX}
+        GROUP BY ms.user_id
         """,
-        (user_id,),
-    ).fetchone()
-    recipes = db.execute(
+        ids,
+    ):
+        counts[row["user_id"]].update(quick_mixes=row["quick_mixes"], guided_mixes=row["guided_mixes"])
+    for row in db.execute(
         f"""
-        SELECT COUNT(*) AS recipes_created
+        SELECT r.created_by, COUNT(*) AS recipes_created
         FROM recipes r
-        WHERE r.created_by = ? AND {tvw_recipe_analytics_predicate_sql("r")}
+        WHERE r.created_by IN ({marks}) AND {tvw_recipe_analytics_predicate_sql("r")}
           AND r.id NOT IN (SELECT recipe_id FROM recipe_references WHERE recipe_id IS NOT NULL)
+        GROUP BY r.created_by
         """,
-        (user_id,),
-    ).fetchone()
-    return {**dict(mixes), **dict(recipes)}
+        ids,
+    ):
+        counts[row["created_by"]]["recipes_created"] = row["recipes_created"]
+    return counts
 
 
 def set_recipe_like(*, user_id: int, recipe_id: int, liked: bool) -> None:
