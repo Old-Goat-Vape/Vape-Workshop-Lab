@@ -39,6 +39,14 @@
             <a class="tvw-brand" href="{{ url_for('tvw_community.community_feed') }}">The Vape Workshop</a>
             <div class="tvw-header-shortcuts">
                 <a class="tvw-nav-link tvw-header-forum" href="{{ tvw_forum_url }}" aria-label="The Vape Workshop forum">Forum</a>
+                {% set unread = unread_notification_count|default(0) %}
+                <a class="tvw-nav-link tvw-header-inbox{% if ep == 'tvw_community.notifications' %} is-active{% endif %}"
+                   href="{{ url_for('tvw_community.notifications') }}"
+                   aria-label="Notifications{% if unread %}, {{ unread }} unread{% endif %}"
+                   title="Notifications"{% if ep == 'tvw_community.notifications' %} aria-current="page"{% endif %}>
+                    <span aria-hidden="true">🔔</span>
+                    {% if unread %}<span class="badge rounded-pill text-bg-warning tvw-inbox-count" aria-hidden="true">{{ '99+' if unread > 99 else unread }}</span>{% endif %}
+                </a>
                 <button type="button"
                         class="tvw-nav-toggle"
                         id="tvwNavToggle"

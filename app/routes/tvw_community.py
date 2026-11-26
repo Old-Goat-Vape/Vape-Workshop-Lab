@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import secrets
+
 from flask import abort, request, Blueprint, current_app, flash, jsonify, redirect, render_template, session, url_for
 
-from services import community_discovery_service, guided_mix_session_service, recognition_service
-from db import get_db
+from services import community_discovery_service, guided_mix_session_service, member_notification_service, recognition_service
+from db import get_db, sqlite_retry
 from models import recipes_repo
 from utils.auth import (
     can_access_lab_bridge,
@@ -50,6 +52,48 @@ def community_feed():
         viewer_is_old_goat=viewer_is_old_goat,
         **discovery,
     )
+
+
+@tvw_community_bp.route("/notifications", methods=["GET", "POST"])
+@login_required
+def notifications():
+    user_id = int(session["user_id"])
+    if request.method == "POST":
+        token = request.form.get("notification_token", "").encode()
+        expected = session.get("notification_token", "").encode()
+        if not expected or not secrets.compare_digest(token, expected):
+            abort(403)
+        action = request.form.get("action")
+        if action == "read_all":
+            sqlite_retry(lambda: member_notification_service.mark_all_read(user_id))
+            return redirect(url_for(".notifications"), code=303)
+        if action != "open":
+            abort(400)
+        item = sqlite_retry(lambda: member_notification_service.open_notification(
+            user_id, request.form.get("kind", ""), request.form.get("event_key", ""),
+        ))
+        if not item:
+            flash("This notification is no longer available.", "info")
+            return redirect(url_for(".notifications"), code=303)
+        if item["kind"] == "recipe_shared":
+            target = url_for("tvw_recipes.tvw_recipe_detail", slug=item["target_id"])
+        else:
+            target = url_for("tvw_recipes.tvw_batch_steeping", session_id=item["target_id"])
+        return redirect(target, code=303)
+
+    if "notification_token" not in session:
+        session["notification_token"] = secrets.token_urlsafe(32)
+    page = max(1, request.args.get("page", 1, type=int))
+    if page > 1_000_000:
+        abort(404)
+    page_size = 25
+    items = member_notification_service.list_notifications(user_id, page=page, page_size=page_size)
+    if not items and page > 1:
+        return redirect(url_for(".notifications"))
+    return render_template(
+        "tvw_notifications.html", items=items[:page_size], page=page,
+        has_next=len(items) > page_size, notification_token=session["notification_token"],
+    ), 200, {"Cache-Control": "private, no-store"}
 
 
 @tvw_community_bp.route("/my-mixer-stats")

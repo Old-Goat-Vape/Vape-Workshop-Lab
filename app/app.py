@@ -274,6 +274,8 @@ def inject_global_data():
         "steeping_reminders": 0,
     }
     if "user_id" in session:
+        from services.member_notification_service import unread_count
+        data["unread_notification_count"] = unread_count(int(session["user_id"]))
         role = session.get("role")
         data["user"] = {
             "username": session.get("username"),

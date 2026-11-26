@@ -42,6 +42,9 @@ def run_startup_migrations() -> dict:
     db.executescript(recipe_sharing_schema)
     from services.batch_steeping_service import SCHEMA as batch_steep_schema
     db.executescript(batch_steep_schema)
+    _add_column_if_missing("batch_steeping", "reminder_revision", "INTEGER NOT NULL DEFAULT 0")
+    from services.member_notification_service import SCHEMA as member_notification_schema
+    db.executescript(member_notification_schema)
 
     from services.expert_flavour_review_service import SCHEMA as expert_review_schema
     db.executescript(expert_review_schema)

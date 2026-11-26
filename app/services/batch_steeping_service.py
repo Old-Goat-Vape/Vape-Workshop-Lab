@@ -10,6 +10,7 @@ SCHEMA="""CREATE TABLE IF NOT EXISTS batch_steeping (
  steep_days INTEGER CHECK(steep_days IS NULL OR steep_days BETWEEN 0 AND 365),
  mixed_at TEXT,
  reminder_enabled INTEGER NOT NULL DEFAULT 0 CHECK(reminder_enabled IN (0,1)),
+ reminder_revision INTEGER NOT NULL DEFAULT 0,
  acknowledged_at TEXT,
  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -81,19 +82,23 @@ def fetch(session_id,user_id,now=None):
     return describe(row,now)
 
 
-SHELF=""" WHERE ms.user_id=? AND ms.abandoned_at IS NULL AND (
+RECORDED_BATCH_SQL = """ms.abandoned_at IS NULL AND (
     (ms.mode='quick' AND b.mixed_at IS NOT NULL) OR
     (ms.mode='guided' AND ms.completed_at IS NOT NULL AND NOT EXISTS(
         SELECT 1 FROM mix_session_steps s WHERE s.mix_session_id=ms.id AND s.completed_at IS NULL)))"""
 
 
+SHELF = " WHERE ms.user_id=? AND " + RECORDED_BATCH_SQL
+
+DUE_AT_SQL = """datetime(CASE ms.mode WHEN 'guided' THEN ms.completed_at ELSE b.mixed_at END,
+    '+' || b.steep_days || ' days')"""
+
+
 def list_for(user_id,now=None,page=1):
     db=get_db();snapshot(db=db,user_id=user_id);db.commit()
-    rows=db.execute(SELECT+SHELF+""" ORDER BY CASE WHEN b.reminder_enabled=1
-        AND (b.acknowledged_at IS NULL OR datetime(b.acknowledged_at)<
-            datetime(CASE ms.mode WHEN 'guided' THEN ms.completed_at ELSE b.mixed_at END,'+'||b.steep_days||' days'))
-        AND datetime(CASE ms.mode WHEN 'guided' THEN ms.completed_at ELSE b.mixed_at END,
-            '+'||b.steep_days||' days')<=datetime('now') THEN 0 ELSE 1 END,
+    rows=db.execute(SELECT+SHELF+f""" ORDER BY CASE WHEN b.reminder_enabled=1
+        AND (b.acknowledged_at IS NULL OR datetime(b.acknowledged_at)<{DUE_AT_SQL})
+        AND {DUE_AT_SQL}<=datetime('now') THEN 0 ELSE 1 END,
         ms.created_at DESC,ms.id DESC LIMIT 50 OFFSET ?""",(user_id,(max(1,page)-1)*50))
     return [describe(r,now) for r in rows]
 
@@ -103,27 +108,32 @@ def shelf_count(user_id):
 
 
 def due_count(user_id):
-    # Only opted-in plans are read for every header, rather than all mix history.
-    rows=get_db().execute(SELECT+""" WHERE ms.user_id=? AND b.reminder_enabled=1
-        AND b.steep_days IS NOT NULL AND ms.abandoned_at IS NULL
-        AND (b.acknowledged_at IS NULL OR datetime(b.acknowledged_at) <
-            datetime(CASE ms.mode WHEN 'guided' THEN ms.completed_at ELSE b.mixed_at END,'+'||b.steep_days||' days'))""",(user_id,))
-    return sum(describe(r)['reminder_due'] for r in rows)
+    return get_db().execute(
+        "SELECT COUNT(*) FROM batch_steeping b JOIN mix_sessions ms ON ms.id=b.session_id" + SHELF
+        + f""" AND b.reminder_enabled=1 AND {DUE_AT_SQL}<=datetime('now')
+            AND (b.acknowledged_at IS NULL OR datetime(b.acknowledged_at)<{DUE_AT_SQL})""",
+        (user_id,),
+    ).fetchone()[0]
 
 
 def save(session_id,user_id,raw_days,remind):
-    row=fetch(session_id,user_id)
+    fetch(session_id,user_id)
     raw=str(raw_days if raw_days is not None else '').strip()
     # Explicit zero is meaningful, unlike blank.
     if raw and (not raw.isdigit() or not 0<=int(raw)<=365):
         raise ValueError('Use a whole number from 0 to 365 days, or leave blank for Not set.')
     days=int(raw) if raw else None
     if remind and days is None:raise ValueError('Set a steep time before enabling a reminder.')
-    changed=days!=row['steep_days'] or bool(remind)!=bool(row['reminder_enabled'])
     db=get_db()
-    db.execute("""UPDATE batch_steeping SET steep_days=?,reminder_enabled=?,
-        acknowledged_at=CASE WHEN ? THEN NULL ELSE acknowledged_at END,updated_at=CURRENT_TIMESTAMP
-        WHERE session_id=?""",(days,int(bool(remind)),int(changed),session_id))
+    db.execute("""
+        UPDATE batch_steeping
+        SET steep_days=:days, reminder_enabled=:remind,
+            acknowledged_at=CASE WHEN steep_days IS NOT :days OR reminder_enabled != :remind
+                THEN NULL ELSE acknowledged_at END,
+            reminder_revision=reminder_revision + (steep_days IS NOT :days OR reminder_enabled != :remind),
+            updated_at=CURRENT_TIMESTAMP
+        WHERE session_id=:session_id
+        """, {"days": days, "remind": int(bool(remind)), "session_id": session_id})
     db.commit()
 
 

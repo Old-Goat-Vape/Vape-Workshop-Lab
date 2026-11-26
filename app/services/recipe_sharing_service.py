@@ -79,11 +79,12 @@ def change(recipe_id,actor_id,recipient_id,permission):
             user=db.execute('SELECT id FROM users WHERE id=?',(recipient_id,)).fetchone()
             if not user or users_repo.tvw_account_access_violation(recipient_id):
                 raise ValueError('Choose an available user from the search results.')
-            db.execute("""INSERT INTO recipe_access(recipe_id,user_id,can_edit,granted_by)
+            changed=db.execute("""INSERT INTO recipe_access(recipe_id,user_id,can_edit,granted_by)
                 VALUES(?,?,?,?) ON CONFLICT(recipe_id,user_id) DO UPDATE SET
                 can_edit=excluded.can_edit,granted_by=excluded.granted_by,
-                granted_at=CURRENT_TIMESTAMP,revoked_at=NULL""",(recipe_id,recipient_id,int(permission=='edit'),actor_id))
-            changed=1
+                granted_at=CURRENT_TIMESTAMP,revoked_at=NULL
+                WHERE recipe_access.revoked_at IS NOT NULL OR recipe_access.can_edit != excluded.can_edit
+                """,(recipe_id,recipient_id,int(permission=='edit'),actor_id)).rowcount
         if changed:
             db.execute('INSERT INTO recipe_access_audit(recipe_id,user_id,actor_id,action) VALUES(?,?,?,?)',
                 (recipe_id,recipient_id,actor_id,permission))

@@ -127,6 +127,20 @@ body[data-bs-theme="dark"] {
   border-color: var(--tvw-border-subtle);
 }
 
+.tvw-nav-link.tvw-header-inbox {
+  position: relative;
+  justify-content: center;
+  width: 48px;
+  padding-inline: 0;
+  border-color: var(--tvw-border-subtle);
+}
+
+.tvw-inbox-count {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.35rem;
+}
+
 .tvw-nav-toggle {
   display: none;
   margin-left: auto;
