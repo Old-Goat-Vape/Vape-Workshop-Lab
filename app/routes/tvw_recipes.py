@@ -571,7 +571,7 @@ def _render_recipe_detail(
         "status": str(recipe.get("moderation_status") or "active"),
         "reason": str(recipe.get("moderation_reason") or ""),
         "hidden_from_public": bool(int(recipe.get("is_hidden") or 0) == 1),
-        "inactive": bool(int(recipe.get("active") or 1) == 0),
+        "inactive": not recipes_repo.recipe_is_active(recipe),
     }
 
     recipe_engagement = recipes_repo.fetch_recipe_engagement_for_viewer(
@@ -683,6 +683,52 @@ def tvw_recipe_sharing(recipe_id):
     query=request.args.get('q','').strip()[:80]
     return render_template('tvw_recipe_sharing.html',recipe=recipe,recipients=sharing.recipients(recipe_id,actor),
         matches=sharing.search_users(query,actor),query=query,sharing_token=session['recipe_sharing_token'])
+
+
+@tvw_recipes_bp.route("/recipes/<int:recipe_id>/manage", methods=["GET", "POST"])
+@login_required
+def tvw_recipe_manage(recipe_id: int):
+    owner_id = int(session["user_id"])
+    recipe = recipe_sharing_service.owner_recipe(recipe_id, owner_id)
+    if not recipe:
+        abort(404)
+    if request.method == "GET":
+        if "recipe_manage_token" not in session:
+            session["recipe_manage_token"] = secrets.token_urlsafe(32)
+        return render_template(
+            "tvw_recipe_manage.html",
+            recipe=recipe,
+            confirm_delete=request.args.get("action") == "delete",
+            manage_token=session["recipe_manage_token"],
+        )
+
+    token = request.form.get("manage_token", "").encode()
+    expected = session.get("recipe_manage_token", "").encode()
+    if not expected or not secrets.compare_digest(token, expected):
+        abort(403)
+    action = request.form.get("action")
+    if action not in ("private", "delete"):
+        abort(400)
+    try:
+        changed = sqlite_retry(
+            lambda: recipes_repo.make_owned_recipe_private(
+                recipe_id=recipe_id, owner_id=owner_id, archive=action == "delete"
+            ),
+            attempts=15,
+            base_delay_s=0.05,
+        )
+    except sqlite3.OperationalError as exc:
+        if not is_sqlite_busy_error(exc):
+            raise
+        flash(SQLITE_BUSY_USER_MESSAGE, "warning")
+        return redirect(url_for(".tvw_recipe_manage", recipe_id=recipe_id, action=action), code=303)
+    if not changed:
+        abort(404)
+    if action == "delete":
+        flash("Recipe removed from the library. Existing mix records were kept.", "success")
+        return redirect(url_for(".tvw_recipe_library", mine=1), code=303)
+    flash("Recipe is now private.", "success")
+    return redirect(url_for(".tvw_recipe_manage", recipe_id=recipe_id), code=303)
 
 
 @tvw_recipes_bp.route("/recipes/<slug>/mix-logs")
@@ -810,11 +856,13 @@ def tvw_recipe_save():
                 url_for("tvw_recipes.tvw_recipe_detail", slug=existing.get("slug") or existing["id"])
             )
 
+    is_owner = bool(existing and existing.get("created_by") == user_id)
     try:
-        payload = recipe_builder_service.parse_recipe_builder_form(request.form, is_edit=is_edit)
-        if existing and int(existing.get('created_by') or 0)!=user_id:
-            if payload.visibility!=str(existing.get('visibility') or 'private').lower():
-                abort(403,description='Only the recipe owner can change its visibility.')
+        payload = recipe_builder_service.parse_recipe_builder_form(
+            request.form, is_edit=is_edit, prefer_private=is_owner,
+        )
+        if existing and not is_owner and payload.visibility != str(existing.get("visibility") or "private").lower():
+            abort(403, description="Only the recipe owner can change its visibility.")
         try:
             prepared_image = recipe_story_service.prepare_image(request.files.get('recipe_image'))
         except ValueError as image_error:

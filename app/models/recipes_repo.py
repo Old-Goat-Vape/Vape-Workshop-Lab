@@ -22,10 +22,14 @@ def tvw_recipe_public_list_predicate_sql(alias: str = "r") -> str:
             f" AND LOWER(COALESCE({alias}.visibility, 'private')) = 'public'")
 
 
+def recipe_is_active(recipe: dict | None) -> bool:
+    return bool(recipe and recipe.get("active") in (None, 1))
+
+
 def recipe_dict_visible_in_public_lists(recipe: dict | None) -> bool:
     if not recipe:
         return False
-    if int(recipe.get("active") or 1) != 1:
+    if not recipe_is_active(recipe):
         return False
     if int(recipe.get("is_hidden") or 0) == 1:
         return False
@@ -54,7 +58,7 @@ def can_view_recipe_in_tvw_community(
     viewer_is_old_goat: bool,
 ) -> bool:
     """Community detail/API access: Old Goat or owner bypasses public-only gate."""
-    if not recipe:
+    if not recipe_is_active(recipe):
         return False
     if viewer_is_old_goat:
         return True
@@ -63,14 +67,13 @@ def can_view_recipe_in_tvw_community(
         return True
     from services.recipe_sharing_service import access
     if viewer_user_id is not None and access(recipe['id'],viewer_user_id):
-        return (int(recipe.get('active') if recipe.get('active') is not None else 1)==1
-                and not int(recipe.get('is_hidden') or 0)
+        return (not int(recipe.get('is_hidden') or 0)
                 and str(recipe.get('moderation_status') or 'active').lower() not in ('hidden','archived','removed'))
     return recipe_dict_visible_in_public_lists(recipe)
 
 
 def can_edit_recipe(recipe, user_id, *, admin=False):
-    if not recipe or not user_id:return False
+    if not recipe_is_active(recipe) or not user_id:return False
     if int(recipe.get('created_by') or 0)==int(user_id) or admin:return True
     from services.recipe_sharing_service import access
     grant=access(recipe['id'],user_id)
@@ -481,6 +484,24 @@ def fetch_recipe(recipe_id: int) -> Optional[Dict[str, Any]]:
     db = get_db()
     row = db.execute("SELECT * FROM recipes WHERE id = ?", (recipe_id,)).fetchone()
     return dict(row) if row else None
+
+
+def make_owned_recipe_private(*, recipe_id: int, owner_id: int, archive: bool = False) -> bool:
+    """Withdraw a recipe from public view without touching versions or batch history."""
+    with transaction() as db:
+        updated = db.execute(
+            """
+            UPDATE recipes
+            SET visibility = 'private',
+                status = CASE WHEN LOWER(status) = 'help' THEN 'WIP' ELSE status END,
+                active = CASE WHEN ? THEN 0 ELSE active END,
+                moderation_status = CASE WHEN ? THEN 'archived' ELSE moderation_status END,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND created_by = ? AND COALESCE(active, 1) = 1
+            """,
+            (archive, archive, recipe_id, owner_id),
+        )
+        return updated.rowcount == 1
 
 
 def fetch_recipe_by_slug_or_id(slug: str) -> Optional[Dict[str, Any]]:
@@ -1074,7 +1095,7 @@ def build_tvw_library_where(
     min_favorite_count: int = 0,
 ) -> tuple[list[str], list[Any]]:
     """Shared WHERE clause + params for recipe library / discovery (community list rules)."""
-    where: list[str] = []
+    where = ["COALESCE(r.active, 1) = 1"]
     params: list[Any] = []
     public_gate = tvw_recipe_public_list_predicate_sql("r")
     if viewer_is_old_goat:

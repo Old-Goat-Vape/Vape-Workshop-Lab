@@ -273,6 +273,7 @@
             <a class="btn btn-warning" href="{{ detail_url }}">Open</a>
             <a class="btn btn-outline-warning" href="{{ mix_url }}">Mix</a>
             <a class="btn btn-outline-light" href="{{ edit_url }}">Edit</a>
+            <a class="btn btn-outline-light" href="{{ url_for('tvw_recipes.tvw_recipe_manage', recipe_id=recipe.id) }}">Manage</a>
           {% else %}
             <a class="btn btn-warning" href="{{ detail_url }}">View</a>
             <a class="btn btn-outline-warning" href="{{ mix_url }}">Mix</a>

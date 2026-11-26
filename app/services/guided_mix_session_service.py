@@ -2067,6 +2067,7 @@ def list_user_mix_sessions(
                 r.id AS recipe_id,
                 r.name AS recipe_name,
                 r.slug AS recipe_slug,
+                COALESCE(r.active, 1) = 1 AS recipe_available,
                 rv.version_number,
                 (
                     SELECT COUNT(1) FROM mix_session_steps s
@@ -2168,6 +2169,7 @@ def list_user_guided_sessions(*, user_id: int, limit: int = 30) -> list[dict[str
         JOIN recipe_versions rv ON rv.id = ms.recipe_version_id
         JOIN recipes r ON r.id = rv.recipe_id
         WHERE ms.user_id = ? AND ms.abandoned_at IS NULL AND LOWER(COALESCE(ms.mode, '')) = 'guided'
+          AND COALESCE(r.active, 1) = 1
           AND NOT EXISTS (
               SELECT 1 FROM production_job_batches pb
               JOIN production_jobs pj ON pj.id = pb.production_job_id

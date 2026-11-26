@@ -151,7 +151,9 @@ def form_values_from_version(active_version: dict[str, Any] | None, *, recipe: d
     }
 
 
-def parse_recipe_builder_form(form, *, is_edit: bool = False) -> RecipeBuilderPayload:
+def parse_recipe_builder_form(
+    form, *, is_edit: bool = False, prefer_private: bool = False,
+) -> RecipeBuilderPayload:
     values = form_values_from_request(form)
     # Keep raw strings for redisplay; coerce empties to defaults without wiping 0.
     values["calc_target_ml"] = str(values.get("calc_target_ml") if str(values.get("calc_target_ml") or "").strip() != "" else "60").strip()
@@ -175,7 +177,10 @@ def parse_recipe_builder_form(form, *, is_edit: bool = False) -> RecipeBuilderPa
     if status not in _ALLOWED_STATUS:
         errors["status"] = "Choose a valid recipe status."
     if status == "help":
-        visibility = values["visibility"] = "public"
+        if prefer_private and visibility == "private":
+            status = values["status"] = "wip"
+        else:
+            visibility = values["visibility"] = "public"
 
     try:
         pg_ratio = _parse_float_field(values["calc_pg_ratio"], 30.0)

@@ -32,7 +32,7 @@ def access(recipe_id,user_id):
 
 
 def owner_recipe(recipe_id,actor_id):
-    row=get_db().execute('SELECT * FROM recipes WHERE id=? AND created_by=?',(recipe_id,actor_id)).fetchone()
+    row=get_db().execute('SELECT * FROM recipes WHERE id=? AND created_by=? AND COALESCE(active, 1)=1',(recipe_id,actor_id)).fetchone()
     return dict(row) if row else None
 
 
