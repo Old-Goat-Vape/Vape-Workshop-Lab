@@ -27,6 +27,8 @@ def run_startup_migrations() -> dict:
     This keeps schema evolution out of request handlers.
     """
     db = get_db()
+    from services.recognition_service import SCHEMA as recipe_awards_schema
+    db.executescript(recipe_awards_schema)
     from services.recipe_story_service import SCHEMA as recipe_story_schema
     db.executescript(recipe_story_schema)
     from services.flavour_browse_service import SCHEMA as flavour_notebook_schema

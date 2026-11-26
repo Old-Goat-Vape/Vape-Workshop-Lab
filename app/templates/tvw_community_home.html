@@ -1,4 +1,5 @@
 {% extends "base_public.html" %}
+{% from "partials/tvw_recognition.html" import mixer_badge, recipe_awards %}
 {% block body_class %}tvw-dashboard-route{% endblock %}
 {% block title %}Home | The Vape Workshop Calculator{% endblock %}
 {% block content %}
@@ -99,7 +100,14 @@
     <section class="tvw-community-help" aria-labelledby="communityHelpHeading">
       <div class="tvw-section-heading"><p class="tvw-dashboard-kicker">Better together</p><h2 id="communityHelpHeading">Mixers asking for help</h2><p>A fresh pair of taste buds can make all the difference.</p></div>
       {% for item in help_recipes %}
-      <a class="tvw-help-request" href="{{ item.detail_href }}#communityFeedback"><span><strong>{{ item.name }}</strong><span>{{ item.owner_username or 'A community mixer' }} · Help needed</span></span><span aria-hidden="true">→</span></a>
+      <a class="tvw-help-request" href="{{ item.detail_href }}#communityFeedback">
+        <span>
+          <strong>{{ item.name }}</strong>
+          {{ recipe_awards(item.recipe_awards) }}
+          <span class="tvw-help-request-author">{{ item.owner_username or 'A community mixer' }} {{ mixer_badge(item.mixer_badge) }} · Help needed</span>
+        </span>
+        <span aria-hidden="true">→</span>
+      </a>
       {% else %}<p class="tvw-help-empty">No one needs a hand right now. When a mixer asks for help, you'll find their recipe here.</p>{% endfor %}
       <div class="d-flex flex-wrap gap-3">
         <a class="tvw-bench-text-link" href="{{ url_for('tvw_recipes.tvw_recipe_library', status='help') }}">View all help requests →</a>

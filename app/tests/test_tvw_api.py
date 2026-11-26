@@ -2910,6 +2910,7 @@ class TVWApiTests(unittest.TestCase):
 
         # 3) Old Goat / admin viewer — private still visible under existing permission model
         with self.client.session_transaction() as sess:
+            sess.clear()
             sess["user_id"] = 2
             sess["username"] = "Old Goat"
             sess["role"] = "Old Goat"

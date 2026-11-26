@@ -15,7 +15,7 @@ from models import recipes_repo, users_repo
 from services import guided_mix_session_service
 from services import guided_mix_start_service
 from services import recipe_library_discovery_service
-from services import recipe_library_presentation
+from services import recipe_library_presentation, recognition_service
 from services import stash_service
 from services import recipe_sharing_service
 from services import what_can_i_make_service
@@ -190,6 +190,7 @@ def tvw_recipe_library():
         viewer_user_id=uid,
         viewer_username=username_s,
     )
+    recognition_service.annotate_recipes(recipes)
     scope_counts = recipe_library_presentation.library_scope_counts(
         viewer_user_id=uid,
         viewer_is_old_goat=viewer_is_old_goat,
@@ -592,6 +593,14 @@ def _render_recipe_detail(
         mixer_notes_preview=mixer_notes_preview,
     )
 
+    recipe["is_imported"] = detail["is_imported"]
+    recognition_service.annotate_recipes([recipe])
+    award_token = None
+    if can_access_tvw_admin(role) and recognition_service.can_receive_recipe_award(recipe["id"]):
+        if "recipe_award_token" not in session:
+            session["recipe_award_token"] = secrets.token_urlsafe(32)
+        award_token = session["recipe_award_token"]
+
     saved_draft = session.get('recipe_builder_saved') or {}
     clear_draft_key = None
     if saved_draft.get('recipe_id') == recipe['id']:
@@ -602,6 +611,7 @@ def _render_recipe_detail(
         my_recipe_notes=recipe_story_service.private_notes(recipe['id'], uid),
         clear_draft_key=clear_draft_key,
         recipe=recipe,
+        award_token=award_token,
         versions=versions,
         published_version=published_version,
         published_version_id=published_version_id,
@@ -632,6 +642,24 @@ def _render_recipe_detail(
 @login_required
 def tvw_recipe_detail(slug: str):
     return _render_recipe_detail(slug)
+
+
+@tvw_recipes_bp.post("/recipes/<int:recipe_id>/awards")
+@login_required
+def tvw_recipe_award(recipe_id: int):
+    token = request.form.get("award_token", "").encode()
+    expected = session.get("recipe_award_token", "").encode()
+    if not can_access_tvw_admin(session.get("role")) or not expected or not secrets.compare_digest(token, expected):
+        abort(403)
+    recipe = recipes_repo.fetch_recipe_by_slug_or_id(str(recipe_id))
+    if not recipe:
+        abort(404)
+    try:
+        recognition_service.record_recipe_award(recipe["id"], request.form.get("period", ""))
+        flash("Recipe award recorded.", "success")
+    except ValueError as exc:
+        flash(str(exc), "warning")
+    return redirect(url_for(".tvw_recipe_detail", slug=recipe.get("slug") or recipe["id"]))
 
 
 @tvw_recipes_bp.route('/recipes/<int:recipe_id>/sharing',methods=['GET','POST'])

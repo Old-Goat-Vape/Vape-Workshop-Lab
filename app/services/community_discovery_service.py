@@ -7,6 +7,7 @@ from typing import Any
 from flask import url_for
 
 from models import recipes_repo
+from services import recognition_service
 
 DISCOVERY_TAB_SIZE = 3
 DISCOVERY_FETCH_BUFFER = 6
@@ -330,8 +331,13 @@ def build_community_discovery_context(
         viewer_user_id=viewer_user_id, viewer_is_old_goat=False,
         public_discovery_only=True,
     )
+    help_recipes = [_enrich_tab_recipe(row, tab_id="updated") for row in help_rows]
+    cards = [recipe for tab in tabs for recipe in tab["recipes"]]
+    if featured:
+        cards.append(featured)
+    recognition_service.annotate_recipes(cards + help_recipes)
     return {
-        "help_recipes": [_enrich_tab_recipe(row, tab_id="updated") for row in help_rows],
+        "help_recipes": help_recipes,
         "discovery_featured": featured,
         "discovery_featured_badge": featured_badge,
         "discovery_tabs": tabs,

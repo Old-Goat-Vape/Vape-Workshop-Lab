@@ -1,4 +1,5 @@
 {% from "partials/tvw_recipe_picture.html" import recipe_picture %}
+{% from "partials/tvw_recognition.html" import mixer_badge, recipe_awards %}
 {# Community dashboard discovery — featured recipe + tabbed collection #}
 {% from "partials/tvw_dashboard_illustrations.html" import discovery_featured_motif %}
 
@@ -19,8 +20,9 @@
       <h3 class="tvw-discover-card-title">
         <a href="{{ recipe.detail_href }}" class="tvw-discover-card-title-link">{{ recipe.name }}</a>
       </h3>
+      {{ recipe_awards(recipe.recipe_awards) }}
       {% if recipe.short_description %}<p class="tvw-discover-card-category" style="display:block;">{{ recipe.short_description }}</p>{% endif %}
-      <p class="tvw-discover-card-author">by {{ recipe.owner_username }}</p>
+      <p class="tvw-discover-card-author">by {{ recipe.owner_username }} {{ mixer_badge(recipe.mixer_badge) }}</p>
       {% if recipe.context_label %}
         <span class="tvw-discover-reason">{{ recipe.context_label }}</span>
       {% endif %}
@@ -66,7 +68,8 @@
             {{ discovery_featured.name }}
           </a>
         </h3>
-        <p class="tvw-discover-featured-author">by {{ discovery_featured.owner_username }}</p>
+        {{ recipe_awards(discovery_featured.recipe_awards) }}
+        <p class="tvw-discover-featured-author">by {{ discovery_featured.owner_username }} {{ mixer_badge(discovery_featured.mixer_badge) }}</p>
         {{ recipe_picture(discovery_featured.recipe_profiles_json,discovery_featured.tags_csv,discovery_featured.has_recipe_image,discovery_featured.current_version_id,discovery_featured.name,'featured') }}
         {% if discovery_featured.short_description %}<p class="tvw-discover-featured-desc">{{ discovery_featured.short_description }}</p>
         {% elif discovery_featured.version_notes %}

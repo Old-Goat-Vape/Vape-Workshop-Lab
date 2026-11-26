@@ -1,0 +1,13 @@
+{% macro mixer_badge(label) -%}
+  {% if label %}<span class="badge rounded-pill text-bg-warning tvw-mixer-badge" title="Mixer badge">{{ label }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro recipe_awards(labels) -%}
+  {% if labels %}
+    <span class="d-flex flex-wrap gap-1 my-1" role="group" aria-label="Recipe awards">
+      {% for label in labels %}
+        <span class="badge rounded-pill text-bg-warning text-wrap text-start tvw-recipe-award">{{ label }}</span>
+      {% endfor %}
+    </span>
+  {% endif %}
+{%- endmacro %}

@@ -1,4 +1,5 @@
 {% extends "base_public.html" %}
+{% from "partials/tvw_recognition.html" import mixer_badge, recipe_awards %}
 {% from "partials/tvw_recipe_picture.html" import recipe_picture %}
 {% block title %}Recipe Library | The Vape Workshop Calculator{% endblock %}
 {% block body_class %}tvw-recipe-library-route{% endblock %}
@@ -217,6 +218,7 @@
           <h2 class="tvw-lib-card-title">
             <a href="{{ detail_url }}">{{ recipe.name }}</a>
           </h2>
+          {{ recipe_awards(recipe.recipe_awards) }}
           <div class="tvw-lib-pills">
             {% if pill == 'public' %}
               <span class="tvw-lib-pill tvw-lib-pill-public">Public</span>
@@ -248,7 +250,7 @@
 
         <p class="tvw-lib-card-submeta">
           {% if recipe.library_owner_label %}
-            <span class="tvw-lib-card-author">By {{ recipe.library_owner_label }}</span>
+            <span class="tvw-lib-card-author">By {{ recipe.library_owner_label }} {{ mixer_badge(recipe.mixer_badge) }}</span>
           {% endif %}
           {% if recipe.library_updated_label %}
             {% if recipe.library_owner_label %} · {% endif %}<span class="tvw-lib-card-date">{{ recipe.library_updated_label }}</span>

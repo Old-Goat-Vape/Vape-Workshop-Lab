@@ -1336,32 +1336,74 @@ def is_public_community_recipe(recipe_id: int) -> bool:
     ).fetchone() is not None
 
 
+# Both counts use the mix session as the unit, including a recovered two-bottle batch.
+_RECORDED_PERSONAL_MIX = """
+    ms.abandoned_at IS NULL
+    AND ms.production_job_id IS NULL
+    AND NOT EXISTS (
+        SELECT 1 FROM production_job_batches pb WHERE pb.guided_mix_session_id = ms.id
+    )
+    AND (
+        (ms.mode = 'quick' AND bs.mixed_at IS NOT NULL)
+        OR (ms.mode = 'guided' AND ms.completed_at IS NOT NULL AND NOT EXISTS (
+            SELECT 1 FROM mix_session_steps step
+            WHERE step.mix_session_id = ms.id AND step.completed_at IS NULL
+        ))
+    )
+"""
+
+
 def count_recorded_recipe_mixes(recipe_id: int) -> int:
     """Count completed personal batches across versions, including confirmed Quick Mixes."""
     row = get_db().execute(
-        """
+        f"""
         SELECT COUNT(*) AS total
         FROM recipe_versions rv
         JOIN mix_sessions ms ON ms.recipe_version_id = rv.id
         LEFT JOIN batch_steeping bs ON bs.session_id = ms.id
-        WHERE rv.recipe_id = ?
-          AND ms.user_id IS NOT NULL
-          AND ms.abandoned_at IS NULL
-          AND ms.production_job_id IS NULL
-          AND NOT EXISTS (
-              SELECT 1 FROM production_job_batches pb WHERE pb.guided_mix_session_id = ms.id
-          )
-          AND (
-              (ms.mode = 'quick' AND bs.mixed_at IS NOT NULL)
-              OR (ms.mode = 'guided' AND ms.completed_at IS NOT NULL AND NOT EXISTS (
-                  SELECT 1 FROM mix_session_steps step
-                  WHERE step.mix_session_id = ms.id AND step.completed_at IS NULL
-              ))
-          )
+        WHERE rv.recipe_id = ? AND ms.user_id IS NOT NULL AND {_RECORDED_PERSONAL_MIX}
         """,
         (recipe_id,),
     ).fetchone()
     return int(row["total"])
+
+
+def fetch_mixer_activity_counts(user_id: int) -> dict[str, int]:
+    return fetch_mixer_activity_counts_for_users({user_id})[user_id]
+
+
+def fetch_mixer_activity_counts_for_users(user_ids: set[int]) -> dict[int, dict[str, int]]:
+    if not user_ids:
+        return {}
+    ids = tuple(user_ids)
+    marks = ", ".join("?" for _ in ids)
+    counts = {user_id: {"quick_mixes": 0, "guided_mixes": 0, "recipes_created": 0} for user_id in ids}
+    db = get_db()
+    for row in db.execute(
+        f"""
+        SELECT ms.user_id,
+               COUNT(CASE WHEN ms.mode = 'quick' THEN 1 END) AS quick_mixes,
+               COUNT(CASE WHEN ms.mode = 'guided' THEN 1 END) AS guided_mixes
+        FROM mix_sessions ms
+        LEFT JOIN batch_steeping bs ON bs.session_id = ms.id
+        WHERE ms.user_id IN ({marks}) AND {_RECORDED_PERSONAL_MIX}
+        GROUP BY ms.user_id
+        """,
+        ids,
+    ):
+        counts[row["user_id"]].update(quick_mixes=row["quick_mixes"], guided_mixes=row["guided_mixes"])
+    for row in db.execute(
+        f"""
+        SELECT r.created_by, COUNT(*) AS recipes_created
+        FROM recipes r
+        WHERE r.created_by IN ({marks}) AND {tvw_recipe_analytics_predicate_sql("r")}
+          AND r.id NOT IN (SELECT recipe_id FROM recipe_references WHERE recipe_id IS NOT NULL)
+        GROUP BY r.created_by
+        """,
+        ids,
+    ):
+        counts[row["created_by"]]["recipes_created"] = row["recipes_created"]
+    return counts
 
 
 def set_recipe_like(*, user_id: int, recipe_id: int, liked: bool) -> None:
