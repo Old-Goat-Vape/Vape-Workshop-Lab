@@ -49,17 +49,14 @@
       </p>
       <div class="row g-2 align-items-end">
         <div class="col-12 col-lg-7">
-          <label class="form-label small text-secondary mb-0">Flavour</label>
-          <input id="stashQuickAddFlavour" class="form-control form-control-sm" list="stashQuickAddOptions" placeholder="Start typing brand or flavour name">
-          <datalist id="stashQuickAddOptions">
-            {% for opt in quick_add_options %}
-              <option value="{{ opt.brand or 'Unknown' }} — {{ opt.canonical_name }}" data-flavour-id="{{ opt.id }}" data-reference-id="{{ opt.source_flavor_ref_id or '' }}"></option>
-            {% endfor %}
-          </datalist>
+          <label class="form-label small text-secondary mb-0" for="stashQuickAddFlavour">Flavour</label>
+          <input id="stashQuickAddFlavour" class="form-control form-control-sm" autocomplete="off"
+                 aria-controls="stashQuickAddOptions" aria-describedby="stashQuickAddHint" placeholder="Start typing brand or flavour name">
+          <ul class="list-group overflow-auto" id="stashQuickAddOptions" aria-label="Flavour suggestions" style="max-height: 14rem;"></ul>
         </div>
         <div class="col-6 col-lg-2">
-          <label class="form-label small text-secondary mb-0">Qty (ml)</label>
-          <input id="stashQuickAddQty" type="number" step="0.1" min="0" value="10" class="form-control form-control-sm text-end">
+          <label class="form-label small text-secondary mb-0" for="stashQuickAddQty">Qty (ml)</label>
+          <input id="stashQuickAddQty" type="number" step="any" min="0" class="form-control form-control-sm text-end">
         </div>
         {% if is_lab_linked %}
           <div class="col-6 col-lg-3">
@@ -69,7 +66,7 @@
         {% endif %}
         <div class="col-12 d-grid d-md-flex gap-2 mt-1">
           <button id="stashQuickAddBtn" type="button" class="btn btn-sm btn-outline-warning">Add to stash</button>
-          <span id="stashQuickAddHint" class="small text-secondary align-self-center"></span>
+          <span id="stashQuickAddHint" role="status" class="small text-secondary align-self-center"></span>
         </div>
       </div>
     </div>
@@ -226,33 +223,46 @@
   const quickBtn = document.getElementById("stashQuickAddBtn");
   const quickHint = document.getElementById("stashQuickAddHint");
   const quickRef = document.getElementById("stashQuickAddRef");
-  const datalist = document.getElementById("stashQuickAddOptions");
-
+  const suggestions = document.getElementById("stashQuickAddOptions");
+  let selectedFlavour = null;
   let searchTimer;
   let searchVersion = 0;
   quickInput?.addEventListener("input", () => {
     clearTimeout(searchTimer);
     const version = ++searchVersion;
     const query = quickInput.value.trim();
-    // A selected full label must keep its identity until the user changes it.
-    if ([...datalist.options].some((o) => o.value === query)) return;
-    datalist.replaceChildren();
-    if (query.length < 2) { quickHint.textContent = "Type at least two characters."; return; }
+    selectedFlavour = null;
+    suggestions.replaceChildren();
+    if (query.length < 2) {
+      quickHint.textContent = "Type at least two characters.";
+      return;
+    }
     quickHint.textContent = "Searching…";
     searchTimer = setTimeout(async () => {
       try {
         const res = await fetch(`/api/stash/flavour-search?q=${encodeURIComponent(query)}`);
         const body = await parseJson(res);
         if (version !== searchVersion) return;
-        if (!res.ok) throw new Error(body.message || "Search failed.");
-        for (const item of body.items || []) {
-          const option = document.createElement("option");
-          option.value = `${item.brand || "Unknown"} — ${item.canonical_name} (#${item.id})`;
-          option.dataset.flavourId = item.id;
-          option.dataset.referenceId = item.source_flavor_ref_id || "";
-          datalist.append(option);
+        if (!res.ok || body.status !== "success") throw new Error(body.message || "Search failed.");
+        const items = body.items || [];
+        for (const item of items) {
+          const row = document.createElement("li");
+          const choice = document.createElement("button");
+          const label = `${item.brand || "Unknown"} — ${item.canonical_name}`;
+          choice.type = "button";
+          choice.className = "list-group-item list-group-item-action";
+          choice.textContent = item.suggestion ? `Similar spelling: ${label}` : label;
+          choice.addEventListener("click", () => {
+            selectedFlavour = item;
+            quickInput.value = label;
+            suggestions.replaceChildren();
+            quickHint.textContent = "Enter the amount you have.";
+            quickQty.focus();
+          });
+          row.append(choice);
+          suggestions.append(row);
         }
-        quickHint.textContent = datalist.options.length ? ((body.items || []).some(item => item.suggestion) ? "Similar spellings — check the flavour and manufacturer before choosing." : "Choose a flavour from the suggestions.") : "No matching flavours.";
+        quickHint.textContent = items.length ? "Choose a flavour from the suggestions." : "No matching flavours.";
       } catch (error) {
         if (version === searchVersion) quickHint.textContent = error.message;
       }
@@ -263,53 +273,36 @@
     try { return await res.json(); } catch (_) { return {}; }
   }
 
-  function resolveQuickAddIds() {
-    const val = (quickInput?.value || "").trim();
-    if (!val || !datalist) return { flavourId: 0, referenceId: 0 };
-    const opt = [...datalist.options].find((o) => o.value === val);
-    if (!opt) return { flavourId: 0, referenceId: 0 };
-    return {
-      flavourId: parseInt(opt.dataset.flavourId || "0", 10) || 0,
-      referenceId: parseInt(opt.dataset.referenceId || "0", 10) || 0,
-    };
-  }
-
   quickBtn?.addEventListener("click", async () => {
-    const qty = parseFloat(quickQty?.value || "0");
-    const isLab = {{ "true" if is_lab_linked else "false" }};
-    const { flavourId, referenceId } = resolveQuickAddIds();
-    const fallbackRef = parseInt(quickRef?.value || "0", 10) || 0;
-    let body = {};
-    if (isLab) {
-      const rid = referenceId || fallbackRef;
-      if (flavourId) body = { flavour_id: flavourId, quantity_ml: qty };
-      else if (rid) body = { reference_id: rid, quantity_ml: qty };
-      else {
-        quickHint.textContent = "Pick a flavour or enter a fallback reference id.";
-        return;
-      }
-    } else {
-      if (!flavourId) {
-        quickHint.textContent = "Pick a valid flavour from the list.";
-        return;
-      }
-      body = { flavour_id: flavourId, quantity_ml: qty, is_favorite: false };
-    }
-    quickBtn.disabled = true;
-    quickHint.textContent = "";
-    const res = await fetch("/api/stash", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    quickBtn.disabled = false;
-    if (!res.ok) {
-      const j = await parseJson(res);
-      quickHint.textContent = j.message || "Could not add to stash.";
+    const qty = quickQty.valueAsNumber;
+    if (quickBtn.disabled) return;
+    if (!Number.isFinite(qty) || qty <= 0) {
+      quickHint.textContent = "Enter how many ml you have, greater than zero.";
+      quickQty.focus();
       return;
     }
-    quickHint.textContent = "Added.";
-    window.location.reload();
+    const fallbackRef = Number(quickRef?.value);
+    if (!selectedFlavour && (!quickRef || !Number.isInteger(fallbackRef) || fallbackRef <= 0)) {
+      quickHint.textContent = quickRef ? "Choose a flavour or enter a reference ID." : "Choose a flavour from the suggestions.";
+      quickInput.focus();
+      return;
+    }
+    const body = selectedFlavour ? { flavour_id: selectedFlavour.id } : { reference_id: fallbackRef };
+    quickBtn.disabled = true;
+    quickHint.textContent = "Saving…";
+    try {
+      const res = await fetch("/api/stash", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...body, quantity_ml: qty }),
+      });
+      const result = await parseJson(res);
+      if (!res.ok || result.status !== "success") throw new Error(result.message || "Could not save to stash.");
+      window.location.reload();
+    } catch (error) {
+      quickHint.textContent = error.message;
+      quickBtn.disabled = false;
+    }
   });
 
   document.querySelectorAll(".tvw-stash-row").forEach((tr) => {

@@ -724,12 +724,12 @@ def fetch_tvw_flavours(
 
     Metrics (no N+1):
       - ``used_in_count``: distinct eligible recipes across all visibility levels
-        using this flavour's ``source_flavor_ref_id`` in the current version.
+        using this flavour’s verified ingredient identity in the current version.
       - ``avg_rating``: mean of visible flavour_reviews only; NULL if none.
       - ``avg_usage_percent``: ``avg_usage`` else ``default_percent`` from import/catalog;
         NULL if neither set (UI shows —).
     """
-    from config.catalogue_identity import visible_flavour_sql
+    from config.catalogue_identity import recipe_flavour_sql, visible_flavour_sql
     db = get_db()
     from services.flavour_browse_service import family
     from services.recipe_story_service import PROFILES
@@ -780,6 +780,31 @@ def fetch_tvw_flavours(
 
     rows = db.execute(
         f"""
+        WITH usage_lines AS (
+            SELECT fr.id AS reference_id, fr.brand, fr.name, r.id AS recipe_id, ri.amount_percent,
+                   CASE
+                     WHEN COALESCE(fr.is_nicotine,0)=0 AND {recipe_flavour_sql('fr')}
+                     THEN COALESCE(tvw_catalogue_key(fr.brand,fr.name,fr.category), 'ref:'||fr.id)
+                   END AS identity_key
+            FROM recipes r
+            JOIN recipe_versions v ON v.id = r.current_version_id AND v.recipe_id = r.id
+            JOIN recipe_items ri ON ri.version_id = v.id
+            JOIN flavor_reference fr ON fr.id = ri.ingredient_id
+            WHERE {pub} AND COALESCE(fr.active,1)=1
+              AND ri.amount_percent>0 AND ri.amount_percent<=100
+        ),
+        usage_samples AS (
+            SELECT identity_key, recipe_id
+            FROM usage_lines WHERE identity_key IS NOT NULL
+            GROUP BY identity_key, recipe_id HAVING SUM(amount_percent)<=100
+            UNION ALL
+            SELECT 'name:'||json_array(LOWER(TRIM(COALESCE(brand,''))),LOWER(TRIM(COALESCE(name,'')))), recipe_id
+            FROM usage_lines
+            GROUP BY 1, recipe_id HAVING SUM(amount_percent)<=100
+        ),
+        usage_counts AS (
+            SELECT identity_key, COUNT(*) AS used_in_count FROM usage_samples GROUP BY identity_key
+        )
         SELECT
             f.id,
             f.canonical_name,
@@ -803,17 +828,12 @@ def fetch_tvw_flavours(
               AND LOWER(TRIM(COALESCE(fr.moderation_status, 'active'))) = 'active'
             GROUP BY flavour_id
         ) rv ON rv.flavour_id = f.id
-        LEFT JOIN (
-            SELECT f2.id AS flavour_id, COUNT(DISTINCT r.id) AS used_in_count
-            FROM flavours f2
-            JOIN recipe_items ri ON ri.ingredient_id = f2.source_flavor_ref_id
-            JOIN recipe_versions v ON v.id = ri.version_id
-            JOIN recipes r ON r.id = v.recipe_id AND r.current_version_id=v.id
-            WHERE COALESCE(f2.merged_into_flavour_id, 0) = 0
-              AND COALESCE(f2.source_flavor_ref_id, 0) != 0
-              AND {pub}
-            GROUP BY f2.id
-        ) ru ON ru.flavour_id = f.id
+        LEFT JOIN flavor_reference linked ON linked.id=f.source_flavor_ref_id
+        LEFT JOIN usage_counts ru ON ru.identity_key=CASE
+          WHEN COALESCE(f.source_flavor_ref_id,0)!=0
+          THEN COALESCE(tvw_catalogue_key(linked.brand,linked.name,linked.category), 'ref:'||linked.id)
+          ELSE 'name:'||json_array(LOWER(TRIM(COALESCE(f.brand,''))),LOWER(TRIM(COALESCE(f.canonical_name,''))))
+        END
         WHERE {" AND ".join(where)}
         ORDER BY {sort_expr} {sort_order}, f.id ASC
         LIMIT ? OFFSET ?

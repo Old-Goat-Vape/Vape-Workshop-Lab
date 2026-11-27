@@ -250,7 +250,17 @@ def tvw_what_can_i_make():
         username=str(session.get("username") or ""),
         target_batch_ml=target_batch_ml,
     )
-    return render_template("tvw_what_can_i_make.html", wcm=bundle)
+    group = request.args.get("group", "")
+    recipe_groups = {"ready", "low_stock", "short_batch", "missing_1", "missing_2", "missing_more"}
+    page = max(1, request.args.get("page", 1, type=int))
+    page_size = 10
+    if group in recipe_groups:
+        last_page = max(1, (len(bundle[group]) + page_size - 1) // page_size)
+        page = min(page, last_page)
+    return render_template(
+        "tvw_what_can_i_make.html", wcm=bundle,
+        result_group=group, result_page=page, result_page_size=page_size,
+    )
 
 
 @tvw_recipes_bp.route("/my-mixes")
@@ -1238,13 +1248,11 @@ def tvw_stash():
         sort_by=sort_by,
         sort_dir=sort_dir,
     )
-    quick_add_options = []  # Search the full catalogue on demand; do not cap an embedded seed.
     return render_template(
         "tvw_stash.html",
         stash_rows=rows,
         stash_source=stash_source,
         is_lab_linked=is_lab_linked,
-        quick_add_options=quick_add_options,
         search=search,
         sort_by=sort_by,
         sort_dir=sort_dir,

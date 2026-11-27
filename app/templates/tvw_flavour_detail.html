@@ -16,7 +16,7 @@
       <div><strong id="stashSummaryQty">{{ '%.1f'|format(stash_binding.quantity_ml|float) }} ml</strong><span>in your stash</span></div>
     </div>
     <p class="text-secondary">{% if stash_binding.is_lab_linked %}Your quantities come from the linked Lab holdings.{% else %}Your personal stash, ready for your next mix.{% endif %}</p>
-    <div class="d-flex flex-wrap gap-2"><a class="btn btn-warning" href="#stash-actions">{{ 'Update stash' if stash_binding.quantity_ml > 0 else 'Add to stash' }}</a><a class="btn btn-outline-light" href="{{ url_for('tvw_recipes.tvw_purchase_purpose',flavour_id=flavour.id) }}">Why did I buy this?</a><a class="btn btn-outline-light" href="#my-notebook">My notebook</a><a class="btn btn-outline-light" href="{{ url_for('tvw_recipes.tvw_stash') }}">Open My Stash</a></div>
+    <div class="d-flex flex-wrap gap-2"><a id="stashSummaryAction" class="btn btn-warning" href="#stash-actions">{{ 'Update stash' if stash_binding.quantity_ml > 0 else 'Add to stash' }}</a><a class="btn btn-outline-light" href="{{ url_for('tvw_recipes.tvw_purchase_purpose',flavour_id=flavour.id) }}">Why did I buy this?</a><a class="btn btn-outline-light" href="#my-notebook">My notebook</a><a class="btn btn-outline-light" href="{{ url_for('tvw_recipes.tvw_stash') }}">Open My Stash</a></div>
     </div>
   </header>
   <nav class="flavour-section-nav" aria-label="Flavour sections"><a href="#review-knowledge">Flavour knowledge</a><a href="#reference-reviews">Reference reviews · {{ expert_reviews|length }}</a><a href="#tasting-tests">My tasting tests</a><a href="#usage-insights">Usage data</a><a href="#pairings">Pairings</a><a href="#my-notebook">Private notebook</a><a href="#recipes">Recipes · {{ recipes_total }}</a><a href="#notes">Community notes · {{ community_counts.notes_visible }}</a><a href="#reviews">Reviews · {{ community_counts.reviews_visible }}</a></nav>
@@ -87,11 +87,11 @@
       <div class="d-flex flex-wrap gap-2 align-items-end">
         <div style="min-width:8rem">
           <label class="form-label small text-secondary mb-0">Qty (ml)</label>
-          <input id="stashQtyInput" type="number" min="0" step="0.1" class="form-control form-control-sm text-end" value="{{ '%.2f'|format(stash_binding.quantity_ml|float) }}">
+          <input id="stashQtyInput" type="number" min="0" step="any" class="form-control form-control-sm text-end" value="{{ '%.2f'|format(stash_binding.quantity_ml|float) }}">
         </div>
         <button id="stashSaveBtn" type="button" class="btn btn-sm btn-outline-success">Save to stash</button>
         <button id="stashRemoveBtn" type="button" class="btn btn-sm btn-outline-danger">Remove from stash</button>
-        <span id="stashStatus" class="small text-secondary"></span>
+        <span id="stashStatus" role="status" class="small text-secondary"></span>
       </div>
     </div>
   </section>
@@ -260,8 +260,19 @@
     });
   };
 
+  const showStashQuantity = (qty) => {
+    stashQtyInput.value = String(qty);
+    document.getElementById("stashSummaryQty").textContent = `${qty.toFixed(2)} ml`;
+    document.getElementById("stashSummaryAction").textContent = qty > 0 ? "Update stash" : "Add to stash";
+  };
+
   stashSaveBtn?.addEventListener("click", async () => {
-    const qty = Number(stashQtyInput?.value || 0);
+    const qty = stashQtyInput.valueAsNumber;
+    if (!Number.isFinite(qty) || qty < 0) {
+      stashStatus.textContent = "Enter a quantity of zero or more ml.";
+      stashQtyInput.focus();
+      return;
+    }
     let body = {};
     if (stashBinding?.is_lab_linked) {
       if (stashBinding.reference_id) body = { reference_id: Number(stashBinding.reference_id), quantity_ml: qty };
@@ -269,15 +280,22 @@
     } else {
       body = { flavour_id: flavourId, quantity_ml: qty };
     }
+    stashSaveBtn.disabled = true;
+    stashRemoveBtn.disabled = true;
+    stashStatus.textContent = "Saving…";
     try {
-      await apiJson("/api/stash", {
+      const result = await apiJson("/api/stash", {
         method: "PATCH",
         body: JSON.stringify(body),
       });
-      document.getElementById("stashSummaryQty").textContent = `${qty.toFixed(2)} ml`;
-      stashStatus.textContent = "Saved";
+      if (result.status !== "success") throw new Error("Could not save stash entry.");
+      showStashQuantity(qty);
+      stashStatus.textContent = `Saved ${qty} ml to your stash.`;
     } catch (e) {
       stashStatus.textContent = e.message || "Could not save stash entry.";
+    } finally {
+      stashSaveBtn.disabled = false;
+      stashRemoveBtn.disabled = false;
     }
   });
 
@@ -286,13 +304,18 @@
     const url = stashBinding?.is_lab_linked && stashBinding?.reference_id && !flavourId
       ? `/api/stash/reference/${Number(stashBinding.reference_id)}`
       : `/api/stash/${flavourId}`;
+    stashSaveBtn.disabled = true;
+    stashRemoveBtn.disabled = true;
     try {
-      await apiJson(url, { method: "DELETE" });
-      stashQtyInput.value = "0.00";
-      document.getElementById("stashSummaryQty").textContent = "0.00 ml";
+      const result = await apiJson(url, { method: "DELETE" });
+      if (result.status !== "success") throw new Error("Could not remove stash entry.");
+      showStashQuantity(0);
       stashStatus.textContent = "Removed";
     } catch (e) {
       stashStatus.textContent = e.message || "Could not remove stash entry.";
+    } finally {
+      stashSaveBtn.disabled = false;
+      stashRemoveBtn.disabled = false;
     }
   });
 
