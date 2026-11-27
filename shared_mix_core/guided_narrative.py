@@ -900,7 +900,7 @@ def build_live_coach_summary(
         label = "Overshooting trend"
         severity = "warning"
         detail = (
-            "You are overshooting slightly. Use shorter pulse pours in the final margin."
+            "Repeated overpours noted. Use shorter pulse pours in the final margin."
             if not tone.strict
             else "Overshoot trend detected. Reduce flow and apply final-margin pulse control."
         )
@@ -944,7 +944,7 @@ def build_live_coach_summary(
         severity = "info"
         if overshoot_count > 0:
             detail = (
-                "Recent slight overpour noted. Keep the next pours controlled."
+                "Recent overpour noted. Keep the next pours controlled."
                 if not tone.strict
                 else "Recent over-target noted. Maintain strict pace and verification."
             )

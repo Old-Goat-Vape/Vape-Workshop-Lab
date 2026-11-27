@@ -82,6 +82,9 @@ def build_mix_input_from_recipe_version(
     if not version_row or int(version_row.get("recipe_id") or 0) != int(recipe_id):
         raise ValueError("Recipe/version mismatch.")
 
+    from db import get_db
+    from config.recipe_quality import assert_mixable
+    assert_mixable(get_db(), recipe_id, version_id)
     formula_rows = recipes_repo.fetch_version_items_with_stock(version_id)
     if not formula_rows:
         raise ValueError("Recipe version has no ingredients.")

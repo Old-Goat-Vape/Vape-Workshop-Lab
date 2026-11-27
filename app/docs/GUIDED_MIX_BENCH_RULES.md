@@ -555,3 +555,13 @@ Fractional recovery targets (for example 45.1 ml) must retain their decimal part
 Home resume, history, recipe links, bench metadata and final batch headings. Show
 measured-split history only when a split was actually recorded; one-vessel rescues
 retain original pours and top-ups without inventing a transfer.
+
+
+### Recovery re-weighing (member workflow regression, 27 November 2026)
+
+A serious flavour-overpour review offers **Re-weigh current ingredient**. This
+retires only the current unresolved review and returns to the original open pour
+without taring, accepting a dose or changing remaining targets. Preserve the old
+reading in the event history, clear it from the active input, and evaluate the new
+reading normally, including creating a new recovery for another serious overpour.
+Do not label an unspecified or serious overpour as slight in coaching.
