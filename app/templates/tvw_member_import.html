@@ -5,7 +5,7 @@
   <h1>Import recipes or stash</h1>
   <p>Upload a Vaping Community Calculator recipe export, a SessionDrummer stash export, or a stash CSV with <code>brand,flavour,quantity_ml</code> columns. Quantities are in ml.</p>
   <p>Recipes import as private works in progress. Existing stash quantities stay as they are. Flavours must match the catalogue before their records can be imported.</p>
-  <form id="member-import-form" method="post" enctype="multipart/form-data">
+  <form id="member-import-form" action="{{ url_for('tvw_recipes.tvw_member_import') }}" method="post" enctype="multipart/form-data">
     <div class="mb-3">
       <label for="member-import-file" class="form-label">CSV file</label>
       <input id="member-import-file" name="file" class="form-control" type="file" accept=".csv,text/csv" required>
@@ -17,5 +17,5 @@
     </div>
   </form>
 </div>
-<script src="{{ url_for('static', filename='tvw-member-import.js') }}" defer></script>
+<script src="{{ url_for('static', filename='tvw-member-import.js', v=2) }}" defer></script>
 {% endblock %}
