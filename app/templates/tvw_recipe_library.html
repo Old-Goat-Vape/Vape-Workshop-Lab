@@ -58,7 +58,10 @@
         · <strong>{{ scope_counts.public }}</strong> community
       </p>
     </div>
-    <a class="btn btn-warning tvw-lib-create" href="{{ url_for('tvw_recipes.tvw_recipe_new') }}">Create recipe</a>
+    <div class="d-flex flex-wrap gap-2">
+      <a class="btn btn-outline-light" href="{{ url_for('tvw_recipes.tvw_member_import') }}">Import CSV</a>
+      <a class="btn btn-warning tvw-lib-create" href="{{ url_for('tvw_recipes.tvw_recipe_new') }}">Create recipe</a>
+    </div>
   </header>
 
   {% if viewer_is_old_goat %}

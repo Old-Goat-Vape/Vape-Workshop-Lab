@@ -1,0 +1,49 @@
+{% if error %}<p class="alert alert-warning" role="alert">{{ error }}</p>{% endif %}
+{% if rows %}
+  {% set matched = rows|rejectattr('issue', 'defined')|list %}
+  {% set skipped = rows|length - matched|length %}
+  {% set needs_amount = matched|rejectattr('quantity', 'defined')|list|length if kind == 'stash' else 0 %}
+  {% set ready = matched|length - needs_amount %}
+  <h2 class="h4">Import preview</h2>
+  <p>{{ ready }} ready to import{% if needs_amount %} · {{ needs_amount }} need quantities{% endif %} · {{ skipped }} to skip</p>
+  {% if kind == 'recipes' %}
+    <p>VC exports do not include batch settings. Review the PG/VG ratio and nicotine settings before mixing.</p>
+  {% elif lab_linked %}
+    <p>New stash items will be added to the shared Lab holdings.</p>
+  {% endif %}
+  {% if needs_amount %}
+    <p>Enter how many ml you have for the matched flavours you want to import. Leave an amount blank to skip that flavour.</p>
+  {% endif %}
+  {% if matched %}
+    <input type="hidden" name="preview_token" value="{{ token }}">
+    <button type="submit" name="action" value="apply" class="btn btn-warning mb-3">{% if needs_amount %}Import stash items with quantities{% else %}Import {{ ready }} {{ 'recipes' if kind == 'recipes' else 'stash items' }}{% endif %}</button>
+  {% endif %}
+  <div class="table-responsive">
+    <table class="table table-sm">
+      <thead><tr><th scope="col">{{ 'Recipe' if kind == 'recipes' else 'Flavour' }}</th><th scope="col">Result</th></tr></thead>
+      <tbody>
+        {% for row in rows %}
+          <tr>
+            <td>{{ row.name }}{% if kind == 'stash' and row.quantity is defined %} · {{ row.quantity }} ml{% endif %}</td>
+            <td>
+              {% if row.issue is defined %}
+                {{ row.issue }}
+              {% elif kind == 'stash' and row.quantity is not defined %}
+                <label class="visually-hidden" for="import-quantity-{{ loop.index0 }}">Quantity in ml for {{ row.name }}</label>
+                <input class="form-control form-control-sm" id="import-quantity-{{ loop.index0 }}"
+                       type="number" inputmode="decimal" min="0" max="1000000" step="any"
+                       placeholder="Quantity (ml)" name="quantity_{{ loop.index0 }}" value="{{ row.entered_quantity|default('') }}"
+                       {% if row.quantity_error is defined %}aria-invalid="true" aria-describedby="import-quantity-error-{{ loop.index0 }}"{% endif %}>
+                {% if row.quantity_error is defined %}
+                  <div class="text-danger" id="import-quantity-error-{{ loop.index0 }}">{{ row.quantity_error }}</div>
+                {% endif %}
+              {% else %}
+                Ready to import
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
