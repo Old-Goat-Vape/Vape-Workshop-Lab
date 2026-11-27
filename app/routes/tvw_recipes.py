@@ -85,6 +85,19 @@ def _render_recipe_builder(
 @tvw_recipes_bp.route("/recipes/new")
 @login_required
 def tvw_recipe_new():
+    if request.args.get('guided') == '1':
+        from services.stash_recipe_guide_service import build_context, draft_rows
+        context = build_context(user_id=int(session['user_id']), role=session.get('role'), username=session.get('username'))
+        try:
+            selected = [int(v) for v in request.args.getlist('flavour')]
+            rows = draft_rows(context, selected, [request.args.get(f'pct_{rid}', '') for rid in selected])
+        except (ValueError, TypeError):
+            flash('Check your selected flavours, percentages and stock for a 10 ml test.', 'warning')
+            return redirect(url_for('tvw_community.recipe_guide'))
+        return _render_recipe_builder(mode='create', flavour_rows=rows, form_values=dict(
+            name='My stash experiment', visibility='private', status='wip', calc_target_ml='10',
+            calc_target_nic='0', calc_pg_ratio='30', calc_vg_ratio='70',
+            notes='Stash recipe guide beta: experimental starting point based on aggregate recipe usage. Record your tasting, steep age, balance, sweetness, cooling and next adjustment here.'))
     if request.args.get('practice') == '1':
         return _render_recipe_builder(mode='create',form_values=dict(name='My first practice mix',visibility='private',status='wip',calc_target_ml='10',calc_target_nic='0',calc_pg_ratio='30',calc_vg_ratio='70'))
     return _render_recipe_builder(mode="create")
