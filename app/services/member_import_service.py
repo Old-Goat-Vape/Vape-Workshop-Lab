@@ -22,6 +22,7 @@ VC_HEADER = (
     "released", "image", "profile",
 )
 STASH_HEADER = {"brand", "flavour", "quantity_ml"}
+SD_STASH_HEADER = {"manufacturer", "flavor", "on hand (ml)", "cost/bottle", "cost/ml", "location"}
 PROFILE_MAP = {name.lower(): name for name in recipe_story_service.PROFILES} | {
     "fruity": "Fruit", "nutty": "Nut", "spicy": "Spice", "cooling": "Menthol",
     "cake": "Bakery", "cookie": "Bakery", "ice cream": "Cream",
@@ -94,15 +95,27 @@ def _vc_recipe(values):
     }
 
 
-def _stash_item(values):
-    brand, name, raw = values["brand"].strip(), values["flavour"].strip(), values["quantity_ml"].strip()
+def _stash_quantity(raw):
     try:
         quantity = float(raw)
     except ValueError:
         raise ValueError("Enter a quantity in ml.") from None
-    if not brand or not name or not math.isfinite(quantity) or not 0 <= quantity <= 1_000_000:
-        raise ValueError("Enter a brand, flavour and a valid quantity in ml.")
-    return {"name": f"{brand} · {name}", "key": canonical_item(brand, name)[2], "quantity": quantity}
+    if not math.isfinite(quantity) or not 0 <= quantity <= 1_000_000:
+        raise ValueError("Quantity must be between 0 and 1,000,000 ml.")
+    return quantity
+
+
+def _stash_item(brand, name, raw, *, allow_missing_amount=False):
+    brand, name, raw = brand.strip(), name.strip(), raw.strip()
+    if not brand or not name:
+        return {"name": name or brand or "Unnamed flavour", "issue": "Manufacturer and flavour name needed"}
+    row = {"name": f"{brand} · {name}", "key": canonical_item(brand, name)[2]}
+    if raw or not allow_missing_amount:
+        try:
+            row["quantity"] = _stash_quantity(raw)
+        except ValueError as error:
+            row["issue"] = str(error)
+    return row
 
 
 def read_export(data):
@@ -123,9 +136,16 @@ def read_export(data):
         elif len(header) == 3 and set(header) == STASH_HEADER:
             body_delimiter = delimiter
             kind = "stash"
-            read_row = lambda values: _stash_item(dict(zip(header, values)))
+            read_row = lambda values: _stash_item(*(values[header.index(key)] for key in ("brand", "flavour", "quantity_ml")))
+        elif len(header) == len(SD_STASH_HEADER) and set(header) == SD_STASH_HEADER:
+            body_delimiter = delimiter
+            kind = "stash"
+            read_row = lambda values: _stash_item(
+                *(values[header.index(key)] for key in ("manufacturer", "flavor", "on hand (ml)")),
+                allow_missing_amount=True,
+            )
         else:
-            raise ValueError("Use a VC recipe export or a stash CSV with brand, flavour, quantity_ml columns.")
+            raise ValueError("Use a VC recipe export, an SD stash export, or a stash CSV with brand, flavour, quantity_ml columns.")
 
         entries = []
         for number, values in enumerate(csv.reader(io.StringIO(rest, newline=""), delimiter=body_delimiter, strict=True), 1):
@@ -223,12 +243,27 @@ def preview(kind, entries, *, user_id, lab_linked):
     return results
 
 
+def fill_missing_amounts(rows, form):
+    """Apply entered amounts only to matched, new items whose export lacked a quantity."""
+    for index, row in enumerate(rows):
+        if "issue" in row or "quantity" in row:
+            continue
+        raw = form.get(f"quantity_{index}", "").strip()
+        if not raw:
+            continue
+        row["entered_quantity"] = raw
+        try:
+            row["quantity"] = _stash_quantity(raw)
+        except ValueError as error:
+            row["quantity_error"] = str(error)
+
+
 def apply(kind, rows, *, user_id, lab_linked):
     """Save only reviewed rows inside the caller's transaction."""
     db = get_db()
     count = 0
     for row in rows:
-        if row.get("issue"):
+        if row.get("issue") or (kind == "stash" and "quantity" not in row):
             continue
         if kind == "recipes":
             recipe_id = recipes_repo.insert_recipe(name=row["name"], recipe_code=row["code"], status="WIP", created_by=user_id)

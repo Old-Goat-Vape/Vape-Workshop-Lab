@@ -1263,6 +1263,7 @@ def tvw_member_import():
     if request.method == "GET":
         return page()
 
+    request.max_form_parts = imports.MAX_ROWS + 10
     action = request.form.get("action")
     fragment = action == "preview" and request.headers.get("X-TVW-Import-Preview") == "1"
     if action not in {"preview", "apply"}:
@@ -1300,6 +1301,15 @@ def tvw_member_import():
         if not secrets.compare_digest(digest, approved["digest"]):
             session.pop("member_import_preview", None)
             return page(error="The file, catalogue or stash changed. Preview the CSV again.", status=409)
+        if kind == "stash":
+            imports.fill_missing_amounts(rows, request.form)
+            if any("quantity_error" in row for row in rows):
+                # Keep the approved preview intact so a corrected value can be resubmitted.
+                for row in rows:
+                    if "entered_quantity" in row:
+                        row.pop("quantity", None)
+                return page(rows=rows, kind=kind, token=token, lab_linked=lab_linked,
+                            error="Correct the quantities marked below.", status=400)
         count = imports.apply(kind, rows, user_id=user_id, lab_linked=lab_linked)
     session.pop("member_import_preview", None)
     label = "private recipes" if kind == "recipes" else "stash items"

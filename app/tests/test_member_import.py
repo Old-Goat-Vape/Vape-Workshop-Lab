@@ -26,9 +26,10 @@ class MemberImportTests(unittest.TestCase):
     tearDown = base.RecipeBuilderCreateTests.tearDown
     _login = base.RecipeBuilderCreateTests._login
 
-    def upload(self, data, action, token=""):
+    def upload(self, data, action, token="", **quantities):
         return self.client.post("/imports", data={
             "file": (io.BytesIO(data), "export.csv"), "action": action, "preview_token": token,
+            **quantities,
         })
 
     def token(self, response):
@@ -102,6 +103,40 @@ class MemberImportTests(unittest.TestCase):
         with base.flask_app.app_context():
             stock = get_db().execute("SELECT reference_id,current_stock FROM library_items ORDER BY reference_id")
             self.assertEqual([tuple(row) for row in stock], [(101, 2), (102, 4.5)])
+
+    def test_sd_stash_keeps_blank_amounts_optional_and_uses_supplied_stock(self):
+        self._login(1, "member1", "member")
+        with base.flask_app.app_context():
+            db = get_db()
+            db.executemany(
+                "INSERT INTO flavours(id,brand,canonical_name,category,source_flavor_ref_id) VALUES(?,'Test',?,'Flavor',?)",
+                [(1, "Vanilla", 101), (2, "Cream", 102), (3, "Fruit", None), (4, "Chocolate", None)],
+            )
+            db.commit()
+        data = (
+            b'Manufacturer,Flavor,"On Hand (ml)",Cost/Bottle,Cost/ml,Location\n'
+            b'Test,Vanilla,,12,3,Box\nTest,Cream,7.5,,,\nTest,Fruit,,,,\n'
+            b'Test,Chocolate,,,,\n,Brandless,,,,\nTest,Unknown,,,,\n'
+        )
+        preview = self.upload(data, "preview")
+        self.assertIn("1 ready to import · 3 need quantities · 2 to skip", preview.text)
+        self.assertIn("Manufacturer and flavour name needed", preview.text)
+        self.assertIn("Catalogue match needed", preview.text)
+        token = self.token(preview)
+        invalid = self.upload(data, "apply", token, quantity_0="3.25", quantity_2="-1")
+        self.assertEqual(invalid.status_code, 400)
+        fields = BeautifulSoup(invalid.data, "html.parser")
+        self.assertEqual(fields.select_one('[name="quantity_0"]')["value"], "3.25")
+        self.assertEqual(fields.select_one('[name="quantity_2"]')["aria-invalid"], "true")
+        with base.flask_app.app_context():
+            self.assertEqual(get_db().execute("SELECT COUNT(*) FROM user_stash_items").fetchone()[0], 0)
+        result = self.upload(data, "apply", token, quantity_0="3.25", quantity_1="99", quantity_2="0", quantity_4="5")
+        self.assertEqual(result.status_code, 302)
+        with base.flask_app.app_context():
+            rows = get_db().execute("SELECT flavour_id,quantity_ml FROM user_stash_items ORDER BY flavour_id")
+            self.assertEqual([tuple(row) for row in rows], [(1, 3.25), (2, 7.5), (3, 0)])
+        repeat = self.upload(data, "preview")
+        self.assertIn("0 ready to import · 1 need quantities · 5 to skip", repeat.text)
 
     def test_stale_preview_does_not_overwrite_stash(self):
         self._login(1, "member1", "member")
