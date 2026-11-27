@@ -263,7 +263,7 @@ def apply(kind, rows, *, user_id, lab_linked):
     db = get_db()
     count = 0
     for row in rows:
-        if row.get("issue") or (kind == "stash" and "quantity" not in row):
+        if row.get("issue"):
             continue
         if kind == "recipes":
             recipe_id = recipes_repo.insert_recipe(name=row["name"], recipe_code=row["code"], status="WIP", created_by=user_id)
@@ -283,12 +283,14 @@ def apply(kind, rows, *, user_id, lab_linked):
             recipes_repo.insert_recipe_items(version_id=version_id, items=row["items"])
             recipes_repo.set_current_version(recipe_id=recipe_id, version_id=version_id)
         elif lab_linked:
+            quantity = row.get("quantity")
+            status = "Quantity unknown" if quantity is None else "In Use" if quantity > 0.05 else "Empty"
             db.execute("""INSERT INTO library_items
                 (reference_id, current_stock, unit, low_stock_threshold, status, active)
                 VALUES (?, ?, 'ml', 10.0, ?, 1)""",
-                (row["target"], row["quantity"], "In Use" if row["quantity"] > 0.05 else "Empty"))
+                (row["target"], quantity if quantity is not None else 0.0, status))
         else:
             db.execute("INSERT INTO user_stash_items (user_id, flavour_id, quantity_ml) VALUES (?, ?, ?)",
-                       (user_id, row["target"], row["quantity"]))
+                       (user_id, row["target"], row.get("quantity")))
         count += 1
     return count

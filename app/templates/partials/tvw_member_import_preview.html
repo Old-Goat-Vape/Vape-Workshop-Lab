@@ -5,18 +5,18 @@
   {% set needs_amount = matched|rejectattr('quantity', 'defined')|list|length if kind == 'stash' else 0 %}
   {% set ready = matched|length - needs_amount %}
   <h2 class="h4">Import preview</h2>
-  <p>{{ ready }} ready to import{% if needs_amount %} · {{ needs_amount }} need quantities{% endif %} · {{ skipped }} to skip</p>
+  <p>{{ ready }} ready to import{% if needs_amount %} · {{ needs_amount }} will import with unknown quantities{% endif %} · {{ skipped }} to skip</p>
   {% if kind == 'recipes' %}
     <p>VC exports do not include batch settings. Review the PG/VG ratio and nicotine settings before mixing.</p>
   {% elif lab_linked %}
     <p>New stash items will be added to the shared Lab holdings.</p>
   {% endif %}
   {% if needs_amount %}
-    <p>Enter how many ml you have for the matched flavours you want to import. Leave an amount blank to skip that flavour.</p>
+    <p>Enter quantities now or leave them blank and fill them in later in My Stash. What Can I Make? only counts measured stock.</p>
   {% endif %}
   {% if matched %}
     <input type="hidden" name="preview_token" value="{{ token }}">
-    <button type="submit" name="action" value="apply" class="btn btn-warning mb-3">{% if needs_amount %}Import stash items with quantities{% else %}Import {{ ready }} {{ 'recipes' if kind == 'recipes' else 'stash items' }}{% endif %}</button>
+    <button type="submit" name="action" value="apply" class="btn btn-warning mb-3">Import {{ matched|length }} {{ 'recipes' if kind == 'recipes' else 'stash items' }}</button>
   {% endif %}
   <div class="table-responsive">
     <table class="table table-sm">

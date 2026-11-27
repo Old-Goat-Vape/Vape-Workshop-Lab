@@ -12,7 +12,7 @@ def upsert_user_stash_item(
     *,
     user_id: int,
     flavour_id: int,
-    quantity_ml: float,
+    quantity_ml: float | None,
     is_favorite: bool,
     last_used_at: str,
 ) -> int:
@@ -20,7 +20,7 @@ def upsert_user_stash_item(
     db = get_db()
     uid = int(user_id)
     fid = int(flavour_id)
-    qty = float(quantity_ml)
+    qty = float(quantity_ml) if quantity_ml is not None else None
     fav = 1 if is_favorite else 0
     rows = db.execute(
         "SELECT id FROM user_stash_items WHERE user_id = ? AND flavour_id = ? ORDER BY id ASC",
@@ -122,6 +122,7 @@ def build_stash_page_rows(
                     "is_favorite": False,
                     "tvw_mapped": bool(it.get("tvw_mapped", True)),
                     "lab_status": str(it.get("status") or ""),
+                    "quantity_unknown": it.get("status") == "Quantity unknown",
                     "last_used_at": None,
                     "source": source,
                 }
@@ -146,6 +147,7 @@ def build_stash_page_rows(
                     "is_favorite": bool(int(r.get("is_favorite") or 0)),
                     "tvw_mapped": True,
                     "lab_status": None,
+                    "quantity_unknown": r.get("quantity_ml") is None,
                     "last_used_at": r.get("last_used_at"),
                     "source": source,
                 }
