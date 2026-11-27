@@ -1256,7 +1256,8 @@ def tvw_member_import():
 
     def page(*, fragment=False, status=200, **values):
         template = "partials/tvw_member_import_preview.html" if fragment else "tvw_member_import.html"
-        response = make_response(render_template(template, **values), status)
+        review_count = len(imports.review_candidates(values.get("rows", ())))
+        response = make_response(render_template(template, review_count=review_count, **values), status)
         response.headers["Cache-Control"] = "private, no-store"
         return response
 
@@ -1311,6 +1312,7 @@ def tvw_member_import():
                 return page(rows=rows, kind=kind, token=token, lab_linked=lab_linked,
                             error="Correct the quantities marked below.", status=400)
         count = imports.apply(kind, rows, user_id=user_id, lab_linked=lab_linked)
+        queued = imports.queue_review_requests(rows, user_id=user_id)
         unknown_count = sum("issue" not in row and "quantity" not in row for row in rows) if kind == "stash" else 0
     session.pop("member_import_preview", None)
     label = "private recipes" if kind == "recipes" else "stash items"
@@ -1319,6 +1321,8 @@ def tvw_member_import():
         flash(f"Imported {count} {label}.{unknown_note} Skipped {len(rows) - count} records.", "success")
     else:
         flash(f"No {label} imported. The preview explains why the records were skipped.", "warning")
+    if queued:
+        flash(f"Sent {queued} flavour request(s) to admins for review.", "info")
     return redirect(url_for("tvw_recipes.tvw_recipe_library", mine=1) if kind == "recipes" else url_for("tvw_recipes.tvw_stash"))
 
 

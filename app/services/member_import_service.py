@@ -10,9 +10,10 @@ from html import unescape
 from bs4 import BeautifulSoup
 
 from config.catalogue_identity import canonical_item, recipe_flavour_sql, visible_flavour_sql
+from config.catalogue_product_policy import recipe_product_allowed
 from db import get_db
 from models import recipes_repo
-from services import recipe_story_service
+from services import flavour_request_service, recipe_story_service
 
 MAX_BYTES = 4 * 1024 * 1024
 MAX_ROWS = 2000
@@ -109,7 +110,7 @@ def _stash_item(brand, name, raw, *, allow_missing_amount=False):
     brand, name, raw = brand.strip(), name.strip(), raw.strip()
     if not brand or not name:
         return {"name": name or brand or "Unnamed flavour", "issue": "Manufacturer and flavour name needed"}
-    row = {"name": f"{brand} · {name}", "key": canonical_item(brand, name)[2]}
+    row = {"name": f"{brand} · {name}", "identity": (brand, name), "key": canonical_item(brand, name)[2]}
     if raw or not allow_missing_amount:
         try:
             row["quantity"] = _stash_quantity(raw)
@@ -181,12 +182,13 @@ def _reference_index(db):
 
 def _stash_index(db, user_id, lab_linked):
     if lab_linked:
-        rows = db.execute("""SELECT fr.brand, fr.name, fr.category FROM library_items li
-            JOIN flavor_reference fr ON fr.id=li.reference_id WHERE li.active=1""")
+        rows = db.execute("""SELECT li.reference_id AS target, fr.brand, fr.name, fr.category FROM library_items li
+            JOIN flavor_reference fr ON fr.id=li.reference_id WHERE li.active=1""").fetchall()
     else:
-        rows = db.execute("""SELECT f.brand, f.canonical_name AS name, f.category FROM user_stash_items s
-            JOIN flavours f ON f.id=s.flavour_id WHERE s.user_id=?""", (user_id,))
-    existing = {canonical_item(row["brand"], row["name"], row["category"])[2] for row in rows}
+        rows = db.execute("""SELECT f.id AS target, f.brand, f.canonical_name AS name, f.category FROM user_stash_items s
+            JOIN flavours f ON f.id=s.flavour_id WHERE s.user_id=?""", (user_id,)).fetchall()
+    existing = {row["target"] for row in rows}
+    existing_keys = {canonical_item(row["brand"], row["name"], row["category"])[2] for row in rows}
     index = {}
     for row in db.execute(f"""SELECT id, source_flavor_ref_id, brand, canonical_name, category FROM flavours f
         WHERE {visible_flavour_sql('f')} ORDER BY source_flavor_ref_id IS NULL, id"""):
@@ -194,18 +196,58 @@ def _stash_index(db, user_id, lab_linked):
         if target is not None:
             index.setdefault(canonical_item(row["brand"], row["canonical_name"], row["category"])[2], target)
     index.pop(None, None)
-    return index, existing
+    return index, existing, existing_keys
+
+
+def _reviewed_matches(db, *, use_references):
+    reviewed_keys = {row[0] for row in db.execute("SELECT DISTINCT identity_key FROM flavour_requests")}
+    matches = {}
+    for row in db.execute(f"""SELECT r.identity_key, f.id, f.source_flavor_ref_id
+        FROM flavour_requests r JOIN flavours f ON f.id = r.flavour_id
+        WHERE r.status IN ('added', 'matched') AND {visible_flavour_sql('f')}
+        ORDER BY r.id DESC"""):
+        target = row["source_flavor_ref_id"] if use_references else row["id"]
+        if target is not None:
+            matches.setdefault(row["identity_key"], target)
+    return reviewed_keys, matches
+
+
+def _request_candidate(brand, name, reviewed_keys):
+    try:
+        key = flavour_request_service.request_identity(brand, name)
+    except ValueError:
+        return None
+    if key not in reviewed_keys and recipe_product_allowed(brand, name, "Flavor"):
+        return key, brand, name
+    return None
+
+
+def review_candidates(rows):
+    """One request per catalogue identity, including ingredients repeated across recipes."""
+    return {
+        key: (brand, name)
+        for row in rows for key, brand, name in row.get("review_flavours", ())
+    }
+
+
+def queue_review_requests(rows, *, user_id):
+    return sum(
+        flavour_request_service.submit(user_id, brand, name, "", commit=False)
+        for brand, name in review_candidates(rows).values()
+    )
 
 
 def preview(kind, entries, *, user_id, lab_linked):
     db = get_db()
+    reviewed_keys, reviewed_matches = _reviewed_matches(db, use_references=kind == "recipes" or lab_linked)
     if kind == "recipes":
-        references = _reference_index(db)
+        references = reviewed_matches | _reference_index(db)
         existing = {row[0] for row in db.execute("SELECT recipe_code FROM recipes WHERE recipe_code LIKE ?", (f"member-vc-{user_id}-%",))}
         duplicates = Counter(entry.get("source_id") for entry in entries)
     else:
-        targets, existing = _stash_index(db, user_id, lab_linked)
-        duplicates = Counter(entry.get("key") for entry in entries)
+        catalogue, existing, existing_keys = _stash_index(db, user_id, lab_linked)
+        targets = reviewed_matches | catalogue
+        duplicates = Counter(targets.get(entry["key"]) for entry in entries if "issue" not in entry)
     results = []
     for entry in entries:
         result = dict(entry)
@@ -215,10 +257,14 @@ def preview(kind, entries, *, user_id, lab_linked):
                 code = f"member-vc-{user_id}-{source_id}"
                 items = {}
                 missing = []
+                candidates = []
                 for brand, name, amount in entry["ingredients"]:
                     reference = references.get(canonical_item(brand, name)[2])
                     if reference is None:
                         missing.append(f"{brand} · {name}")
+                        candidate = _request_candidate(brand, name, reviewed_keys)
+                        if candidate:
+                            candidates.append(candidate)
                     else:
                         items[reference] = items.get(reference, 0) + amount
                 if code in existing:
@@ -227,18 +273,23 @@ def preview(kind, entries, *, user_id, lab_linked):
                     result["issue"] = "Duplicate VC recipe ID in this file"
                 elif missing:
                     result["issue"] = "Catalogue match needed for " + ", ".join(dict.fromkeys(missing))
+                    result["review_flavours"] = candidates
                 else:
                     result.update(code=code, items=list(items.items()))
             else:
                 key = entry["key"]
-                if key in existing:
+                target = targets.get(key)
+                if key in existing_keys or target in existing:
                     result["issue"] = "Already in your stash. Saved quantity kept."
-                elif key not in targets:
+                elif target is None:
                     result["issue"] = "Catalogue match needed"
-                elif duplicates[key] > 1:
+                    candidate = _request_candidate(*entry["identity"], reviewed_keys)
+                    if candidate:
+                        result["review_flavours"] = [candidate]
+                elif duplicates[target] > 1:
                     result["issue"] = "Duplicate flavour in this file. Combine the quantities before importing."
                 else:
-                    result["target"] = targets[key]
+                    result["target"] = target
         results.append(result)
     return results
 
