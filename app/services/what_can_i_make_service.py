@@ -72,7 +72,7 @@ def fetch_stash_reference_qty_ml(
             if ml <= MIN_STASH_ML:
                 continue
             qty[rid] = qty.get(rid, 0.0) + ml
-        return qty, "lab_shared_holdings"
+        return _expand_equivalent_stock(qty), "lab_shared_holdings"
 
     if not user_id:
         return {}, "user_stash_items"
@@ -122,11 +122,29 @@ def fetch_stash_reference_qty_ml(
             continue
         qty[int(ref_id)] += ml
 
-    return dict(qty), "user_stash_items"
+    return _expand_equivalent_stock(dict(qty)), "user_stash_items"
+
+
+def _expand_equivalent_stock(qty):
+    from config.catalogue_identity import equivalent_recipe_reference_ids
+    expanded = dict(qty)
+    # Each group is summed once, even when stock uses two legacy references.
+    visited = set()
+    for reference_id in qty:
+        if reference_id in visited:
+            continue
+        equivalents = equivalent_recipe_reference_ids(get_db(), reference_id) or [reference_id]
+        total = sum(qty.get(ref, 0) for ref in equivalents)
+        for ref in equivalents:
+            expanded[ref] = total
+        visited.update(equivalents)
+    return expanded
 
 
 def _fetch_public_recipes_for_scan(*, limit: int, viewer_user_id: int | None = None) -> list[dict[str, Any]]:
     db = get_db()
+    from config.recipe_quality import recipe_quality_sql
+    quality = recipe_quality_sql("r")
     pub = recipes_repo.tvw_recipe_public_list_predicate_sql("r")
     from services.recipe_sharing_service import grant_sql
     visibility = f"(({pub}) OR r.created_by = ? OR (({recipes_repo.tvw_recipe_analytics_predicate_sql('r')}) AND {grant_sql()}))" if viewer_user_id is not None else f"({pub})"
@@ -145,6 +163,10 @@ def _fetch_public_recipes_for_scan(*, limit: int, viewer_user_id: int | None = N
         WHERE r.active = 1
           AND r.current_version_id IS NOT NULL
           AND {visibility}
+          AND {quality}
+          AND EXISTS (SELECT 1 FROM recipe_items qi WHERE qi.version_id=rv.id AND qi.amount_percent>0)
+          AND NOT EXISTS (SELECT 1 FROM recipe_items qi WHERE qi.version_id=rv.id AND COALESCE(qi.amount_percent,0)<=0)
+          AND (SELECT SUM(qi.amount_percent) FROM recipe_items qi WHERE qi.version_id=rv.id)<=100
         ORDER BY r.updated_at DESC, r.id DESC
         LIMIT ?
         """,
@@ -185,6 +207,18 @@ def fetch_version_ingredients_map(version_ids: list[int]) -> dict[int, list[dict
                     "name": r["name"],
                 }
             )
+    # A recipe can contain legacy aliases for the same physical flavour. Combine
+    # their requirements so one bottle is never counted twice as available stock.
+    from config.catalogue_identity import canonical_item
+    for vid, items in out.items():
+        grouped = {}
+        for item in items:
+            key = canonical_item(item['brand'], item['name'], 'Flavor')[2] or str(item['ingredient_id'])
+            if key in grouped:
+                grouped[key]['amount_percent'] += item['amount_percent']
+            else:
+                grouped[key] = dict(item)
+        out[vid] = list(grouped.values())
     return dict(out)
 
 
@@ -197,24 +231,24 @@ def _reference_to_display_flavour_ids(reference_ids: set[int]) -> dict[int, int 
     if not reference_ids:
         return {}
     db = get_db()
+    from config.catalogue_identity import canonical_item, visible_flavour_sql
+    # Build the catalogue index once rather than an unindexed cross join per ref.
+    pages = {}
+    direct = {}
+    for row in db.execute(f"SELECT f.id,f.brand,f.canonical_name,f.category,f.source_flavor_ref_id FROM flavours f WHERE {visible_flavour_sql('f')} ORDER BY f.id"):
+        key = canonical_item(row['brand'], row['canonical_name'], row['category'])[2]
+        if key:
+            pages.setdefault(key, int(row['id']))
+        if row['source_flavor_ref_id']:
+            direct.setdefault(int(row['source_flavor_ref_id']), int(row['id']))
+    result = {int(rid): None for rid in reference_ids}
     ids = list(reference_ids)
-    result: dict[int, int | None] = {int(rid): None for rid in reference_ids}
     for i in range(0, len(ids), VERSION_ID_CHUNK):
-        chunk = ids[i : i + VERSION_ID_CHUNK]
-        ph = ",".join("?" * len(chunk))
-        rows = db.execute(
-            f"""
-            SELECT source_flavor_ref_id AS ref_id, MIN(id) AS flavour_id
-            FROM flavours
-            WHERE source_flavor_ref_id IN ({ph})
-              AND COALESCE(merged_into_flavour_id, 0) = 0
-            GROUP BY source_flavor_ref_id
-            """,
-            chunk,
-        ).fetchall()
-        for r in rows:
-            rid = int(r["ref_id"])
-            result[rid] = int(r["flavour_id"]) if r["flavour_id"] is not None else None
+        chunk = ids[i:i+VERSION_ID_CHUNK]
+        marks = ','.join('?' for _ in chunk)
+        for row in db.execute(f'SELECT id,brand,name,category FROM flavor_reference WHERE id IN ({marks})', chunk):
+            key = canonical_item(row['brand'],row['name'],row['category'])[2]
+            result[int(row['id'])] = direct.get(int(row['id'])) or (pages.get(key) if key else None)
     return result
 
 

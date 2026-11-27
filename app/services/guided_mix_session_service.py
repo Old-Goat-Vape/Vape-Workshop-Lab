@@ -2572,6 +2572,30 @@ def complete_guided_step_with_policy(
         str(step_row["step_type"] or step_payload.get("step_type") or "").lower() == "recovery"
         and str(step_payload.get("source_event") or "").lower() == "overpour"
     )
+    if undo and is_overpour_review:
+        if step_row["completed_at"] or next_open_step_no != int(step_no):
+            return {"ok": False, "message": "Only the current unresolved recovery can return to re-weighing."}
+        # Recovery is inserted immediately before the still-open original pour.
+        # Retire this review, preserving the audit trail, and reopen that reading.
+        pour = db.execute("""SELECT id, payload_json FROM mix_session_steps
+            WHERE mix_session_id=? AND step_no>? AND completed_at IS NULL
+            AND step_type='add_ingredient' ORDER BY step_no LIMIT 1""",
+            (session_id, step_no)).fetchone()
+        pour_payload = json.loads(pour["payload_json"] or "{}") if pour else {}
+        if not pour or not pour_payload.get("overpour_recovery_pending"):
+            return {"ok": False, "message": "No pending pour to re-weigh. Review the saved batch."}
+        for key in ("measured_grams", "actual_ml", "measured_ml", "delta_grams",
+                    "over_by_grams", "overpour_recovery_pending", "overpour_recovery_resolved"):
+            pour_payload.pop(key, None)
+        step_payload["recovery_cancelled_for_reweigh"] = True
+        db.execute("UPDATE mix_session_steps SET payload_json=?, completed_at=datetime('now') WHERE id=?",
+                   (json.dumps(step_payload), target_step_id))
+        db.execute("UPDATE mix_session_steps SET payload_json=?, completed_at=NULL WHERE id=?",
+                   (json.dumps(pour_payload), pour["id"]))
+        _append_mix_event_log(db, int(session_id), {"event": "overpour_reweigh_requested",
+            "ingredient": step_payload.get("ingredient_name"), "previous_reading": step_payload.get("measured_amount")})
+        db.commit()
+        return {"ok": True, "message": "Re-weigh the current ingredient without taring. Enter the corrected scale reading."}
     if not undo and is_overpour_review:
         reviewed = bool(step_payload.get("recovery_reviewed"))
         if not reviewed or recovery_action != "accept_deviation" or bool(policy.overpour_hard_stop):

@@ -144,4 +144,20 @@ def bridge_to_lab():
 @tvw_community_bp.route('/first-mix')
 @login_required
 def first_mix():
-    return render_template('tvw_first_mix.html')
+    from services.what_can_i_make_service import fetch_version_ingredients_map, map_reference_ids_to_flavour_pages
+    candidates = get_db().execute(f"""SELECT r.id,r.name,r.slug,r.current_version_id
+        FROM recipes r JOIN recipe_items ri ON ri.version_id=r.current_version_id
+        WHERE {recipes_repo.tvw_recipe_public_list_predicate_sql('r')}
+          AND LOWER(r.status)='ready' AND COALESCE(r.slug,'')!=''
+        GROUP BY r.id HAVING COUNT(*) BETWEEN 2 AND 4
+          AND MIN(ri.amount_percent)>0 AND SUM(ri.amount_percent)<=30
+        ORDER BY COUNT(*),r.id LIMIT 50""").fetchall()
+    beginner_recipe = None
+    ingredient_map = fetch_version_ingredients_map([row['current_version_id'] for row in candidates])
+    links = map_reference_ids_to_flavour_pages({i['ingredient_id'] for items in ingredient_map.values() for i in items})
+    for row in candidates:
+        items = ingredient_map.get(row['current_version_id'], [])
+        if items and all(links.get(i['ingredient_id']) for i in items):
+            beginner_recipe = dict(row)
+            break
+    return render_template('tvw_first_mix.html', beginner_recipe=beginner_recipe)

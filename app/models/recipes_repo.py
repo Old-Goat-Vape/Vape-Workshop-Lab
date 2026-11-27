@@ -10,7 +10,9 @@ from db import get_db
 
 def tvw_recipe_analytics_predicate_sql(alias: str = "r") -> str:
     """Eligible aggregate source, independent of recipe visibility."""
+    from config.recipe_quality import recipe_quality_sql
     return (
+        recipe_quality_sql(alias) + " AND " +
         f"COALESCE({alias}.active, 1) = 1 AND COALESCE({alias}.is_hidden, 0) = 0 AND "
         f"LOWER(COALESCE({alias}.moderation_status, 'active')) NOT IN ('hidden', 'archived', 'removed')"
     )

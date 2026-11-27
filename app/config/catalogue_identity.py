@@ -98,6 +98,8 @@ def find_reference(db, *, brand, name, category="Flavor"):
 def register_catalogue_functions(db):
     from config.catalogue_product_policy import recipe_product_allowed
     from config.flavour_search import search_score
+    from config.recipe_quality import is_reference_collection
+    db.create_function("tvw_reference_collection", 1, is_reference_collection, deterministic=True)
 
     db.create_function("tvw_flavour_search_score", 4, search_score, deterministic=True)
 

@@ -48,6 +48,11 @@ def _alias_lookup_key(brand_raw: str) -> str:
 
 
 _LINE_BRAND_ALIASES = {
+    "fa": "FA",
+    "flavour art": "FA",
+    "flavor art": "FA",
+    "flavourart": "FA",
+    "flavorart": "FA",
     "flv": "FLV",
     "flavorah": "FLV",
     # Intentionally omit "cap"/"capella" here — series (CAP vs CAP (SL) vs CAP (ES)) needs flavour context.
