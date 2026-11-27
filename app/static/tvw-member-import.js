@@ -15,7 +15,7 @@ importForm.addEventListener('submit', async (event) => {
     importPreview.textContent = 'Checking CSV…';
 
     try {
-        const response = await fetch(importForm.action, {
+        const response = await fetch(importForm.getAttribute('action'), {
             method: 'POST',
             body: fields,
             headers: {'X-TVW-Import-Preview': '1'},
