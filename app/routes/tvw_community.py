@@ -161,3 +161,12 @@ def first_mix():
             beginner_recipe = dict(row)
             break
     return render_template('tvw_first_mix.html', beginner_recipe=beginner_recipe)
+
+
+@tvw_community_bp.route('/recipe-guide')
+@login_required
+def recipe_guide():
+    from services.stash_recipe_guide_service import build_context
+    context = build_context(user_id=int(session['user_id']), role=session.get('role'),
+                            username=session.get('username'), main_id=request.args.get('main', type=int))
+    return render_template('tvw_recipe_guide.html', **context), 200, {'Cache-Control': 'private, no-store'}

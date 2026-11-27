@@ -1,0 +1,31 @@
+{% extends 'base_public.html' %}
+{% block title %}Build from my stash | The Vape Workshop<script src="{{ url_for('static', filename='tvw-stash-guide.js') }}" defer></script>
+{% endblock %}
+{% block content %}
+<div class="container py-4" style="max-width:1000px">
+<h1>Build from my stash <span class="badge bg-info text-dark">Beta</span></h1>
+<p>Create a small experiment with flavours you own. Experienced mixers: give this a bash too, and record what you would change.</p>
+<p>Usage averages describe how each exact concentrate is used across recipes. They are a useful starting guide, including aggregate data from private recipes; individual recipes and their authors are never shown here. Averages do not guarantee that a new combination will taste balanced.</p>
+{% if not choices %}
+<p>Add your concentrates and their quantities first.</p><a class="btn btn-warning" href="{{ url_for('tvw_recipes.tvw_stash') }}">Set up my stash</a>
+{% else %}
+<form method="get" class="my-4"><label for="main" class="form-label">Choose your main flavour</label><select name="main" id="main" class="form-select" required><option value="">Choose a flavour</option>{% for row in choices if row.kind == 'flavour' %}<option value="{{ row.id }}" {% if main and main.id == row.id %}selected{% endif %}>{{ row.brand }} · {{ row.name }}</option>{% endfor %}</select><button class="btn btn-outline-warning mt-2">Find supporting flavours I own</button></form>
+{% if main %}
+<h2>Build around {{ main.name }}</h2>
+<p>Choose up to four ingredients in total. Shared-recipe counts highlight observed pairings; ingredients without a count have no pairing evidence shown. Keep your first experiment simple.</p>
+<p><strong>Sweetness:</strong> Sweeteners are common finishing touches. Some concentrates already add sweetness, so an extra sweetener is optional. <strong>Ice:</strong> Fruit mixes are often paired with cooling. Choose it if that is the effect you want, using the average for the exact coolant you own.</p>
+<form id="stashGuideForm" method="get" action="{{ url_for('tvw_recipes.tvw_recipe_new') }}">
+<input type="hidden" name="guided" value="1"><input type="hidden" name="practice" value="1">
+<div class="table-responsive"><table class="table"><caption>Only flavours in your logged stash. Quantities are checked again before opening the draft.</caption><thead><tr><th>Use</th><th>Flavour and purpose</th><th>Evidence</th><th>Starting %</th></tr></thead><tbody>
+{% for row in choices %}<tr><td><input type="checkbox" name="flavour" value="{{ row.id }}" aria-label="Use {{ row.brand }} {{ row.name }}" {% if row.id == main.id %}checked{% endif %}></td><td>{{ row.brand }} · {{ row.name }}<br><small>{{ 'Main flavour' if row.id == main.id else (row.kind if row.kind != 'flavour' else 'Possible supporting flavour') }} · {{ row.quantity_ml }} ml in stock</small></td><td>{% if row.percent %}Average {{ row.percent }}% · {{ row.recipe_count }} recipes{% else %}No usage average: enter your own starting percentage{% endif %}{% if row.pair_count %}<br>{{ row.pair_count }} recipes pair this with your main flavour{% endif %}</td><td><input class="form-control" style="min-width:90px" type="number" min="0.01" max="99.99" step="0.01" name="pct_{{ row.id }}" value="{{ row.percent if row.percent else '' }}" aria-label="Percentage for {{ row.brand }} {{ row.name }}"></td></tr>{% endfor %}
+</tbody></table></div>
+<p>Review the combined percentage and each flavour's role. Several individual averages added together can overpower a mix. Adjust supporting flavours before continuing. No average is invented when data is missing.</p>
+<p id="guideTotal" role="status"></p><button class="btn btn-warning">Review my private 10 ml · 0 mg draft</button>
+<p class="mt-3">Opening the draft saves no recipe and uses no stock. The builder lets you edit everything and check the final PG/VG ratio before saving or mixing.</p>
+</form>
+{% endif %}{% endif %}
+<hr><h2>Help test the guide</h2><p>Save the experiment privately, mix a small test, and add tasting notes to your recipe: steep age, flavour balance, sweetness, cooling, and the change you would make next. To invite community feedback, deliberately publish your recipe with Help needed; check its visibility before saving.</p>
+<a href="{{ url_for('tvw_community.first_mix') }}">Back to the first mix walkthrough</a>
+</div>
+<script src="{{ url_for('static', filename='tvw-stash-guide.js') }}" defer></script>
+{% endblock %}
