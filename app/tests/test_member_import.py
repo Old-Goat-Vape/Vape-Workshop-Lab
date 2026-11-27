@@ -104,7 +104,7 @@ class MemberImportTests(unittest.TestCase):
             stock = get_db().execute("SELECT reference_id,current_stock FROM library_items ORDER BY reference_id")
             self.assertEqual([tuple(row) for row in stock], [(101, 2), (102, 4.5)])
 
-    def test_sd_stash_keeps_blank_amounts_optional_and_uses_supplied_stock(self):
+    def test_sd_stash_imports_unknown_and_measured_quantities(self):
         self._login(1, "member1", "member")
         with base.flask_app.app_context():
             db = get_db()
@@ -119,7 +119,7 @@ class MemberImportTests(unittest.TestCase):
             b'Test,Chocolate,,,,\n,Brandless,,,,\nTest,Unknown,,,,\n'
         )
         preview = self.upload(data, "preview")
-        self.assertIn("1 ready to import · 3 need quantities · 2 to skip", preview.text)
+        self.assertIn("1 ready to import · 3 will import with unknown quantities · 2 to skip", preview.text)
         self.assertIn("Manufacturer and flavour name needed", preview.text)
         self.assertIn("Catalogue match needed", preview.text)
         token = self.token(preview)
@@ -134,9 +134,44 @@ class MemberImportTests(unittest.TestCase):
         self.assertEqual(result.status_code, 302)
         with base.flask_app.app_context():
             rows = get_db().execute("SELECT flavour_id,quantity_ml FROM user_stash_items ORDER BY flavour_id")
-            self.assertEqual([tuple(row) for row in rows], [(1, 3.25), (2, 7.5), (3, 0)])
+            self.assertEqual([tuple(row) for row in rows], [(1, 3.25), (2, 7.5), (3, 0), (4, None)])
+        self.assertIn('placeholder="Unknown"', self.client.get("/stash").text)
+        favorite = self.client.patch("/api/stash", json={"flavour_id": 4, "is_favorite": True})
+        self.assertEqual(favorite.status_code, 200)
+        with base.flask_app.app_context():
+            self.assertIsNone(get_db().execute("SELECT quantity_ml FROM user_stash_items WHERE flavour_id=4").fetchone()[0])
         repeat = self.upload(data, "preview")
-        self.assertIn("0 ready to import · 1 need quantities · 5 to skip", repeat.text)
+        self.assertIn("0 ready to import · 6 to skip", repeat.text)
+
+    def test_sd_stash_imports_unknown_amount_into_linked_lab_without_counting_it_as_stock(self):
+        from models import inventory_repo
+        from services.what_can_i_make_service import fetch_stash_reference_qty_ml
+
+        self._login(3, "Old Goat", "Old Goat")
+        with base.flask_app.app_context():
+            db = get_db()
+            db.execute("INSERT INTO flavours(id,brand,canonical_name,category,source_flavor_ref_id) VALUES(1,'Test','Vanilla','Flavor',101)")
+            db.commit()
+        data = b'Manufacturer,Flavor,"On Hand (ml)",Cost/Bottle,Cost/ml,Location\nTest,Vanilla,,,,\n'
+        token = self.token(self.upload(data, "preview"))
+        result = self.upload(data, "apply", token)
+        self.assertEqual(result.status_code, 302)
+        page = self.client.get("/stash").text
+        self.assertIn("Imported 1 stash items. Quantity unknown for 1.", page)
+        self.assertIn('placeholder="Unknown"', page)
+        with base.flask_app.app_context():
+            db = get_db()
+            inventory_repo.mark_empty_if_below(reference_id=101)
+            row = db.execute("SELECT current_stock,status FROM library_items WHERE reference_id=101").fetchone()
+            self.assertEqual(tuple(row), (0, "Quantity unknown"))
+            self.assertEqual(fetch_stash_reference_qty_ml(user_id=3, role="Old Goat", username="Old Goat")[0], {})
+            db.commit()
+        save = self.client.patch("/api/stash", json={"flavour_id": 1, "quantity_ml": 8})
+        self.assertEqual(save.status_code, 200)
+        self.assertNotIn('placeholder="Unknown"', self.client.get("/stash").text)
+        with base.flask_app.app_context():
+            row = get_db().execute("SELECT current_stock,status FROM library_items WHERE reference_id=101").fetchone()
+            self.assertEqual(tuple(row), (8, "In Use"))
 
     def test_stale_preview_does_not_overwrite_stash(self):
         self._login(1, "member1", "member")

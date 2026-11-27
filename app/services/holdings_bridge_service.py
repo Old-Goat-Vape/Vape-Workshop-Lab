@@ -65,7 +65,12 @@ def list_old_goat_shared_holdings() -> list[dict[str, Any]]:
             MAX(li.id) AS library_item_id,
             li.reference_id,
             SUM(li.current_stock) AS current_stock,
-            CASE WHEN SUM(li.current_stock) > 0.05 THEN 'In Use' ELSE 'Empty' END AS status,
+            CASE
+                WHEN SUM(li.current_stock) > 0.05 THEN 'In Use'
+                WHEN MIN(CASE WHEN li.status = 'Quantity unknown' THEN 1 ELSE 0 END) = 1
+                     AND MAX(li.current_stock) = 0 THEN 'Quantity unknown'
+                ELSE 'Empty'
+            END AS status,
             MAX(COALESCE(li.unit, 'ml')) AS unit,
             MAX(fr.brand) AS brand,
             MAX(fr.name) AS name

@@ -77,8 +77,9 @@ def update_library_stock_delta_ml(*, reference_id: int, delta_ml: float) -> None
 def update_library_stock_set(*, item_id: int, new_stock: float, unit: str) -> None:
     db = get_db()
     db.execute(
-        "UPDATE library_items SET current_stock = ?, unit = ?, active = 1 WHERE id = ?",
-        (float(new_stock), unit, int(item_id)),
+        """UPDATE library_items SET current_stock = ?, unit = ?, active = 1,
+            status = CASE WHEN status = 'Quantity unknown' THEN ? ELSE status END WHERE id = ?""",
+        (float(new_stock), unit, "In Use" if float(new_stock) > 0.05 else "Empty", int(item_id)),
     )
 
 
@@ -91,6 +92,7 @@ def mark_empty_if_below(*, reference_id: int, threshold: float = 0.05) -> None:
         WHERE current_stock <= ?
           AND reference_id = ?
           AND active = 1
+          AND COALESCE(status, '') <> 'Quantity unknown'
         """,
         (float(threshold), int(reference_id)),
     )
@@ -403,8 +405,9 @@ def update_reference_fields(*, reference_id: int, name: str, brand: str, categor
 def update_library_item_fields(*, item_id: int, current_stock: float, unit: str) -> None:
     db = get_db()
     db.execute(
-        "UPDATE library_items SET current_stock = ?, unit = ?, active = 1 WHERE id = ?",
-        (float(current_stock), unit, int(item_id)),
+        """UPDATE library_items SET current_stock = ?, unit = ?, active = 1,
+            status = CASE WHEN status = 'Quantity unknown' THEN ? ELSE status END WHERE id = ?""",
+        (float(current_stock), unit, "In Use" if float(current_stock) > 0.05 else "Empty", int(item_id)),
     )
 
 

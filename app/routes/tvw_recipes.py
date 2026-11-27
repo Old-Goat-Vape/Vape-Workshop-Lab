@@ -1311,9 +1311,14 @@ def tvw_member_import():
                 return page(rows=rows, kind=kind, token=token, lab_linked=lab_linked,
                             error="Correct the quantities marked below.", status=400)
         count = imports.apply(kind, rows, user_id=user_id, lab_linked=lab_linked)
+        unknown_count = sum("issue" not in row and "quantity" not in row for row in rows) if kind == "stash" else 0
     session.pop("member_import_preview", None)
     label = "private recipes" if kind == "recipes" else "stash items"
-    flash(f"Imported {count} {label}. Skipped {len(rows) - count} records.", "success")
+    if count:
+        unknown_note = f" Quantity unknown for {unknown_count}." if unknown_count else ""
+        flash(f"Imported {count} {label}.{unknown_note} Skipped {len(rows) - count} records.", "success")
+    else:
+        flash(f"No {label} imported. The preview explains why the records were skipped.", "warning")
     return redirect(url_for("tvw_recipes.tvw_recipe_library", mine=1) if kind == "recipes" else url_for("tvw_recipes.tvw_stash"))
 
 

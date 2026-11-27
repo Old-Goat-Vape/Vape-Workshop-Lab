@@ -715,7 +715,7 @@ def patch_stash_item():
         "SELECT id, quantity_ml, is_favorite FROM user_stash_items WHERE user_id = ? AND flavour_id = ? ORDER BY id ASC LIMIT 1",
         (int(user_id or 0), fid),
     ).fetchone()
-    qty = float(row["quantity_ml"] or 0.0) if row else 0.0
+    qty = row["quantity_ml"] if row else 0.0
     if "quantity_ml" in data and data.get("quantity_ml") is not None:
         qty = float(data.get("quantity_ml") or 0.0)
     fav_i = int(row["is_favorite"] or 0) if row else 0
