@@ -102,8 +102,10 @@
     {% endif %}
   {%- endmacro %}
 
-  {% macro recipe_section(title, badge_class, recipes, show_missing) -%}
-    <section class="card shadow-sm mb-3">
+  {% macro recipe_section(key, title, badge_class, recipes, show_missing) -%}
+    {% set page = result_page if result_group == key else 1 %}
+    {% set offset = (page - 1) * result_page_size %}
+    <section id="{{ key }}" class="card shadow-sm mb-3">
       <div class="card-body">
         <h2 class="h6 mb-3 d-flex align-items-center gap-2 flex-wrap">
           {{ title }}
@@ -113,7 +115,7 @@
           <p class="small text-secondary mb-0">Nothing in this group yet.</p>
         {% else %}
           <div class="vstack gap-2">
-            {% for r in recipes %}
+            {% for r in recipes[offset : offset + result_page_size] %}
               <div class="border border-secondary rounded p-2 p-md-3">
                 <div class="d-flex justify-content-between align-items-start gap-2">
                   <a class="fw-semibold text-light text-decoration-none" href="{{ url_for('tvw_recipes.tvw_recipe_detail', slug=(r.slug or r.id)) }}">{{ r.name }}</a>
@@ -155,17 +157,28 @@
               </div>
             {% endfor %}
           </div>
+          {% if recipes|length > result_page_size %}
+            <nav class="d-flex flex-wrap gap-2 align-items-center mt-3" aria-label="{{ title }} pages">
+              {% if page > 1 %}
+                <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_what_can_i_make', batch_ml=wcm.target_batch_ml, group=key, page=page-1, _anchor=key) }}">Previous</a>
+              {% endif %}
+              <span class="text-secondary">Showing {{ offset + 1 }}–{{ [offset + result_page_size, recipes|length]|min }} of {{ recipes|length }}</span>
+              {% if offset + result_page_size < recipes|length %}
+                <a class="btn btn-sm btn-outline-light" href="{{ url_for('tvw_recipes.tvw_what_can_i_make', batch_ml=wcm.target_batch_ml, group=key, page=page+1, _anchor=key) }}">Next</a>
+              {% endif %}
+            </nav>
+          {% endif %}
         {% endif %}
       </div>
     </section>
   {%- endmacro %}
 
-  {{ recipe_section("Can make now", "text-bg-success", wcm.ready, false) }}
-  {{ recipe_section("Can make but low stock", "text-bg-info text-dark", wcm.low_stock, false) }}
-  {{ recipe_section("Not enough for this batch", "text-bg-danger", wcm.short_batch, false) }}
-  {{ recipe_section("Missing 1 flavour", "text-bg-warning text-dark", wcm.missing_1, true) }}
-  {{ recipe_section("Missing 2 flavours", "text-bg-secondary", wcm.missing_2, true) }}
-  {{ recipe_section("Missing more", "text-bg-dark", wcm.missing_more, true) }}
+  {{ recipe_section("ready", "Can make now", "text-bg-success", wcm.ready, false) }}
+  {{ recipe_section("low_stock", "Can make but low stock", "text-bg-info text-dark", wcm.low_stock, false) }}
+  {{ recipe_section("short_batch", "Not enough for this batch", "text-bg-danger", wcm.short_batch, false) }}
+  {{ recipe_section("missing_1", "Missing 1 flavour", "text-bg-warning text-dark", wcm.missing_1, true) }}
+  {{ recipe_section("missing_2", "Missing 2 flavours", "text-bg-secondary", wcm.missing_2, true) }}
+  {{ recipe_section("missing_more", "Missing more", "text-bg-dark", wcm.missing_more, true) }}
 
   <p class="small text-secondary mb-0">
     Large libraries are capped per request (default scan limit). Constants: headroom ≥ {{ wcm.qty_constants.headroom_ratio }}× required or leave ≥ {{ wcm.qty_constants.remaining_after_ml }} ml after mix marks <strong>low stock</strong> when still feasible.
