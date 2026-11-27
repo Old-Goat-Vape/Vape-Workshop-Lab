@@ -173,6 +173,53 @@ class MemberImportTests(unittest.TestCase):
             row = get_db().execute("SELECT current_stock,status FROM library_items WHERE reference_id=101").fetchone()
             self.assertEqual(tuple(row), (8, "In Use"))
 
+    def test_unmatched_stash_rows_queue_once_and_admin_match_enables_reimport(self):
+        from services import flavour_request_service
+
+        self._login(1, "member1", "member")
+        data = (
+            b'brand,flavour,quantity_ml\n'
+            b'Test,Alternate Vanilla,3.5\nTest,Alternate Vanilla,3.5\n,No Brand,4\n'
+        )
+        preview = self.upload(data, "preview")
+        self.assertIn(b"Confirm to send 1 unmatched flavour to admins", preview.data)
+        self.assertIn(b"Send flavour requests", preview.data)
+        with base.flask_app.app_context():
+            self.assertEqual(flavour_request_service.pending_count(), 0)
+        result = self.upload(data, "apply", self.token(preview))
+        self.assertEqual(result.status_code, 302)
+        repeat = self.upload(data, "preview")
+        self.assertNotIn(b"Send flavour requests", repeat.data)
+        with base.flask_app.app_context():
+            db = get_db()
+            requests = flavour_request_service.pending_requests(1, 10)
+            self.assertEqual(len(requests), 1)
+            self.assertEqual((requests[0]["brand"], requests[0]["name"], requests[0]["username"]),
+                             ("Test", "Alternate Vanilla", "member1"))
+            db.execute("INSERT INTO flavours(id,brand,canonical_name,category,source_flavor_ref_id) VALUES(1,'Test','Vanilla','Flavor',101)")
+            db.commit()
+            flavour_request_service.review(requests[0]["id"], 3, "Old Goat", "match", 1)
+        single = b'brand,flavour,quantity_ml\nTest,Alternate Vanilla,3.5\n'
+        self.assertEqual(self.upload(single, "apply", self.token(self.upload(single, "preview"))).status_code, 302)
+        with base.flask_app.app_context():
+            row = get_db().execute("SELECT flavour_id,quantity_ml FROM user_stash_items").fetchone()
+            self.assertEqual(tuple(row), (1, 3.5))
+        self.assertIn(b"Saved quantity kept", self.upload(single, "preview").data)
+
+    def test_recipe_import_deduplicates_unmatched_ingredients_across_formulas(self):
+        self._login(1, "member1", "member")
+        data = vc_export(
+            (42, "First recipe", "1, Unknown, Test, 2", 2),
+            (43, "Second recipe", "1, Unknown, Test, 3", 3),
+        )
+        preview = self.upload(data, "preview")
+        self.assertIn(b"Confirm to send 1 unmatched flavour to admins", preview.data)
+        self.assertEqual(self.upload(data, "apply", self.token(preview)).status_code, 302)
+        with base.flask_app.app_context():
+            db = get_db()
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM recipes").fetchone()[0], 0)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM flavour_requests WHERE status='pending'").fetchone()[0], 1)
+
     def test_stale_preview_does_not_overwrite_stash(self):
         self._login(1, "member1", "member")
         with base.flask_app.app_context():

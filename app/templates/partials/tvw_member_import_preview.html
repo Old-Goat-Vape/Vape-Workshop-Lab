@@ -14,9 +14,12 @@
   {% if needs_amount %}
     <p>Enter quantities now or leave them blank and fill them in later in My Stash. What Can I Make? only counts measured stock.</p>
   {% endif %}
-  {% if matched %}
+  {% if review_count %}
+    <p>Confirm to send {{ review_count }} unmatched flavour{% if review_count != 1 %}s{% endif %} to admins for review. You can retry the affected records after review.</p>
+  {% endif %}
+  {% if matched or review_count %}
     <input type="hidden" name="preview_token" value="{{ token }}">
-    <button type="submit" name="action" value="apply" class="btn btn-warning mb-3">Import {{ matched|length }} {{ 'recipes' if kind == 'recipes' else 'stash items' }}</button>
+    <button type="submit" name="action" value="apply" class="btn btn-warning mb-3">{% if matched %}Import {{ matched|length }} {{ 'recipes' if kind == 'recipes' else 'stash items' }}{% if review_count %} and send requests{% endif %}{% else %}Send flavour requests{% endif %}</button>
   {% endif %}
   <div class="table-responsive">
     <table class="table table-sm">
@@ -27,7 +30,7 @@
             <td>{{ row.name }}{% if kind == 'stash' and row.quantity is defined %} · {{ row.quantity }} ml{% endif %}</td>
             <td>
               {% if row.issue is defined %}
-                {{ row.issue }}
+                {{ row.issue }}{% if row.review_flavours %} · Admin review on confirmation{% endif %}
               {% elif kind == 'stash' and row.quantity is not defined %}
                 <label class="visually-hidden" for="import-quantity-{{ loop.index0 }}">Quantity in ml for {{ row.name }}</label>
                 <input class="form-control form-control-sm" id="import-quantity-{{ loop.index0 }}"

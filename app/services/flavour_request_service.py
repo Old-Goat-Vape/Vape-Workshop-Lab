@@ -1,4 +1,5 @@
 """Member requests stay separate from the catalogue until an admin reviews them."""
+from contextlib import nullcontext
 from urllib.parse import urlsplit
 
 from config.canonical_library_brands import normalize_flavor_identity_name
@@ -29,12 +30,17 @@ CREATE INDEX IF NOT EXISTS idx_flavour_requests_requester ON flavour_requests(re
 """
 
 
-def submit(requester_id, brand, name, product_url):
+def request_identity(brand, name):
     if not (0 < len(brand) <= 100 and 0 < len(name) <= 160):
         raise ValueError("Enter a brand and flavour name within the field limits.")
     _, _, key = canonical_item(brand, name)
     if not key:
         raise ValueError("Enter a valid brand and flavour name.")
+    return key
+
+
+def submit(requester_id, brand, name, product_url, *, commit=True):
+    key = request_identity(brand, name)
     if product_url:
         try:
             url = urlsplit(product_url)
@@ -48,7 +54,7 @@ def submit(requester_id, brand, name, product_url):
         if not valid:
             raise ValueError("Enter a valid HTTP or HTTPS product link.")
     db = get_db()
-    with db:
+    with (db if commit else nullcontext()):
         result = db.execute(
             """
             INSERT INTO flavour_requests (requester_id, brand, name, product_url, identity_key)
