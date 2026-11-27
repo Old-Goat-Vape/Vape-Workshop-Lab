@@ -1,0 +1,21 @@
+{% extends "base_public.html" %}
+{% block title %}Import recipes or stash | The Vape Workshop{% endblock %}
+{% block content %}
+<div class="tvw-page">
+  <h1>Import recipes or stash</h1>
+  <p>Upload a Vaping Community Calculator recipe export, or a stash CSV with <code>brand,flavour,quantity_ml</code> columns. Quantities are in ml.</p>
+  <p>Recipes import as private works in progress. Existing stash quantities stay as they are. Flavours must match the catalogue before their records can be imported.</p>
+  <form id="member-import-form" method="post" enctype="multipart/form-data">
+    <div class="mb-3">
+      <label for="member-import-file" class="form-label">CSV file</label>
+      <input id="member-import-file" name="file" class="form-control" type="file" accept=".csv,text/csv" required>
+    </div>
+    <button type="submit" name="action" value="preview" class="btn btn-outline-light">Preview import</button>
+    <div id="member-import-preview" class="mt-3" aria-live="polite">
+      {% if rows %}<p>Choose the same file again to confirm the import.</p>{% endif %}
+      {% include "partials/tvw_member_import_preview.html" %}
+    </div>
+  </form>
+</div>
+<script src="{{ url_for('static', filename='tvw-member-import.js') }}" defer></script>
+{% endblock %}

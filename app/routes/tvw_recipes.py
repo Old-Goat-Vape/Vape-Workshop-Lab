@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import io
+import json
 import logging
 import os
 import re
@@ -8,7 +10,7 @@ import sqlite3
 import secrets
 import uuid
 
-from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, session, url_for, send_file
+from flask import Blueprint, abort, current_app, flash, make_response, redirect, render_template, request, session, url_for, send_file
 
 from db import SQLITE_BUSY_USER_MESSAGE, is_sqlite_busy_error, sqlite_retry
 from models import recipes_repo, users_repo
@@ -1245,6 +1247,64 @@ def tvw_flavour_testing(flavour_id,test_id=None,action=None):
         return tvw_flavour_detail(flavour_id),400
     flash('Snapshot posted as a community note.' if action=='share' else 'Your private tasting record was saved.','success')
     return redirect(url_for('tvw_recipes.tvw_flavour_detail',flavour_id=flavour_id,return_to=browse.library_return(request.form.get('return_to','')))+'#tasting-tests')
+
+
+@tvw_recipes_bp.route("/imports", methods=["GET", "POST"])
+@login_required
+def tvw_member_import():
+    from services import holdings_bridge_service, member_import_service as imports
+
+    def page(*, fragment=False, status=200, **values):
+        template = "partials/tvw_member_import_preview.html" if fragment else "tvw_member_import.html"
+        response = make_response(render_template(template, **values), status)
+        response.headers["Cache-Control"] = "private, no-store"
+        return response
+
+    if request.method == "GET":
+        return page()
+
+    action = request.form.get("action")
+    fragment = action == "preview" and request.headers.get("X-TVW-Import-Preview") == "1"
+    if action not in {"preview", "apply"}:
+        return page(error="Preview the CSV before importing it.", status=400)
+    user_id = int(session["user_id"])
+    lab_linked = holdings_bridge_service.is_old_goat_user(
+        user_id=user_id, role=session.get("role"), username=session.get("username"),
+    )
+    if action == "apply":
+        approved = session.get("member_import_preview") or {}
+        token = request.form.get("preview_token", "")
+        if approved.get("user_id") != user_id or not secrets.compare_digest(token.encode(), approved["token"].encode()):
+            return page(error="Preview this CSV again before importing it.", status=400)
+    upload = request.files.get("file")
+    try:
+        data = upload.read(imports.MAX_BYTES + 1) if upload is not None else b""
+        kind, entries = imports.read_export(data)
+    except ValueError as error:
+        return page(error=str(error), status=400, fragment=fragment)
+
+    def reviewed_plan():
+        rows = imports.preview(kind, entries, user_id=user_id, lab_linked=lab_linked)
+        payload = json.dumps([kind, lab_linked, rows], sort_keys=True).encode()
+        digest = hashlib.sha256(hashlib.sha256(data).digest() + payload).hexdigest()
+        return rows, digest
+
+    if action == "preview":
+        rows, digest = reviewed_plan()
+        token = secrets.token_hex(24)
+        session["member_import_preview"] = {"token": token, "digest": digest, "user_id": user_id}
+        return page(fragment=fragment, rows=rows, kind=kind, token=token, lab_linked=lab_linked)
+
+    with recipes_repo.transaction(immediate=True):
+        rows, digest = reviewed_plan()
+        if not secrets.compare_digest(digest, approved["digest"]):
+            session.pop("member_import_preview", None)
+            return page(error="The file, catalogue or stash changed. Preview the CSV again.", status=409)
+        count = imports.apply(kind, rows, user_id=user_id, lab_linked=lab_linked)
+    session.pop("member_import_preview", None)
+    label = "private recipes" if kind == "recipes" else "stash items"
+    flash(f"Imported {count} {label}. Skipped {len(rows) - count} records.", "success")
+    return redirect(url_for("tvw_recipes.tvw_recipe_library", mine=1) if kind == "recipes" else url_for("tvw_recipes.tvw_stash"))
 
 
 @tvw_recipes_bp.route("/stash")

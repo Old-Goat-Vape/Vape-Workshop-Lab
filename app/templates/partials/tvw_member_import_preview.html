@@ -1,0 +1,27 @@
+{% if error %}<p class="alert alert-warning" role="alert">{{ error }}</p>{% endif %}
+{% if rows %}
+  {% set skipped = rows|selectattr('issue', 'defined')|list|length %}
+  {% set ready = rows|length - skipped %}
+  <h2 class="h4">Import preview</h2>
+  <p>{{ ready }} ready to import · {{ skipped }} to skip</p>
+  {% if kind == 'recipes' %}
+    <p>VC exports do not include batch settings. Review the PG/VG ratio and nicotine settings before mixing.</p>
+  {% elif lab_linked %}
+    <p>New stash items will be added to the shared Lab holdings.</p>
+  {% endif %}
+  {% if ready %}
+    <input type="hidden" name="preview_token" value="{{ token }}">
+    <button type="submit" name="action" value="apply" class="btn btn-warning mb-3">Import {{ ready }} {{ 'recipes' if kind == 'recipes' else 'stash items' }}</button>
+  {% endif %}
+  <div class="table-responsive">
+    <table class="table table-sm">
+      <thead><tr><th scope="col">{{ 'Recipe' if kind == 'recipes' else 'Flavour' }}</th><th scope="col">Result</th></tr></thead>
+      <tbody>
+        {% for row in rows %}
+          <tr><td>{{ row.name }}{% if kind == 'stash' and row.quantity is defined %} · {{ row.quantity }} ml{% endif %}</td>
+            <td>{{ row.issue if row.issue is defined else 'Ready to import' }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
